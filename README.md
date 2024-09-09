@@ -36,3 +36,26 @@
   - Clear Flags를 Solid Color로 설정
   - Background 색상을 투명(RGBA = (0, 0, 0, 0))으로 설정
   - Culling Mask에서 투명하지 않은 오브젝트 레이어(UI, Char) 설정
+- Field of View를 10으로 설정하여, 3D Object인 Char이 정면을 보게 계속 설정
+
+### Text
+
+- TextMeshPro
+- Font : 상업화이용까지 가능한 폰트
+  - 일본어, 영어 : NotoSansJP
+  - 한국어 : Fallback으로 SUIT
+
+## Script
+
+### Manager
+
+- 개요 : 여러 객체나 시스템을 관리하고 조정. 싱글톤
+  - GameManager : 전체 상태를 관리하고 시스템간 상호작용
+  - AudioManager : 게임의 오디오 요소를 관리
+  - UIManager : UI요소 관리 및 화면 전환/업데이트
+  - APIManager : MY-Little-Jarvis 서버를 호출하고 반환값을 관리
+
+## Handler
+
+- 개요 : 특정/단일 이벤트나 작업을 처리하는 단위
+  - ChatHandler : 채팅시 일어나는 이벤트 관련
