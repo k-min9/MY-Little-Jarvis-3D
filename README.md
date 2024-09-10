@@ -53,6 +53,7 @@
   - GameManager : 전체 상태를 관리하고 시스템간 상호작용
   - AudioManager : 게임의 오디오 요소를 관리
   - UIManager : UI요소 관리 및 화면 전환/업데이트
+    - AnswerBalloonManager : 말풍선을 관리하는 Manager
   - APIManager : MY-Little-Jarvis 서버를 호출하고 반환값을 관리
 
 ## Handler
