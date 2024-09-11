@@ -1,9 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using TMPro;
-/**
-말풍선을 관리하는 Manager
-*/
+
 public class AnswerBalloonManager : MonoBehaviour
 {
     [SerializeField] private Canvas _canvas; // AnswerBalloon 이미지
@@ -64,7 +62,7 @@ public class AnswerBalloonManager : MonoBehaviour
 
         // 높이 조정
         float textHeight = answerBalloonText.preferredHeight;
-        answerBalloonTransform.sizeDelta = new Vector2(answerBalloonTransform.sizeDelta.x, textHeight + 200);
+        answerBalloonTransform.sizeDelta = new Vector2(answerBalloonTransform.sizeDelta.x, textHeight + 60);
 
         
     }
