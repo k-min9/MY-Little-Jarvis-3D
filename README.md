@@ -55,6 +55,10 @@
 
 - 개요 : 여러 객체나 시스템을 관리하고 조정. 싱글톤
   - GameManager : 전체 상태를 관리하고 시스템간 상호작용
+    - StatusManager : 현재 Char에 대한 Status를 관리
+      - Status : isFalling, isPicking, isWalking, isListening, isAnswering, isThinking, isChatting, isChatting
+    - TransparentWindow : 배경을 투명하게 만듬
+    - ChatHandler : 채팅의 질문을 입력받고 반영
   - AudioManager : 게임의 오디오 요소를 관리
   - UIManager : UI요소 관리 및 화면 전환/업데이트
     - AnswerBalloonManager : 말풍선을 관리하는 Manager
