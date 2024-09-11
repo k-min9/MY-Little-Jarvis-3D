@@ -22,6 +22,9 @@
     - 하위로 input Field(TMP)로 input을 받음
     - Character 좌클릭시 등장
     - 입력창 내에서 Enter로 입력받기, ESC로 취소
+  - Image_AnswerBalloon : 답변용 말풍선
+    - Anchor pivot 하단
+    - AnswerBalloonManager로 크기 조절
 - Character
   - MeshCollider로 이벤트 감지
   - Script : Draggable Image
@@ -60,3 +63,13 @@
 
 - 개요 : 특정/단일 이벤트나 작업을 처리하는 단위
   - ChatHandler : 채팅시 일어나는 이벤트 관련
+
+## Assets
+
+- Char : 캐릭터 Prefab
+- Fonts : 라이센스 - Open Font License
+  - Noto Sans JP : 메인 폰트. 일본어, 영어
+  - SUIT : Fall back 폰트. 한국어
+- Sprites : png 등 관리
+- StreamingAssets : 패키징 되지 않는 파일 관리. API 파일 전송받는 위치
+  - Voices : 목소리 관리
