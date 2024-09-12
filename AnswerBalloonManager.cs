@@ -10,7 +10,8 @@ public class AnswerBalloonManager : MonoBehaviour
     [SerializeField] private RectTransform characterTransform; // AnswerBalloon이 표시될 캐릭터의 Transform
     [SerializeField] private RectTransform answerBalloonTransform; // AnswerBalloon의 Transform
     public TextMeshProUGUI answerBalloonText; // AnswerBalloon Text의 Transform
-    private bool is_answering = false; // 전역 상태 변수
+
+    private float hideTimer = 0f; // 타이머 변수 추가
 
     // 싱글톤 인스턴스
     private static AnswerBalloonManager instance;
@@ -31,6 +32,33 @@ public class AnswerBalloonManager : MonoBehaviour
         HideAnswerBalloon(); // 시작 시 AnswerBalloon 숨기기
     }
 
+    // 상태 갱신 로직
+    private void Update()
+    {
+        // 타이머 갱신
+        if (hideTimer > 0f)
+        {
+            hideTimer -= Time.deltaTime;
+        }
+
+        // 타이머가 완료되면 AnswerBalloon 숨기기
+        if (hideTimer <= 0f && StatusManager.Instance.IsAnswering)
+        {
+            HideAnswerBalloon();
+        }
+
+        if (StatusManager.Instance.IsAnswering)
+        {
+            UpdateAnswerBalloonPosition();
+        }
+
+        if (StatusManager.Instance.IsPicking || StatusManager.Instance.IsListening)
+        {
+            HideAnswerBalloon();
+        }
+    }
+
+
     // 싱글톤 인스턴스에 접근하는 속성
     public static AnswerBalloonManager Instance
     {
@@ -49,10 +77,8 @@ public class AnswerBalloonManager : MonoBehaviour
     {
         answerBalloon.SetActive(true);
         answerText.text = string.Empty; // 텍스트 초기화
-        is_answering = true;
-
-        // AnswerBalloon 위치를 조정하는 함수 호출
-        UpdateAnswerBalloonPosition();
+        StatusManager.Instance.IsAnswering = true; // StatusManager 상태 업데이트
+        UpdateAnswerBalloonPosition();  // AnswerBalloon 위치 조정하
     }
 
     // AnswerBalloon의 텍스트를 수정하고 오디오를 재생하는 함수
@@ -68,28 +94,21 @@ public class AnswerBalloonManager : MonoBehaviour
     }
     
     // 현재(마지막) 오디오 재생 후 AnswerBalloon을 숨기는 코루틴 호출
-    public void HideAnswerBalloonAfterAudio() {
-        StartCoroutine(HideAnswerBalloonAfterAudioIEnum());
-    }
-
-    // 오디오 재생 후 일정 시간 뒤에 AnswerBalloon을 숨기는 함수
-    private IEnumerator HideAnswerBalloonAfterAudioIEnum()
+    public void HideAnswerBalloonAfterAudio()
     {
         AudioClip clip = VoiceManager.Instance.GetAudioClip();
 
         if (clip != null)
         {
-            yield return new WaitForSeconds(clip.length + 0.5f); // 오디오 재생 길이 + 0.5초 대기
+            hideTimer = clip.length + 0.5f; // 타이머를 오디오 재생 시간 + 0.5초로 설정
         }
-
-        HideAnswerBalloon();
     }
 
     // AnswerBalloon을 숨기는 함수
     public void HideAnswerBalloon()
     {
         answerBalloon.SetActive(false);
-        is_answering = false;
+        StatusManager.Instance.IsAnswering = false; 
     }
 
     // AnswerBalloon의 위치를 캐릭터 바로 위로 조정하는 함수
@@ -97,11 +116,7 @@ public class AnswerBalloonManager : MonoBehaviour
     {
         Vector2 charPosition = characterTransform.anchoredPosition;
         
-        // float height = answerBalloonTransform.sizeDelta.y;  // anchor을 하단으로 설정하여 사용안함
-
-        charPosition.y += 270; // + 0.5f*height;   // Y축 창크기 200만큼
-
-        answerBalloonTransform.anchoredPosition = charPosition;
-
+        // 캐릭터의 X 위치와 동일하게 설정
+        answerBalloonTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 270); // Y축 창크기 270만큼
     }
 }
