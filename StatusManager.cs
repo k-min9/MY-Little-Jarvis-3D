@@ -1,15 +1,16 @@
 using UnityEngine;
 
 /**
-싱글톤으로 현재 메인 캐릭터의 상태를 전역 관리
+싱글톤으로 현재 메인 캐릭터의 상태를 관리
 
 isFalling = 낙하중인지 여부
 isPicking = 마우스로 현재 드래그 중인지 여부
 isWalking = 현재 걸어다니는지 여부
-isListening = 현재 유저의 질문을 듣고 있는지 여부
+isAsking = 현재 유저의 질문을 듣고 있는지 여부 (음성인식)
+isListening = 현재 유저의 질문을 듣고 있는지 여부 (음성인식)
 isAnswering = 현재 유저에게 답하고 있는지 여부
 isThinking = 현재 유저의 질문에 대한 답을 연산하고 있는지 여부
-isChatting = set은 없고, isListening이나 isThinking,  isAnswering이 하나라도 True이면 True를 반환
+isChatting = set은 없고, isAsking, isListening, isThinking, isAnswering이 하나라도 True이면 True를 반환
 */
 public class StatusManager : MonoBehaviour
 {
@@ -36,7 +37,8 @@ public class StatusManager : MonoBehaviour
     private bool isFalling;
     private bool isPicking;
     private bool isWalking;
-    private bool isListening;
+    private bool isListening;  // 차후 음성인식 용 구별
+    private bool isAsking;
     private bool isAnswering;
     private bool isThinking;
 
@@ -72,6 +74,12 @@ public class StatusManager : MonoBehaviour
         set { isListening = value; }
     }
 
+    public bool IsAsking
+    {
+        get { return isAsking; }
+        set { isAsking = value; }
+    }
+
     public bool IsAnswering
     {
         get { return isAnswering; }
@@ -86,7 +94,7 @@ public class StatusManager : MonoBehaviour
 
     public bool IsChatting
     {
-        get { return isListening || isThinking || isAnswering; }
+        get { return isAsking|| isListening || isThinking || isAnswering; }
     }
 
     private void Awake()
