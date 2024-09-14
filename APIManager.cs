@@ -10,6 +10,60 @@ using UnityEngine;
 
 public class APIManager : MonoBehaviour
 {
+    // Reply 리스트를 저장할 리스트
+    private List<string> replyList = new List<string>();
+    private bool isCompleted = false; // 반환이 완료되었는지 여부를 체크하는 플래그
+
+    // FetchStreamingData에서 호출할 함수
+    private void ProcessReply(JObject jsonObject)
+    {
+        // 반환된 JSON 객체에서 "reply_list"를 가져오기
+        JToken replyToken = jsonObject["reply_list"];
+
+        if (replyToken != null && replyToken.Type == JTokenType.Array)
+        {
+            foreach (var reply in replyToken)
+            {
+                string answerJp = reply["answer_jp"]?.ToString() ?? string.Empty;
+                string answerKo = reply["answer_ko"]?.ToString() ?? string.Empty;
+                string answerEn = reply["answer_en"]?.ToString() ?? string.Empty;
+
+                // 각각의 답변을 리스트에 추가
+                if (!string.IsNullOrEmpty(answerJp))
+                {
+                    Debug.Log($"Japanese Reply: {answerJp}");
+                    replyList.Add(answerJp);
+                }
+
+                if (!string.IsNullOrEmpty(answerKo))
+                {
+                    Debug.Log($"Korean Reply: {answerKo}");
+                    replyList.Add(answerKo);
+                }
+
+                if (!string.IsNullOrEmpty(answerEn))
+                {
+                    Debug.Log($"English Reply: {answerEn}");
+                    replyList.Add(answerEn);
+                }
+            }
+        }
+    }
+
+    // 최종 반환 완료 시 호출될 함수
+    private void OnFinalResponseReceived()
+    {
+        isCompleted = true;
+        Debug.Log("All replies have been received.");
+
+        // 이곳에서 replyList를 반복문으로 처리할 수 있음
+        foreach (string reply in replyList)
+        {
+            Debug.Log(reply); // 각 reply를 출력
+            // 추가 처리 로직
+        }
+    }
+
     // 스트리밍 데이터를 가져오는 메서드
     public async Task FetchStreamingData(string url, Dictionary<string, string> data)
     {
@@ -17,6 +71,10 @@ public class APIManager : MonoBehaviour
 
         try
         {
+            // 요청전 초기화
+            isCompleted = false;
+
+
             // HttpWebRequest 객체를 사용하여 요청 생성
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
             request.Method = "POST";
@@ -46,6 +104,7 @@ public class APIManager : MonoBehaviour
                             {
                                 var jsonObject = JObject.Parse(line);
                                 Debug.Log(jsonObject.ToString());
+                                ProcessReply(jsonObject); // 각 JSON 응답을 처리
                             }
                             catch (JsonReaderException e)
                             {
@@ -53,6 +112,8 @@ public class APIManager : MonoBehaviour
                             }
                         }
                     }
+
+                    OnFinalResponseReceived(); // 최종 반환 완료 시 함수 호출
                 }
             }
         }
@@ -65,7 +126,8 @@ public class APIManager : MonoBehaviour
     // TestStreamAPI 함수를 Start에서 호출
     private void Start()
     {
-        TestStreamAPI();
+        // Test용 코드
+        // TestStreamAPI();
     }
 
     // Start에서 호출될 함수
