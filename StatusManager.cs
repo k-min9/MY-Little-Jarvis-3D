@@ -3,6 +3,7 @@ using UnityEngine;
 /**
 싱글톤으로 현재 메인 캐릭터의 상태를 관리
 
+isDragging = 드래그중인지 여부
 isFalling = 낙하중인지 여부
 isPicking = 마우스로 현재 드래그 중인지 여부
 isWalking = 현재 걸어다니는지 여부
@@ -34,6 +35,7 @@ public class StatusManager : MonoBehaviour
     }
 
     // 상태 관리 변수
+    private bool isDragging;
     private bool isFalling;
     private bool isPicking;
     private bool isWalking;
@@ -43,6 +45,12 @@ public class StatusManager : MonoBehaviour
     private bool isThinking;
 
     // Getter / Setter
+    public bool IsDragging
+    {
+        get { return isDragging; }
+        set { isDragging = value; }
+    }
+
     public bool IsFalling
     {
         get { return isFalling; }
