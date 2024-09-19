@@ -26,9 +26,12 @@
     - Anchor pivot 하단
     - AnswerBalloonManager로 크기 조절
 - Character
-  - MeshCollider로 이벤트 감지
-  - Script
-    - Draggable Image : UnityWeld로 IDragHandler, IBeginDragHandler, IEndDragHandler, IPointerClickHandler 상속
+  - collider : MeshCollider로 이벤트 감지
+    - CharHandler, DragHandler과 연계
+  - Scripts
+    - FallingObject : 자유낙하 관리
+    - CharAttributes : 고유속성관리. API 호출등에 활용
+  - bone : root_bone부터 각각 리깅된 모델
   - Animator
     - Entry, Idle, Walk, Pick을 boolean으로 Exit Time없이 transition
     - Any State, Motion, Exit을 Trigger로 transition
@@ -58,7 +61,6 @@
     - StatusManager : 현재 Char에 대한 Status를 관리
       - Status : isFalling, isPicking, isWalking, isListening, isAnswering, isThinking, isChatting, isChatting
     - TransparentWindow : 배경을 투명하게 만듬
-    - ChatHandler : 채팅의 질문을 입력받고 반영
   - AudioManager : 게임의 오디오 요소를 관리
   - UIManager : UI요소 관리 및 화면 전환/업데이트
     - AnswerBalloonManager : 말풍선을 관리하는 Manager
@@ -71,6 +73,8 @@
 
 - 개요 : 특정/단일 이벤트나 작업을 처리하는 단위
   - ChatHandler : 채팅시 일어나는 이벤트 관련
+  - DragHandler : 드래그시 일어나는 이벤트 관련
+  - ClickHandler : 클릭시 일어나는 이벤트 관련
 
 ## Assets
 
@@ -79,5 +83,7 @@
   - Noto Sans JP : 메인 폰트. 일본어, 영어
   - SUIT : Fall back 폰트. 한국어
 - Sprites : png 등 관리
-- StreamingAssets : 패키징 되지 않는 파일 관리. API 파일 전송받는 위치
+- StreamingAssets : 패키징 되지 않는 파일 관리.
   - Voices : 목소리 관리
+- persistentDataPath : write에 대한 권리가 있는 장소.
+  - API 등으로 전송받은 파일 저장, setting등의 로컬 파일 저장.
