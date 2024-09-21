@@ -44,7 +44,13 @@ public class CharManager : MonoBehaviour
         }
 
         // 첫 번째 캐릭터 생성, Canvas의 자식으로 설정
+        StatusManager.Instance.IsDragging = false;
         currentCharacter = Instantiate(charList[0], Vector3.zero, charList[0].transform.rotation, canvas.transform);
+        setDragHandlerVar(currentCharacter);
+        setClickHandlerVar(currentCharacter);
+        setPhysicsManagerVar(currentCharacter);
+        setAnswerBalloonVar(currentCharacter);
+        setAskBalloonVar(currentCharacter);
 
         // RectTransform을 찾아서 위치를 (0, 0, -70)으로 설정
         RectTransform rectTransform = currentCharacter.GetComponent<RectTransform>();
@@ -100,9 +106,13 @@ public class CharManager : MonoBehaviour
         }
 
         // 새로운 캐릭터 생성, Canvas의 자식으로 설정
+        StatusManager.Instance.IsDragging = false;
         currentCharacter = Instantiate(charList[index], previousPosition, previousRotation, canvas.transform);
         setDragHandlerVar(currentCharacter);
         setClickHandlerVar (currentCharacter);
+        setPhysicsManagerVar(currentCharacter);
+        setAnswerBalloonVar(currentCharacter);
+        setAskBalloonVar(currentCharacter);
 
         // RectTransform 위치를 (0, 0, -70)으로 설정 (또는 이전 위치로 유지)
         RectTransform newRectTransform = currentCharacter.GetComponent<RectTransform>();
@@ -210,5 +220,23 @@ public class CharManager : MonoBehaviour
         }
     }
 
-
+    public void setPhysicsManagerVar(GameObject charObj)
+    {
+        // 캐릭터의 하위에 있는 ClickHandler를 찾아 설정
+        PhysicsManager physicsManager = FindObjectOfType<PhysicsManager>();
+        physicsManager.animator = charObj.GetComponent<Animator>();
+        physicsManager.rectTransform = charObj.GetComponent<RectTransform>();
+    }
+    public void setAnswerBalloonVar(GameObject charObj)
+    {
+        // 캐릭터의 하위에 있는 ClickHandler를 찾아 설정
+        AnswerBalloonManager answerBalloonManager = FindObjectOfType<AnswerBalloonManager>();
+        answerBalloonManager.characterTransform = charObj.GetComponent<RectTransform>();
+    }
+    public void setAskBalloonVar(GameObject charObj)
+    {
+        // 캐릭터의 하위에 있는 ClickHandler를 찾아 설정
+        AskBalloonManager askBalloonManager = FindObjectOfType<AskBalloonManager>();
+        askBalloonManager.characterTransform = charObj.GetComponent<RectTransform>();
+    }
 }
