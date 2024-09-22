@@ -10,6 +10,7 @@ public class PhysicsManager : MonoBehaviour
     public RectTransform rectTransform;
     public Canvas canvas; 
     private float initialRotationY;
+    private Coroutine currentCoroutine;  // StateControlRoutine 제외 현재 작동 코루틴
 
     private void Start()
     {
@@ -18,11 +19,21 @@ public class PhysicsManager : MonoBehaviour
         StartCoroutine(StateControlRoutine());
     }
 
+        private void Update()
+    {
+        if (StatusManager.Instance.IsPicking || StatusManager.Instance.IsFalling || StatusManager.Instance.IsChatting || StatusManager.Instance.IsOptioning)
+        {
+            StopAllAnimations();
+            return;
+        }
+    }
+
     private IEnumerator StateControlRoutine()
     {
         while (true)
         {
-            if (!StatusManager.Instance.IsFalling)
+            if (!StatusManager.Instance.IsFalling 
+            && !StatusManager.Instance.IsPicking)
             {
                 float rand = Random.Range(0f, 1f);
                 if (rand < idleProbability)
@@ -62,14 +73,22 @@ public class PhysicsManager : MonoBehaviour
 
     private void WalkLeftStart()
     {
+        if (currentCoroutine != null) {
+            StopCoroutine(currentCoroutine);  // 기존 코루틴 중지
+            currentCoroutine = null;
+        }
         rectTransform.localEulerAngles = new Vector3(rectTransform.localEulerAngles.x, -90, rectTransform.localEulerAngles.z);
-        StartCoroutine(MoveLeft());
+        currentCoroutine = StartCoroutine(MoveLeft());
     }
 
     private void WalkRightStart()
     {
+        if (currentCoroutine != null) {
+            StopCoroutine(currentCoroutine);  // 기존 코루틴 중지
+            currentCoroutine = null;
+        }
         rectTransform.localEulerAngles = new Vector3(rectTransform.localEulerAngles.x, -270, rectTransform.localEulerAngles.z);
-        StartCoroutine(MoveRight());
+        currentCoroutine = StartCoroutine(MoveRight());
     }
 
     private IEnumerator MoveLeft()
@@ -137,17 +156,13 @@ public class PhysicsManager : MonoBehaviour
         rectTransform.localEulerAngles = new Vector3(rectTransform.localEulerAngles.x, initialRotationY, rectTransform.localEulerAngles.z);
     }
 
-    private void Update()
-    {
-        if (StatusManager.Instance.IsPicking || StatusManager.Instance.IsFalling)
-        {
-            StopAllAnimations();
-            return;
-        }
-    }
-
     public void StopAllAnimations()
     {
+        if (currentCoroutine != null) {
+            StopCoroutine(currentCoroutine);  // 기존 코루틴 중지
+            currentCoroutine = null;
+        }
+
         animator.SetBool("isWalk", false);
         ResetRotation();
     }

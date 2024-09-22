@@ -5,13 +5,14 @@ using UnityEngine;
 
 isDragging = 드래그중인지 여부
 isFalling = 낙하중인지 여부
-isPicking = 마우스로 현재 드래그 중인지 여부
+isPicking = 마우스로 현재 드래그 중인지 여부 (쓰다듬을 고려해서 분리)
 isWalking = 현재 걸어다니는지 여부
 isAsking = 현재 유저의 질문을 듣고 있는지 여부 (음성인식)
 isListening = 현재 유저의 질문을 듣고 있는지 여부 (음성인식)
 isAnswering = 현재 유저에게 답하고 있는지 여부
 isThinking = 현재 유저의 질문에 대한 답을 연산하고 있는지 여부
 isChatting = set은 없고, isAsking, isListening, isThinking, isAnswering이 하나라도 True이면 True를 반환
+isOptioning = 우클릭, 메뉴등의 대기 상태
 */
 public class StatusManager : MonoBehaviour
 {
@@ -43,6 +44,7 @@ public class StatusManager : MonoBehaviour
     private bool isAsking;
     private bool isAnswering;
     private bool isThinking;
+    private bool isOptioning;
 
     // Getter / Setter
     public bool IsDragging
@@ -98,6 +100,12 @@ public class StatusManager : MonoBehaviour
     {
         get { return isThinking; }
         set { isThinking = value; }
+    }
+
+    public bool IsOptioning
+    {
+        get { return isOptioning; }
+        set { isOptioning = value; }
     }
 
     public bool IsChatting
