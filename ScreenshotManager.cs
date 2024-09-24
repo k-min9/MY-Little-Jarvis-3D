@@ -1,13 +1,15 @@
-using System.Collections;
+using System;
+using System.Drawing;  // README trouble shooting
+using System.Runtime.InteropServices;
 using UnityEngine;
-using UnityEngine.UI;
+using System.Collections;
 
 public class ScreenshotManager : MonoBehaviour
 {
     public GameObject screenshotArea; // Panel acting as screenshot area (with borders)
     public GameObject backgroundOverlayPanel; // Panel for background overlay
-    
-    private Rect screenshotRect;
+
+    private Canvas _canvas;
     private bool isSelectingArea = false;
     private Vector3 startMousePosition;
 
@@ -15,71 +17,119 @@ public class ScreenshotManager : MonoBehaviour
     {
         backgroundOverlayPanel.SetActive(false); // Initially, background is disabled
         screenshotArea.SetActive(false); // Initially, screenshot area is hidden
+        _canvas = FindObjectOfType<Canvas>();  // 최상위 Canvas
     }
 
     public void SetScreenshotArea()
     {
         isSelectingArea = true;
         backgroundOverlayPanel.SetActive(true); // Activate background
-        SetPanelAlpha(backgroundOverlayPanel, 0.3f); // Set alpha value to 0.3
+
+        Camera.main.clearFlags = CameraClearFlags.Color;
+        Camera.main.backgroundColor = new UnityEngine.Color(0, 0, 0, 0); // Set the background to transparent
+
+
         StartCoroutine(SelectArea());
     }
 
-    IEnumerator SelectArea()
+    private IEnumerator SelectArea()
     {
-        yield return new WaitForSeconds(1f);  // 1초 대기
+        yield return new WaitForSeconds(0.3f);  // 0.3초 대기
         while (isSelectingArea)
         {
             if (Input.GetMouseButtonDown(0)) // On left mouse click
             {
                 startMousePosition = Input.mousePosition;
+                startMousePosition.x = Mathf.Clamp(startMousePosition.x, 0, Screen.width);
+                startMousePosition.y = Mathf.Clamp(startMousePosition.y, 0, Screen.height);
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvas.transform as RectTransform, startMousePosition, _canvas.worldCamera, out Vector2 startLocalPoint);
                 screenshotArea.SetActive(true); // Show the screenshot area panel
 
                 while (Input.GetMouseButton(0)) // While mouse is held down, update area
                 {
-                    Vector3 endMousePosition = Input.mousePosition;
-                    DrawRect(startMousePosition, endMousePosition);
+                    DrawRect(startLocalPoint);
                     yield return null;
                 }
 
-                Vector3 finalMousePosition = Input.mousePosition;
-                SetRect(startMousePosition, finalMousePosition);
                 isSelectingArea = false;
+                screenshotArea.SetActive(false);
                 backgroundOverlayPanel.SetActive(false); // Deactivate background
             }
             yield return null;
         }
     }
 
-    void DrawRect(Vector3 start, Vector3 end)
-    {
-        // Calculate center and size of the rectangle
-        Vector3 center = (start + end) / 2f;
-        Vector2 size = new Vector2(Mathf.Abs(start.x - end.x), Mathf.Abs(start.y - end.y));
+    void DrawRect(Vector2 startLocalPoint)
+    {        
+        Vector3 endMousePos = Input.mousePosition;
+        endMousePos.y = Mathf.Clamp(endMousePos.y, 0, Screen.height);
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvas.transform as RectTransform, endMousePos, _canvas.worldCamera, out Vector2 endLocalPoint);
+
+        // Calculate the center and size based on the local points
+        Vector3 center = (startLocalPoint + endLocalPoint) / 2f;
+        Vector2 size = new Vector2(Mathf.Abs(startLocalPoint.x - endLocalPoint.x), Mathf.Abs(startLocalPoint.y - endLocalPoint.y));
         
-        // Convert screen space to world space for accurate positioning
-        Vector3 worldCenter = Camera.main.ScreenToWorldPoint(center);
-        worldCenter.z = 0; // Keep it in 2D space
-        
-        screenshotArea.transform.position = worldCenter;
-        screenshotArea.GetComponent<RectTransform>().sizeDelta = size;
+        // Update the position and size of the screenshotArea (which is the Panel's RectTransform)
+        RectTransform panelRectTransform = screenshotArea.GetComponent<RectTransform>();
+
+        if (panelRectTransform != null)
+        {
+            // Set position and size
+            panelRectTransform.localPosition = center;
+            panelRectTransform.sizeDelta = size;  // anchors의 min과 max의 x와 y가 각각 같아야 함
+        }
+        else
+        {
+            Debug.LogWarning("screenshotArea does not have a RectTransform.");
+        }
     }
 
-    void SetRect(Vector3 start, Vector3 end)
-    {
-        // Define the rectangle in screen space based on start and end points
-        float x1 = Mathf.Min(start.x, end.x);
-        float y1 = Mathf.Min(start.y, end.y);
-        float x2 = Mathf.Max(start.x, end.x);
-        float y2 = Mathf.Max(start.y, end.y);
-        screenshotRect = new Rect(x1, y1, x2 - x1, y2 - y1);
-    }
+    // P/Invoke declarations (same as previous example)
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetDesktopWindow();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetWindowDC(IntPtr hWnd);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int nWidth, int nHeight);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr SelectObject(IntPtr hdc, IntPtr bmp);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool BitBlt(IntPtr hdcDest, int xDest, int yDest, int wDest, int hDest,
+                                      IntPtr hdcSrc, int xSrc, int ySrc, int Rop);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteObject(IntPtr hObject);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteDC(IntPtr hdc);
+
+    [DllImport("user32.dll")]
+    private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+
+    private const int SRCCOPY = 0x00CC0020;
 
     public void SaveScreenshot()
     {
-        if (screenshotRect.width > 0 && screenshotRect.height > 0)
+        RectTransform panelRectTransform = screenshotArea.GetComponent<RectTransform>();
+
+        if (panelRectTransform.sizeDelta.x > 0 && panelRectTransform.sizeDelta.y > 0)
         {
-            StartCoroutine(CaptureScreenshot("./Screenshots/screenshot.png"));
+            Vector2 panelSize = panelRectTransform.sizeDelta;
+            Vector3 screenPos = panelRectTransform.anchoredPosition;
+            float x = screenPos.x - panelRectTransform.sizeDelta.x / 2;
+            float y = -screenPos.y - panelRectTransform.sizeDelta.y / 2;
+
+            string filePath = "./Screenshots/panel_capture.png";
+            CaptureDesktopArea((int)x, (int)y, (int)panelSize.x, (int)panelSize.y, filePath);  // x, y 기점으로 width, height 만큼 screenshot
+
+            Debug.Log($"Screenshot saved at {filePath}");
         }
         else
         {
@@ -87,20 +137,32 @@ public class ScreenshotManager : MonoBehaviour
         }
     }
 
-    IEnumerator CaptureScreenshot(string filePath)
+    private void CaptureDesktopArea(int x, int y, int width, int height, string filePath)
     {
-        yield return new WaitForEndOfFrame();
-        Texture2D screenshot = new Texture2D((int)screenshotRect.width, (int)screenshotRect.height, TextureFormat.RGB24, false);
-        screenshot.ReadPixels(screenshotRect, 0, 0);
-        screenshot.Apply();
+        // Get the desktop window and its DC
+        IntPtr desktopHwnd = GetDesktopWindow();
+        IntPtr desktopDC = GetWindowDC(desktopHwnd);
+        IntPtr memoryDC = CreateCompatibleDC(desktopDC);
 
-        if (!System.IO.Directory.Exists("./Screenshots"))
+        // Create a compatible bitmap
+        IntPtr bitmap = CreateCompatibleBitmap(desktopDC, width, height);
+        IntPtr oldBitmap = SelectObject(memoryDC, bitmap);
+
+        // Copy the desktop content to the memory DC (starting from x, y with size width, height)
+        BitBlt(memoryDC, 0, 0, width, height, desktopDC, x, y, SRCCOPY);
+
+        // Create a Bitmap object from the handle
+        using (Bitmap bmp = Bitmap.FromHbitmap(bitmap))
         {
-            System.IO.Directory.CreateDirectory("./Screenshots");
+            // Save the Bitmap as PNG
+            bmp.Save(filePath, System.Drawing.Imaging.ImageFormat.Png);
         }
 
-        System.IO.File.WriteAllBytes(filePath, screenshot.EncodeToPNG());
-        Destroy(screenshot);
+        // Clean up
+        SelectObject(memoryDC, oldBitmap);
+        DeleteObject(bitmap);
+        DeleteDC(memoryDC);
+        ReleaseDC(desktopHwnd, desktopDC);
     }
 
     // Function to set the transparency of a panel
