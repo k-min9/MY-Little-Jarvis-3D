@@ -83,7 +83,15 @@
   - Noto Sans JP : 메인 폰트. 일본어, 영어
   - SUIT : Fall back 폰트. 한국어
 - Sprites : png 등 관리
+  - 외부 png Texture Type : Sprite(2D & UI)
 - StreamingAssets : 패키징 되지 않는 파일 관리.
   - Voices : 목소리 관리
 - persistentDataPath : write에 대한 권리가 있는 장소.
   - API 등으로 전송받은 파일 저장, setting등의 로컬 파일 저장.
+
+## Troube Shooting
+
+### Windows API 사용
+
+- Plugins에 C:\Windows\Microsoft.NET\Framework64\v4.0.30319에서 가져온 System.Drawing.dll 이동
+- Project Settings>Other Settings>API compatibility Level을 .Net Standard 2.1에서 Framework로 변경
