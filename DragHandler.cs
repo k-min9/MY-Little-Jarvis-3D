@@ -20,8 +20,8 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
         mousePos.y = Mathf.Clamp(mousePos.y-50, 0, Screen.height);
         
         RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvas.transform as RectTransform, mousePos, _canvas.worldCamera, out Vector2 pos);
-
-        transform.parent.position = _canvas.transform.TransformPoint(pos);
+        Vector3 newPos = new Vector3(pos.x, pos.y, -70);  // z=--70
+        transform.parent.position = _canvas.transform.TransformPoint(newPos);
 
         // TODO : z축 이동 (-70 정도로, [안 그러면] UI가 머리에 박힘)
     }
@@ -32,7 +32,8 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
         AnswerBalloonManager.Instance.HideAnswerBalloon();
 
         // Pick 상태 전환시의 음성 재생
-        VoiceManager.Instance.PlayAudioFromPath("/Voices/Mari/Mari_Lobby_5.ogg");  // 음성 재생
+        Dialogue pick = DialogueManager.instance.GetRandomPick();
+        VoiceManager.Instance.PlayAudioFromPath(pick.filePath);  // 음성 재생
         StatusManager.Instance.IsDragging = true;
         _animator.SetBool("isPick", true);
         StatusManager.Instance.IsPicking = true;
@@ -41,7 +42,7 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
     public void OnEndDrag(PointerEventData eventData)
     {
         VoiceManager.Instance.StopAudio();  // 음성 종료
-        StatusManager.Instance.IsDragging = true;
+        StatusManager.Instance.IsDragging = false;
         _animator.SetBool("isPick", false);
         StatusManager.Instance.IsPicking = false;
     }
