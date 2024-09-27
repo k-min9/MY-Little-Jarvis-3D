@@ -13,6 +13,9 @@ isAnswering = 현재 유저에게 답하고 있는지 여부
 isThinking = 현재 유저의 질문에 대한 답을 연산하고 있는지 여부
 isChatting = set은 없고, isAsking, isListening, isThinking, isAnswering이 하나라도 True이면 True를 반환
 isOptioning = 우클릭, 메뉴등의 대기 상태
+isOnTop - 최상위 여부
+isMinimize - 최소화 여부
+isAiUsing = 서버를 키거나 그렇게 하도록 명령을 내린 대화 가능 상태
 */
 public class StatusManager : MonoBehaviour
 {
@@ -45,6 +48,9 @@ public class StatusManager : MonoBehaviour
     private bool isAnswering;
     private bool isThinking;
     private bool isOptioning;
+    private bool isOnTop;
+    private bool isMinimize;
+    private bool isAiUsing;
 
     // Getter / Setter
     public bool IsDragging
@@ -106,6 +112,21 @@ public class StatusManager : MonoBehaviour
     {
         get { return isOptioning; }
         set { isOptioning = value; }
+    }
+    public bool IsOnTop
+    {
+        get { return isOnTop; }
+        set { isOnTop = value; }
+    }
+    public bool IsMinimize
+    {
+        get { return isMinimize; }
+        set { isMinimize = value; }
+    }
+    public bool IsAiUsing
+    {
+        get { return isAiUsing; }
+        set { isAiUsing = value; }
     }
 
     public bool IsChatting
