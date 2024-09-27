@@ -43,20 +43,17 @@ public class DialogueManager : MonoBehaviour
 
     void Start()
     {
-        // StreamingAssets 폴더의 경로 설정
-        jsonFilePath = Path.Combine(Application.streamingAssetsPath, "Voices/Mari/Mari_Voiceover.json");
-
         LoadDialoguesFromJSON();
     }
 
-    // JSON 파일 읽기
+    // 현재 캐릭터의 JSON 파일 읽기
     public void LoadDialoguesFromJSON()
     {
-        // Debug.Log(jsonFilePath);
-        // if (File.Exists(jsonFilePath))
-        // {
+        string voicePath = CharManager.Instance.GetVoicePath(CharManager.Instance.GetCurrentCharacter());
+        jsonFilePath = Path.Combine(Application.streamingAssetsPath, voicePath);
+
         string json = File.ReadAllText(jsonFilePath);
-        Debug.Log(json);
+        // Debug.Log(json);
         DialogueCategoryWrapper wrapper = JsonUtility.FromJson<DialogueCategoryWrapper>(json);
 
         // 각각의 대사 리스트에 데이터 할당
@@ -116,6 +113,18 @@ public class DialogueManager : MonoBehaviour
 
         int randomIndex = UnityEngine.Random.Range(0, select.Count);
         return select[randomIndex];
+    }
+    // pick 리스트에서 랜덤한 대사를 반환하는 함수
+    public Dialogue GetRandomPick()
+    {
+        if (pick.Count == 0)
+        {
+            Debug.LogWarning("pick 리스트가 비어 있습니다.");
+            return default(Dialogue); // 기본값 반환
+        }
+
+        int randomIndex = UnityEngine.Random.Range(0, pick.Count);
+        return pick[randomIndex];
     }
 }
 
