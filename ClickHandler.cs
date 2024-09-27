@@ -23,37 +23,36 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
             AskBalloonManager.Instance.ShowAskBalloon();
         }
 
-
         // 중앙클릭
         if (eventData.button == PointerEventData.InputButton.Middle) {
-            Dialogue idle = DialogueManager.instance.GetRandomIdle();
-            VoiceManager.Instance.PlayAudioFromPath(idle.filePath);  // 음성 재생
-            AnswerBalloonManager.Instance.ShowAnswerBalloon();
-            AnswerBalloonManager.Instance.ModifyAnswerBalloonText(idle.japaneseDialogue);
-            AnswerBalloonManager.Instance.HideAnswerBalloonAfterAudio();
+            int prob = UnityEngine.Random.Range(1, 101);  // 1~100(3-1)
+            // 70% 확률로 idle
+            if (prob <= 70) {
+                Dialogue idle = DialogueManager.instance.GetRandomIdle();
+                VoiceManager.Instance.PlayAudioFromPath(idle.filePath);  // 음성 재생
+                AnswerBalloonManager.Instance.ShowAnswerBalloon();
+                AnswerBalloonManager.Instance.ModifyAnswerBalloonText(idle.japaneseDialogue);
+                AnswerBalloonManager.Instance.HideAnswerBalloonAfterAudio();
+            // 30% 확률로 select (모션 두개 뿐)
+            } else {
+                int randomIndex = UnityEngine.Random.Range(1, 3);  // 1~2(3-1)
+                _animator.SetTrigger("doRandomMotion" + randomIndex);
 
+                Dialogue select = DialogueManager.instance.GetRandomSelect();
+                VoiceManager.Instance.PlayAudioFromPath(select.filePath);  // 음성 재생
+                AnswerBalloonManager.Instance.ShowAnswerBalloon();
+                AnswerBalloonManager.Instance.ModifyAnswerBalloonText(select.japaneseDialogue);
+                AnswerBalloonManager.Instance.HideAnswerBalloonAfterAudio();
+            }
             // StartCoroutine(TestModifyAnswerBalloonText());  // 1초마다 ModifyAnswerBalloonText 호출하는 코루틴 시작
             return;
         }
 
-        // 우클릭
-        if (eventData.button == PointerEventData.InputButton.Right)
-        {
-            int randomIndex = UnityEngine.Random.Range(1, 3);  // 1~2(3-1)
-            _animator.SetTrigger("doRandomMotion" + randomIndex);
-
-
-            Dialogue select = DialogueManager.instance.GetRandomSelect();
-            VoiceManager.Instance.PlayAudioFromPath(select.filePath);  // 음성 재생
-            AnswerBalloonManager.Instance.ShowAnswerBalloon();
-            AnswerBalloonManager.Instance.ModifyAnswerBalloonText(select.japaneseDialogue);
-            AnswerBalloonManager.Instance.HideAnswerBalloonAfterAudio();
-
-        }
+        // 우클릭 - Menu Triggger로 이동
+        // if (eventData.button == PointerEventData.InputButton.Right)
+        // {
+        // }
     }
-
-    //TODO menumanager 생기면 이동
-    // _transparentWindow.NextMonitor();
 
     // 테스트용 코루틴
     private IEnumerator TestModifyAnswerBalloonText()
