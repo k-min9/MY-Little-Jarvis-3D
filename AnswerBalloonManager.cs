@@ -1,17 +1,22 @@
 using System.Collections;
 using UnityEngine;
 using TMPro;
+using System;
 
 public class AnswerBalloonManager : MonoBehaviour
 {
     [SerializeField] private Canvas _canvas; // AnswerBalloon 이미지
     [SerializeField] private GameObject answerBalloon; // AnswerBalloon 이미지
     [SerializeField] private TextMeshProUGUI answerText; // AnswerBalloon 하위의 TMP 텍스트
-    [SerializeField] private RectTransform characterTransform; // AnswerBalloon이 표시될 캐릭터의 Transform
+    [SerializeField] public RectTransform characterTransform; // AnswerBalloon이 표시될 캐릭터의 Transform
     [SerializeField] private RectTransform answerBalloonTransform; // AnswerBalloon의 Transform
     public TextMeshProUGUI answerBalloonText; // AnswerBalloon Text의 Transform
 
     private float hideTimer = 0f; // 타이머 변수 추가
+
+    private string textKo = "";
+    private string textJp = "";
+    private string textEn = "";
 
     // 싱글톤 인스턴스
     private static AnswerBalloonManager instance;
@@ -52,7 +57,7 @@ public class AnswerBalloonManager : MonoBehaviour
             UpdateAnswerBalloonPosition();
         }
 
-        if (StatusManager.Instance.IsPicking || StatusManager.Instance.IsListening)
+        if (StatusManager.Instance.IsPicking || StatusManager.Instance.IsListening || StatusManager.Instance.IsAsking )
         {
             HideAnswerBalloon();
         }
@@ -72,6 +77,16 @@ public class AnswerBalloonManager : MonoBehaviour
         }
     }
 
+    // AnswerBalloon을 타이머 무제한으로 보이기
+    public void ShowAnswerBalloonInf()
+    {
+        hideTimer = 99999f;
+        answerBalloon.SetActive(true);
+        answerText.text = string.Empty; // 텍스트 초기화
+        StatusManager.Instance.IsAnswering = true; // StatusManager 상태 업데이트
+        UpdateAnswerBalloonPosition();  // AnswerBalloon 위치 조정하
+    }
+
     // AnswerBalloon을 보이고 텍스트를 초기화하는 함수
     public void ShowAnswerBalloon()
     {
@@ -88,9 +103,17 @@ public class AnswerBalloonManager : MonoBehaviour
 
         // 높이 조정
         float textHeight = answerBalloonText.preferredHeight;
-        answerBalloonTransform.sizeDelta = new Vector2(answerBalloonTransform.sizeDelta.x, textHeight + 60);
+        answerBalloonTransform.sizeDelta = new Vector2(answerBalloonTransform.sizeDelta.x, textHeight + 120);
 
         
+    }
+
+    // 언어전환을 고려한 string setting
+    public void ModifyAnswerBalloonTextInfo(string replyKo, string replyJp, string replyEn) 
+    {
+        textKo = replyKo;
+        textJp = replyJp;
+        textEn = replyEn;
     }
     
     // 현재(마지막) 오디오 재생 후 AnswerBalloon을 숨기는 코루틴 호출
