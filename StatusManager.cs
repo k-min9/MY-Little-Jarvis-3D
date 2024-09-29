@@ -1,4 +1,6 @@
 using UnityEngine;
+using System.Collections;
+using System;
 
 /**
 싱글톤으로 현재 메인 캐릭터의 상태를 관리
@@ -47,7 +49,7 @@ public class StatusManager : MonoBehaviour
     private bool isAsking;
     private bool isAnswering;
     private bool isThinking;
-    private bool isOptioning;
+    public bool isOptioning;
     private bool isOnTop;
     private bool isMinimize;
     private bool isAiUsing;
@@ -145,5 +147,41 @@ public class StatusManager : MonoBehaviour
             _instance = this;
             DontDestroyOnLoad(this.gameObject);
         }
+    }
+
+    // X초간 status를 True로
+    // 예시 : StatusManager.Instance.SetStatusTrueForSecond(value => StatusManager.Instance.IsOptioning = value, 3f); // 3초간 isOptioning을 true로
+    private Coroutine statusCoroutine = null;
+    private float remainingTime = 0f;
+
+    public void SetStatusTrueForSecond(Action<bool> setStatus, float seconds)
+    {
+        if (statusCoroutine != null)
+        {
+            if (remainingTime < seconds)
+            {
+                StopCoroutine(statusCoroutine);
+                statusCoroutine = StartCoroutine(StatusTimer(setStatus, seconds));
+            }
+        }
+        else
+        {
+            statusCoroutine = StartCoroutine(StatusTimer(setStatus, seconds));
+        }
+    }
+
+    private IEnumerator StatusTimer(Action<bool> setStatus, float seconds)
+    {
+        setStatus(true);
+        remainingTime = seconds;
+
+        while (remainingTime > 0)
+        {
+            yield return new WaitForSeconds(1f);
+            remainingTime -= 1f;
+        }
+
+        setStatus(false);
+        statusCoroutine = null;
     }
 }
