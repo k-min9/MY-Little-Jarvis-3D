@@ -50,6 +50,7 @@ public class CharManager : MonoBehaviour
         setClickHandlerVar(currentCharacter);
         setPhysicsManagerVar(currentCharacter);
         setAnswerBalloonVar(currentCharacter);
+        setAnswerBalloonSimpleVar(currentCharacter);
         setAskBalloonVar(currentCharacter);
 
         // RectTransform을 찾아서 위치를 (0, 0, -70)으로 설정
@@ -112,6 +113,7 @@ public class CharManager : MonoBehaviour
         setClickHandlerVar (currentCharacter);
         setPhysicsManagerVar(currentCharacter);
         setAnswerBalloonVar(currentCharacter);
+        setAnswerBalloonSimpleVar(currentCharacter);
         setAskBalloonVar(currentCharacter);
 
         // RectTransform 위치를 (0, 0, -70)으로 설정 (또는 이전 위치로 유지)
@@ -259,6 +261,12 @@ public class CharManager : MonoBehaviour
         // 캐릭터의 하위에 있는 ClickHandler를 찾아 설정
         AnswerBalloonManager answerBalloonManager = FindObjectOfType<AnswerBalloonManager>();
         answerBalloonManager.characterTransform = charObj.GetComponent<RectTransform>();
+    }
+    public void setAnswerBalloonSimpleVar(GameObject charObj)
+    {
+        // 캐릭터의 하위에 있는 ClickHandler를 찾아 설정
+        AnswerBalloonSimpleManager answerBalloonSimpleManager = FindObjectOfType<AnswerBalloonSimpleManager>();
+        answerBalloonSimpleManager.characterTransform = charObj.GetComponent<RectTransform>();
     }
     public void setAskBalloonVar(GameObject charObj)
     {
