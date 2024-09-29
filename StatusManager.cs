@@ -12,6 +12,7 @@ isWalking = 현재 걸어다니는지 여부
 isAsking = 현재 유저의 질문을 듣고 있는지 여부 (음성인식)
 isListening = 현재 유저의 질문을 듣고 있는지 여부 (음성인식)
 isAnswering = 현재 유저에게 답하고 있는지 여부
+isAnsweringSimple = 현재 유저에게 답하고 있는지 여부 (AnswerBalloonSimple update 병렬용)
 isThinking = 현재 유저의 질문에 대한 답을 연산하고 있는지 여부
 isChatting = set은 없고, isAsking, isListening, isThinking, isAnswering이 하나라도 True이면 True를 반환
 isOptioning = 우클릭, 메뉴등의 대기 상태
@@ -48,6 +49,7 @@ public class StatusManager : MonoBehaviour
     public bool isListening;  // 차후 음성인식 용 구별
     public bool isAsking;
     public bool isAnswering;
+    public bool isAnsweringSimple;  // AnswerBalloonSimple 용
     public bool isThinking;
     public bool isOptioning;
     public bool isOnTop;
@@ -103,6 +105,11 @@ public class StatusManager : MonoBehaviour
         get { return isAnswering; }
         set { isAnswering = value; }
     }
+    public bool IsAnsweringSimple
+    {
+        get { return isAnsweringSimple; }
+        set { isAnsweringSimple = value; }
+    }
 
     public bool IsThinking
     {
@@ -133,7 +140,7 @@ public class StatusManager : MonoBehaviour
 
     public bool IsChatting
     {
-        get { return isAsking|| isListening || isThinking || isAnswering; }
+        get { return isAsking|| isListening || isThinking || isAnswering || isAnsweringSimple; }
     }
 
     private void Awake()
