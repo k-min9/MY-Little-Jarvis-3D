@@ -41,18 +41,18 @@ public class StatusManager : MonoBehaviour
     }
 
     // 상태 관리 변수
-    private bool isDragging;
-    private bool isFalling;
-    private bool isPicking;
-    private bool isWalking;
-    private bool isListening;  // 차후 음성인식 용 구별
-    private bool isAsking;
-    private bool isAnswering;
-    private bool isThinking;
+    public bool isDragging;
+    public bool isFalling;
+    public bool isPicking;
+    public bool isWalking;
+    public bool isListening;  // 차후 음성인식 용 구별
+    public bool isAsking;
+    public bool isAnswering;
+    public bool isThinking;
     public bool isOptioning;
-    private bool isOnTop;
-    private bool isMinimize;
-    private bool isAiUsing;
+    public bool isOnTop;
+    public bool isMinimize;
+    public bool isAiUsing;
 
     // Getter / Setter
     public bool IsDragging
