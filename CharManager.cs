@@ -124,7 +124,10 @@ public class CharManager : MonoBehaviour
         // 현재 인덱스 업데이트
         charIndex = index;
 
-        // 캐릭터 닉네임 출력
+        // 현재 Dialogue 업데이트
+        DialogueManager.instance.LoadDialoguesFromJSON();
+
+        // 캐릭터 닉네임 출력 (Log)
         string nickname = GetNickname(currentCharacter);
         if (!string.IsNullOrEmpty(nickname))
         {
@@ -134,6 +137,19 @@ public class CharManager : MonoBehaviour
         {
             Debug.Log("Character has no nickname.");
         }
+    }
+
+    // 캐릭터 교체 from gameobject
+    public void ChangeCharacterFromGameObject(GameObject obj)
+    {
+        for (int i = 0; i < charList.Count; i++)
+        {   
+            if (System.Object.ReferenceEquals(charList[i], obj)) {
+                ChangeCharacter(i);
+                return;
+            }
+        }
+        Debug.Log("ChangeCharacterFromGameObject => 일치캐릭터 없음");
     }
 
     // 다음 캐릭터로 변경하는 함수
@@ -163,6 +179,17 @@ public class CharManager : MonoBehaviour
         if (nicknameComponent != null)
         {
             return nicknameComponent.nickname;
+        }
+        return null;
+    }
+
+    // 캐릭터 프리팹에서 voicePath Getter
+    public string GetVoicePath(GameObject character)
+    {
+        CharAttributes nicknameComponent = character.GetComponent<CharAttributes>();
+        if (nicknameComponent != null)
+        {
+            return nicknameComponent.voicePath;
         }
         return null;
     }
