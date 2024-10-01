@@ -17,6 +17,7 @@ public class AnswerBalloonManager : MonoBehaviour
     private string textKo = "";
     private string textJp = "";
     private string textEn = "";
+    private string answerLanguage = "ko";
 
     // 싱글톤 인스턴스
     private static AnswerBalloonManager instance;
@@ -96,24 +97,43 @@ public class AnswerBalloonManager : MonoBehaviour
         UpdateAnswerBalloonPosition();  // AnswerBalloon 위치 조정하
     }
 
-    // AnswerBalloon의 텍스트를 수정하고 오디오를 재생하는 함수
-    public void ModifyAnswerBalloonText(string text)
+    // AnswerBalloon의 텍스트를 수정
+    public void ModifyAnswerBalloonText()
     {
-        answerText.text = text; // 텍스트 변경
-
+        if (answerLanguage == "ko") {
+            answerText.text = textKo; // 텍스트 변경
+        } else if (answerLanguage == "jp") {
+            answerText.text = textJp; // 텍스트 변경
+        } else {
+            answerText.text = textEn; // 텍스트 변경
+        }
+        
         // 높이 조정
         float textHeight = answerBalloonText.preferredHeight;
-        answerBalloonTransform.sizeDelta = new Vector2(answerBalloonTransform.sizeDelta.x, textHeight + 120);
-
-        
+        answerBalloonTransform.sizeDelta = new Vector2(answerBalloonTransform.sizeDelta.x, textHeight + 120);       
     }
 
     // 언어전환을 고려한 string setting
     public void ModifyAnswerBalloonTextInfo(string replyKo, string replyJp, string replyEn) 
     {
+        answerLanguage = SettingManager.Instance.ui_language; // 표시 언어 초기화[ko, en, jp]
         textKo = replyKo;
         textJp = replyJp;
         textEn = replyEn;
+    }
+
+    // 답변풍선 언어 변경
+    public void changeAnswerLanguage()
+    {
+        if (answerLanguage == "ko") {
+            answerLanguage = "jp";
+        } else if (answerLanguage == "jp") {
+            answerLanguage = "en";
+        } else {
+            answerLanguage = "ko";
+        }
+        // 바뀐 언어로 AnswerBalloon 다시 세팅
+        ModifyAnswerBalloonText();
     }
     
     // 현재(마지막) 오디오 재생 후 AnswerBalloon을 숨기는 코루틴 호출
