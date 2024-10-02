@@ -20,13 +20,22 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
         
         // 좌클릭
         if (eventData.button == PointerEventData.InputButton.Left) {
-            // AskBalloonManager.Instance.ShowAskBalloon();
+            // TODO : AI 있는 캐릭터인지 확인하기
+            AskBalloonManager.Instance.ShowAskBalloon();
 
             // TODO : AI 안켜져있으면 분리
 
             StatusManager.Instance.SetStatusTrueForSecond(value => StatusManager.Instance.IsOptioning = value, 5f); // 3초간 isOptioning을 true로
-            int randomIndex = UnityEngine.Random.Range(1, 3);  // 1~2(3-1)
-            _animator.SetTrigger("doRandomMotion" + randomIndex);
+
+            // doSelect 있으면 이걸로 실행
+            if (isAnimatorTriggerExists(_animator, "doSelect")) {
+                _animator.SetTrigger("doSelect");
+                StatusManager.Instance.SetStatusTrueForSecond(value => StatusManager.Instance.IsOptioning = value, 9f); // 쭉쭉체조 9f /0.6
+            } else {
+                // 없으면 randomMotion
+                int randomIndex = UnityEngine.Random.Range(1, 3);  // 1~2(3-1)
+                _animator.SetTrigger("doRandomMotion" + randomIndex);
+            }
 
             // 대사 기능 잠시 비활성화
             // Dialogue select = DialogueManager.instance.GetRandomSelect();
@@ -72,33 +81,17 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
         // }
     }
 
-    // 테스트용 코루틴
-    private IEnumerator TestModifyAnswerBalloonText()
+    public bool isAnimatorTriggerExists(Animator animator, string triggerName)
     {
-        AnswerBalloonManager.Instance.ModifyAnswerBalloonText("안녕하세요.");
-
-        yield return new WaitForSeconds(1f);
-        AnswerBalloonManager.Instance.ModifyAnswerBalloonText("안녕하세요. 즐거운하루가되셨나요");
-
-        yield return new WaitForSeconds(1f);
-        VoiceManager.Instance.PlayAudioFromPath("/Voices/Mari/Mari_LogIn_2.ogg");  // 음성 재생
-        AnswerBalloonManager.Instance.ModifyAnswerBalloonText("안녕하세요. 즐거운하루가되셨나요. 저도 오늘 선생님을 만나서 기뻐요. 안녕하세요. 즐거운하루가되셨나요. 저도 오늘 선생님을 만나서 기뻐요. 안녕하세요. 즐거운하루가되셨나요. 저도 오늘 선생님을 만나서 기뻐요");
-        AnswerBalloonManager.Instance.HideAnswerBalloonAfterAudio();
-
-        // 마지막 텍스트 이후 HideAnswerBalloon을 예약
-        StartCoroutine(HideAnswerBalloonAfterLastClip());
-    }
-
-    private IEnumerator HideAnswerBalloonAfterLastClip()
-    {
-        AudioClip lastClip = VoiceManager.Instance.GetAudioClip();
-        if (lastClip != null)
+        // Animator의 모든 파라미터 확인
+        foreach (AnimatorControllerParameter param in animator.parameters)
         {
-            yield return new WaitForSeconds(lastClip.length + 0.5f);
+            // 해당 파라미터가 Trigger이고 이름이 일치하는지 확인
+            if (param.type == AnimatorControllerParameterType.Trigger && param.name == triggerName)
+            {
+                return true;  // Trigger가 존재함
+            }
         }
-
-        AnswerBalloonManager.Instance.HideAnswerBalloon();
+        return false;  // Trigger가 존재하지 않음
     }
-
-
 }
