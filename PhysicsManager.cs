@@ -1,8 +1,14 @@
 using UnityEngine;
 using System.Collections;
 
+/**
+좌우 이동 관리
+*/
 public class PhysicsManager : MonoBehaviour
 {
+    public static PhysicsManager instance;
+
+
     public Animator animator;
     public float moveSpeed = 120f;
     public float idleProbability = 0.7f;
@@ -12,6 +18,33 @@ public class PhysicsManager : MonoBehaviour
     private float initialRotationY;
     private Coroutine currentCoroutine;  // StateControlRoutine 제외 현재 작동 코루틴
 
+    // 싱글톤 인스턴스에 접근하는 속성
+    public static PhysicsManager Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = FindObjectOfType<PhysicsManager>();
+            }
+            return instance;
+        }
+    }
+
+    private void Awake()
+    {
+        // 싱글톤 인스턴스 설정
+        if (instance == null)
+        {
+            instance = this;
+            DontDestroyOnLoad(gameObject); // 씬 전환 시에도 오브젝트 유지
+        }
+        else
+        {
+            Destroy(gameObject); // 이미 인스턴스가 존재하면 파괴
+        }
+    }
+
     private void Start()
     {
         walkProbability = 1.0f - idleProbability;
@@ -19,9 +52,12 @@ public class PhysicsManager : MonoBehaviour
         StartCoroutine(StateControlRoutine());
     }
 
-        private void Update()
+    private void Update()
     {
-        if (StatusManager.Instance.IsPicking || StatusManager.Instance.IsFalling || StatusManager.Instance.IsChatting || StatusManager.Instance.IsOptioning)
+        if (StatusManager.Instance.IsPicking 
+        || StatusManager.Instance.IsFalling 
+        || StatusManager.Instance.IsChatting 
+        || StatusManager.Instance.IsOptioning)
         {
             StopAllAnimations();
             return;
@@ -32,12 +68,15 @@ public class PhysicsManager : MonoBehaviour
     {
         while (true)
         {
-            if (!StatusManager.Instance.IsFalling 
-            && !StatusManager.Instance.IsPicking)
+            if (!StatusManager.Instance.IsPicking 
+            && !StatusManager.Instance.IsFalling 
+            && !StatusManager.Instance.IsPicking
+            && !StatusManager.Instance.IsOptioning)
             {
                 float rand = Random.Range(0f, 1f);
                 if (rand < idleProbability)
                 {
+                    
                     SetIdleState();
                 }
                 else if (rand < idleProbability + walkProbability/2)
@@ -53,19 +92,19 @@ public class PhysicsManager : MonoBehaviour
         }
     }
 
-    private void SetIdleState()
+    public void SetIdleState()
     {
         animator.SetBool("isWalk", false);
         ResetRotation();
     }
 
-    private void SetWalkLeftState()
+    public void SetWalkLeftState()
     {
         animator.SetBool("isWalk", true);
         WalkLeftStart();
     }
 
-    private void SetWalkRightState()
+    public void SetWalkRightState()
     {
         animator.SetBool("isWalk", true);
         WalkRightStart();
@@ -96,7 +135,7 @@ public class PhysicsManager : MonoBehaviour
         while (animator.GetBool("isWalk"))
         {
             // 현재 위치 계산
-            Vector2 newPosition = rectTransform.anchoredPosition + new Vector2(-moveSpeed * Time.deltaTime, 0);
+            Vector2 newPosition = rectTransform.anchoredPosition + new Vector2(-moveSpeed * Time.deltaTime * SettingManager.Instance.settings.char_speed / 100f, 0);
 
             // Canvas의 크기 제한 가져오기
             RectTransform canvasRect = canvas.GetComponent<RectTransform>();
@@ -121,7 +160,7 @@ public class PhysicsManager : MonoBehaviour
         while (animator.GetBool("isWalk"))
         {
             // 현재 위치 계산
-            Vector2 newPosition = rectTransform.anchoredPosition + new Vector2(moveSpeed * Time.deltaTime, 0);
+            Vector2 newPosition = rectTransform.anchoredPosition + new Vector2(moveSpeed * Time.deltaTime * SettingManager.Instance.settings.char_speed / 100f, 0);
 
             // Canvas의 크기 제한 가져오기
             RectTransform canvasRect = canvas.GetComponent<RectTransform>();
