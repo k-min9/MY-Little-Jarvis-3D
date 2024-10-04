@@ -116,7 +116,7 @@ public class AnswerBalloonManager : MonoBehaviour
     // 언어전환을 고려한 string setting
     public void ModifyAnswerBalloonTextInfo(string replyKo, string replyJp, string replyEn) 
     {
-        answerLanguage = SettingManager.Instance.ui_language; // 표시 언어 초기화[ko, en, jp]
+        answerLanguage = SettingManager.Instance.settings.ui_language; // 표시 언어 초기화[ko, en, jp]
         textKo = replyKo;
         textJp = replyJp;
         textEn = replyEn;
@@ -150,6 +150,7 @@ public class AnswerBalloonManager : MonoBehaviour
     // AnswerBalloon을 숨기는 함수
     public void HideAnswerBalloon()
     {
+        hideTimer = 0f;  // inf용 초기화
         answerBalloon.SetActive(false);
         StatusManager.Instance.IsAnswering = false; 
     }
@@ -160,6 +161,6 @@ public class AnswerBalloonManager : MonoBehaviour
         Vector2 charPosition = characterTransform.anchoredPosition;
         
         // 캐릭터의 X 위치와 동일하게 설정
-        answerBalloonTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 270); // Y축 창크기 270만큼
+        answerBalloonTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 270 * SettingManager.Instance.settings.char_size / 100f); // Y축 창크기 270만큼
     }
 }

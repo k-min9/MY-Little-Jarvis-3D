@@ -130,6 +130,7 @@ public class AnswerBalloonSimpleManager : MonoBehaviour
     // AnswerBalloonSimple을 숨기는 함수
     public void HideAnswerBalloonSimple()
     {
+        hideTimer = 0f;  // inf용 초기화
         answerBalloonSimple.SetActive(false);
         StatusManager.Instance.IsAnsweringSimple = false; 
     }
@@ -140,6 +141,6 @@ public class AnswerBalloonSimpleManager : MonoBehaviour
         Vector2 charPosition = characterTransform.anchoredPosition;
         
         // 캐릭터의 X 위치와 동일하게 설정
-        answerBalloonSimpleTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 270); // Y축 창크기 270만큼
+        answerBalloonSimpleTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 270 * SettingManager.Instance.settings.char_size / 100f); // Y축 창크기 270만큼
     }
 }
