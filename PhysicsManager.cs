@@ -11,8 +11,8 @@ public class PhysicsManager : MonoBehaviour
 
     public Animator animator;
     public float moveSpeed = 120f;
-    public float idleProbability = 0.7f;
-    public float walkProbability = 0.3f;
+    public float idleProbability = 70f;
+    public float walkProbability = 30f;
     public RectTransform rectTransform;
     public Canvas canvas; 
     private float initialRotationY;
@@ -66,14 +66,15 @@ public class PhysicsManager : MonoBehaviour
 
     private IEnumerator StateControlRoutine()
     {
+        walkProbability = SettingManager.Instance.settings.char_mobility * 2;
         while (true)
         {
             if (!StatusManager.Instance.IsPicking 
             && !StatusManager.Instance.IsFalling 
-            && !StatusManager.Instance.IsPicking
+            && !StatusManager.Instance.IsChatting
             && !StatusManager.Instance.IsOptioning)
             {
-                float rand = Random.Range(0f, 1f);
+                float rand = Random.Range(0f, 100f);
                 if (rand < idleProbability)
                 {
                     
@@ -112,6 +113,7 @@ public class PhysicsManager : MonoBehaviour
 
     private void WalkLeftStart()
     {
+        animator.Play("idle", 0, 0);  // 현재 애니메이션 중지
         if (currentCoroutine != null) {
             StopCoroutine(currentCoroutine);  // 기존 코루틴 중지
             currentCoroutine = null;
@@ -122,6 +124,7 @@ public class PhysicsManager : MonoBehaviour
 
     private void WalkRightStart()
     {
+        animator.Play("idle", 0, 0);  // 현재 애니메이션 중지
         if (currentCoroutine != null) {
             StopCoroutine(currentCoroutine);  // 기존 코루틴 중지
             currentCoroutine = null;
@@ -197,6 +200,7 @@ public class PhysicsManager : MonoBehaviour
 
     public void StopAllAnimations()
     {
+        // animator.Play("idle", 0, 0);  // 현재 애니메이션 중지
         if (currentCoroutine != null) {
             StopCoroutine(currentCoroutine);  // 기존 코루틴 중지
             currentCoroutine = null;
