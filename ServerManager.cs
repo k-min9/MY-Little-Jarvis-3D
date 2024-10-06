@@ -2,8 +2,6 @@ using System.Diagnostics;
 using UnityEngine;
 using System.IO;
 using System.Collections;
-using System.Linq;
-using System.Management;
 
 public class ServerManager : MonoBehaviour 
 {
@@ -49,25 +47,17 @@ public class ServerManager : MonoBehaviour
             AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Already Served");
             return null;
         }
-
-        // StreamingAssets 폴더 경로
-        string streamingAssetsPath = Application.streamingAssetsPath;
-
-        // jarvis_server_jp.exe 파일 확인
+        
+        string streamingAssetsPath = Application.streamingAssetsPath;  // StreamingAssets 폴더 경로
         string jarvisServerPath = Path.Combine(streamingAssetsPath, "jarvis_server_jp.exe");
         if (File.Exists(jarvisServerPath))
         {
-            // TODO : 실행할지 물어봄
-            if (true || AskUserToExecute("jarvis_server_jp.exe를 실행하시겠습니까?"))
-            {
-                // jarvis_server_jp.exe 실행
-                Process serverProcess = RunJarvisServer(jarvisServerPath);
-                AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
-                AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Init server...");
+            // jarvis_server_jp.exe 실행
+            Process serverProcess = RunJarvisServer(jarvisServerPath);
+            AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+            AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Init server...");
 
-                // StartCoroutine(SendFirstPing()); // TODO : 서버 실행 후 핑 보내기 시작
-                return serverProcess;
-            }
+            // StartCoroutine(SendFirstPing()); // TODO : 서버 실행 후 핑 보내기 시작
         }
         else
         {
@@ -84,7 +74,8 @@ public class ServerManager : MonoBehaviour
 
             if (AskUserToExecute("Install_3D.exe를 실행하시겠습니까?"))
             {
-                RunInstallExe(installPath); // Install_3D.exe 실행
+                AskBalloonManager.Instance.SetCurrentQuestion("start_ai_server");  // InitializeQuestions에서 목록 확인(많아질 경우 Enum으로 관리)
+                AskBalloonManager.Instance.ShowAskBalloon();  // 들어가기
             }
         }
 
@@ -121,8 +112,10 @@ public class ServerManager : MonoBehaviour
     }
 
     // Install_3D.exe 실행 함수
-    private static void RunInstallExe(string installPath)
+    public static Process RunInstallExe()
     {
+        string streamingAssetsPath = Application.streamingAssetsPath;
+        string installPath = Path.Combine(streamingAssetsPath, "Install_3D.exe");
         ProcessStartInfo startInfo = new ProcessStartInfo
         {
             FileName = installPath,
@@ -130,12 +123,13 @@ public class ServerManager : MonoBehaviour
             CreateNoWindow = true // 콘솔 창을 표시하지 않음
         };
         Process installProcess = Process.Start(startInfo);
-        installProcess.WaitForExit();
+        // installProcess.WaitForExit();
         UnityEngine.Debug.Log("Install_3D.exe 실행 완료");
+        return installProcess;
     }
 
     // jarvis_server_jp.exe 실행 함수 (콘솔 창 없이)
-    private static Process RunJarvisServer(string serverExePath)
+    public static Process RunJarvisServer(string serverExePath)
     {
         try
         {
@@ -187,4 +181,5 @@ public class ServerManager : MonoBehaviour
         // 다운로드 관련 로직을 여기에 추가
         UnityEngine.Debug.Log("Install_3D.exe 다운로드 중...");
     }
+
 }
