@@ -6,9 +6,10 @@ public class AskBalloonManager : MonoBehaviour
 {
     [SerializeField] private Canvas _canvas; // askBalloon 이미지
     [SerializeField] private GameObject askBalloon; // askBalloon 이미지
+    [SerializeField] private TextMeshProUGUI askText; // askBalloon이 하위의 TMP 텍스트
     [SerializeField] public RectTransform characterTransform; // askBalloon이 표시될 캐릭터의 Transform
     [SerializeField] private RectTransform askBalloonTransform; // askBalloon의 Transform
-    [SerializeField] public TMP_InputField inputField; 
+    public TextMeshProUGUI askBalloonText; // AnswerBalloon Text의 Transform
 
     // 싱글톤 인스턴스
     private static AskBalloonManager instance;
@@ -61,27 +62,33 @@ public class AskBalloonManager : MonoBehaviour
     public void ShowAskBalloon()
     {
         askBalloon.SetActive(true);
-        inputField.text = string.Empty; // 텍스트 초기화
         StatusManager.Instance.IsAsking = true; // StatusManager 상태 업데이트
         UpdateAskBalloonPosition();  // askBalloon 위치 조정하기
-
-        // 기존 애니메이션 중지 및 isAsking 애니메이션 
+        ModifyAnswerBalloonText();
     }
-
-    // // askBalloon의 텍스트를 수정하고 오디오를 재생하는 함수
-    // public void ModifyaskBalloonText(string text)
-    // {
-    //     answerText.text = text; // 텍스트 변경
-    //     // 높이 조정
-    //     float textHeight = askBalloonText.preferredHeight;
-    //     askBalloonTransform.sizeDelta = new Vector2(askBalloonTransform.sizeDelta.x, textHeight + 60);
-    // }
     
     // askBalloon을 숨기는 함수
     public void HideAskBalloon()
     {
         askBalloon.SetActive(false);
         StatusManager.Instance.IsAsking = false; 
+    }
+
+    // askBalloon의 텍스트를 수정 (text 하드코딩)
+    public void ModifyAnswerBalloonText()
+    {
+        string answerLanguage = SettingManager.Instance.settings.ui_language; // 표시 언어 초기화[ko, en, jp]
+        if (answerLanguage == "ko") {
+            askText.text = "AI 서버를 기동하시겠습니까?";
+        } else if (answerLanguage == "jp") {
+            askText.text = "AIサーバーを起動しますか？"; // 텍스트 변경
+        } else {
+            askText.text = "Do you want to start the AI server?"; // 텍스트 변경
+        }
+        
+        // 높이 조정
+        float textHeight = askBalloonText.preferredHeight;
+        askBalloonTransform.sizeDelta = new Vector2(askBalloonTransform.sizeDelta.x, textHeight + 120);       
     }
 
     // askBalloon의 위치를 캐릭터 바로 위로 조정하는 함수
