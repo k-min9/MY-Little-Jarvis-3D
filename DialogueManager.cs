@@ -13,6 +13,7 @@ public struct Dialogue
     public string koreanDialogue; // 한국어 대사
     public string englishDialogue; // 영어 대사
     public string japaneseDialogue; // 일본어 대사
+    public string trigger;  // 애니메이션 트리거
 }
 public class DialogueManager : MonoBehaviour
 {
@@ -39,28 +40,37 @@ public class DialogueManager : MonoBehaviour
         {
             Destroy(gameObject); // 이미 인스턴스가 존재하면 파괴
         }
-    }
 
-    void Start()
-    {
         LoadDialoguesFromJSON();
     }
 
     // 현재 캐릭터의 JSON 파일 읽기
     public void LoadDialoguesFromJSON()
     {
-        string voicePath = CharManager.Instance.GetVoicePath(CharManager.Instance.GetCurrentCharacter());
-        jsonFilePath = Path.Combine(Application.streamingAssetsPath, voicePath);
+        try
+        {
+            string voicePath = CharManager.Instance.GetVoicePath(CharManager.Instance.GetCurrentCharacter());
+            jsonFilePath = Path.Combine(Application.streamingAssetsPath, voicePath);
 
-        string json = File.ReadAllText(jsonFilePath);
-        // Debug.Log(json);
-        DialogueCategoryWrapper wrapper = JsonUtility.FromJson<DialogueCategoryWrapper>(json);
+            string json = File.ReadAllText(jsonFilePath);
+            // Debug.Log(json);
+            DialogueCategoryWrapper wrapper = JsonUtility.FromJson<DialogueCategoryWrapper>(json);
 
-        // 각각의 대사 리스트에 데이터 할당
-        greetings = wrapper.greetings;
-        idle = wrapper.idle;
-        select = wrapper.select;
-        pick = wrapper.pick;
+            // 각각의 대사 리스트에 데이터 할당
+            greetings = wrapper.greetings;
+            idle = wrapper.idle;
+            select = wrapper.select;
+            pick = wrapper.pick;
+        }
+        catch (Exception ex)
+        {
+            // 각각의 대사 리스트에 데이터 할당
+            greetings = new List<Dialogue>();
+            idle = new List<Dialogue>();
+            select = new List<Dialogue>();
+            pick = new List<Dialogue>();
+        }
+
     }
 
     // JSON 파일 저장
