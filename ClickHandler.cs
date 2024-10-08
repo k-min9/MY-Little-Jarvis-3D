@@ -61,9 +61,10 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
                     // 애니메이션 재생, special>select(대사있음)>random 순으로
                     if (isAnimatorTriggerExists(_animator, "doSpecial")) {  // special
                         _animator.SetTrigger("doSpecial");
+                        StatusManager.Instance.SetStatusTrueForSecond(value => StatusManager.Instance.IsOptioning = value, 7.5f); // 15초간 isOptioning을 true로
                     } else if (isAnimatorTriggerExists(_animator, "doSelect")) {  // select
                         Dialogue select = DialogueManager.instance.GetRandomSelect();
-                        DoDialoguBehaviour(select); // select 행동 
+                        DoDialogueBehaviour(select); // select 행동 
                     } else {  // random
                         PlayRandomAnimation(); // 랜덤 애니메이션 재생
                     }
@@ -73,7 +74,7 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
         // 중앙클릭
         if (eventData.button == PointerEventData.InputButton.Middle) {
             Dialogue idle = DialogueManager.instance.GetRandomIdle();
-            DoDialoguBehaviour(idle);// idle 행동 
+            DoDialogueBehaviour(idle);// idle 행동 
         }
         // 우클릭 - Menu Triggger로 이동
         // if (eventData.button == PointerEventData.InputButton.Right)
@@ -103,7 +104,7 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
             int randomIndex = UnityEngine.Random.Range(0, randomMotionTriggers.Count);
             string motion = randomMotionTriggers[randomIndex];
             _animator.SetTrigger(motion);  
-            StatusManager.Instance.SetStatusTrueForSecond(value => StatusManager.Instance.IsOptioning = value, 15f); // 15초간 isOptioning을 true로
+            StatusManager.Instance.SetStatusTrueForSecond(value => StatusManager.Instance.IsOptioning = value, 5f); // 15초간 isOptioning을 true로
         }
     }
 
@@ -143,7 +144,7 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
         return false;  // Trigger가 존재하지 않음
     }
 
-    public void DoDialoguBehaviour(Dialogue dialogue) {
+    public void DoDialogueBehaviour(Dialogue dialogue) {
             // 음성있을 경우 재생
             if (!string.IsNullOrEmpty(dialogue.filePath)) {
                 VoiceManager.Instance.PlayAudioFromPath(dialogue.filePath);  // 음성 재생
