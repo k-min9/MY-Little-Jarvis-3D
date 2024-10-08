@@ -22,14 +22,15 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
         RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvas.transform as RectTransform, mousePos, _canvas.worldCamera, out Vector2 pos);
         Vector3 newPos = new Vector3(pos.x, pos.y, -70);  // z=--70
         transform.parent.position = _canvas.transform.TransformPoint(newPos);
-
-        // TODO : z축 이동 (-70 정도로, [안 그러면] UI가 머리에 박힘)
     }
 
     public void OnBeginDrag(PointerEventData eventData)
     {
         // 기존 말풍선 제거
         AnswerBalloonManager.Instance.HideAnswerBalloon();
+
+        // 기존 애니메이션 정지
+        PhysicsManager.Instance.animator.Play("idle", 0, 0);  // 현재 애니메이션 강제 중지;
 
         // Pick 상태 전환시의 음성 재생
         Dialogue pick = DialogueManager.instance.GetRandomPick();
