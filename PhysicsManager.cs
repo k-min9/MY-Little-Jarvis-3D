@@ -8,7 +8,6 @@ public class PhysicsManager : MonoBehaviour
 {
     public static PhysicsManager instance;
 
-
     public Animator animator;
     public float moveSpeed = 120f;
     public float idleProbability = 70f;
@@ -16,6 +15,8 @@ public class PhysicsManager : MonoBehaviour
     public RectTransform rectTransform;
     public Canvas canvas; 
     private float initialRotationY;
+
+    private float controlTimer = 3f;  // 타이머 초기값
     private Coroutine currentCoroutine;  // StateControlRoutine 제외 현재 작동 코루틴
 
     // 싱글톤 인스턴스에 접근하는 속성
@@ -47,49 +48,53 @@ public class PhysicsManager : MonoBehaviour
 
     private void Start()
     {
-        walkProbability = 1.0f - idleProbability;
+        walkProbability = 100f - idleProbability;
         initialRotationY = rectTransform.localEulerAngles.y;
-        StartCoroutine(StateControlRoutine());
     }
 
     private void Update()
     {
         if (StatusManager.Instance.IsPicking 
         || StatusManager.Instance.IsFalling 
-        || StatusManager.Instance.IsChatting 
+        || StatusManager.Instance.IsConversationing 
         || StatusManager.Instance.IsOptioning)
         {
             StopAllAnimations();
             return;
         }
+
+        // 타이머마다 StateControlRoutine 실행
+        controlTimer -= Time.deltaTime;
+        if (controlTimer <= 0)
+        {
+            controlTimer = 3f;  // 타이머 리셋
+            StateControlRoutine();
+        }
     }
 
-    private IEnumerator StateControlRoutine()
+    private void StateControlRoutine()
     {
-        walkProbability = SettingManager.Instance.settings.char_mobility * 2;
-        while (true)
+        walkProbability = SettingManager.Instance.settings.char_mobility * 2;  // 좌,우 각각 최대 30%
+        idleProbability = 100f - walkProbability;
+
+        if (!StatusManager.Instance.IsPicking 
+        && !StatusManager.Instance.IsFalling 
+        && !StatusManager.Instance.IsConversationing
+        && !StatusManager.Instance.IsOptioning)
         {
-            if (!StatusManager.Instance.IsPicking 
-            && !StatusManager.Instance.IsFalling 
-            && !StatusManager.Instance.IsChatting
-            && !StatusManager.Instance.IsOptioning)
+            float rand = Random.Range(0f, 100f);
+            if (rand < idleProbability)
             {
-                float rand = Random.Range(0f, 100f);
-                if (rand < idleProbability)
-                {
-                    
-                    SetIdleState();
-                }
-                else if (rand < idleProbability + walkProbability/2)
-                {
-                    SetWalkLeftState();
-                }
-                else
-                {
-                    SetWalkRightState();
-                }
+                SetIdleState();
             }
-            yield return new WaitForSeconds(3f);
+            else if (rand < idleProbability + walkProbability / 2)
+            {
+                SetWalkLeftState();
+            }
+            else
+            {
+                SetWalkRightState();
+            }
         }
     }
 
@@ -114,6 +119,9 @@ public class PhysicsManager : MonoBehaviour
     private void WalkLeftStart()
     {
         animator.Play("idle", 0, 0);  // 현재 애니메이션 중지
+        StatusManager.Instance.IsOptioning = false;
+        controlTimer = 3f;  // 타이머 리셋
+
         if (currentCoroutine != null) {
             StopCoroutine(currentCoroutine);  // 기존 코루틴 중지
             currentCoroutine = null;
@@ -125,6 +133,9 @@ public class PhysicsManager : MonoBehaviour
     private void WalkRightStart()
     {
         animator.Play("idle", 0, 0);  // 현재 애니메이션 중지
+        StatusManager.Instance.IsOptioning = false;
+        controlTimer = 3f;  // 타이머 리셋
+
         if (currentCoroutine != null) {
             StopCoroutine(currentCoroutine);  // 기존 코루틴 중지
             currentCoroutine = null;
