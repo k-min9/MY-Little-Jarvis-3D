@@ -70,23 +70,19 @@ public class APIManager : MonoBehaviour
                 // 각각의 답변을 리스트에 추가
                 if (!string.IsNullOrEmpty(answerJp))
                 {
-                    // Debug.Log($"Japanese Reply: {answerJp}");
                     replyListJp.Add(answerJp);
+                    if (SettingManager.Instance.settings.sound_language == "jp") {
+                        answerVoice = answerJp;
+                    }
                 }
 
                 if (!string.IsNullOrEmpty(answerKo))
                 {
-                    // Debug.Log($"Korean Reply: {answerKo}");
                     replyListKo.Add(answerKo);
-
-                    string fullText = string.Join(" ", replyListKo);
-                    Debug.Log($"Korean fullText: {fullText}");
-                    AnswerBalloonManager.Instance.ModifyAnswerBalloonText(fullText);
-
-                    // 한국어 답변
-                    answerVoice = answerKo;
+                    if (SettingManager.Instance.settings.sound_language == "ko") {
+                        answerVoice = answerKo;
+                    }
                 }
-
                 if (!string.IsNullOrEmpty(answerEn))
                 {
                     // Debug.Log($"English Reply: {answerEn}");
@@ -94,10 +90,22 @@ public class APIManager : MonoBehaviour
                 }
             }
             // answerballoon 갱신
+            
+            string replyKo = string.Join(" ", replyListKo);
+            string replyJp = string.Join(" ", replyListJp);
+            string replyEn = string.Join(" ", replyListEn);
+
+            AnswerBalloonManager.Instance.ModifyAnswerBalloonTextInfo(replyKo, replyJp, replyEn);  // Answerballoon 정보 갱신
+            AnswerBalloonManager.Instance.ModifyAnswerBalloonText();  // 정보토대 답변
 
             // 음성 API 호출
             if (answerVoice != null) {
-                GetKoWavFromAPI(answerVoice);
+                if (SettingManager.Instance.settings.sound_language == "ko") {
+                    GetKoWavFromAPI(answerVoice);
+                }
+                if (SettingManager.Instance.settings.sound_language == "jp") {
+                    GetJpWavFromAPI(answerVoice);
+                }
             }
         }
     }
@@ -108,10 +116,10 @@ public class APIManager : MonoBehaviour
         isCompleted = true;
         Debug.Log("All replies have been received.");
 
-        foreach (string reply in replyListJp)
-        {
-            Debug.Log(reply); // 각 reply를 출력
-        }
+        // foreach (string reply in replyListJp)
+        // {
+        //     Debug.Log(reply); // 각 reply를 출력
+        // }
     }
 
     // 스트리밍 데이터를 가져오는 메서드
@@ -183,25 +191,35 @@ public class APIManager : MonoBehaviour
     private void Start()
     {
         // Test용 코드
-        string query = "내일 날씨가 어떨까?";
+        // string query = "내일 날씨가 어떨까?";
+
+        // Test용 stream 답변생성
         // CallConversationStream(query);
 
         // Test용 wav 생성
         // GetKoWavFromAPI(query);
     }
 
-    // conversation_stream 호출
+    // chatHandler에서 호출
     public async void CallConversationStream(string query)
     {
         string streamUrl = "http://127.0.0.1:5000/conversation_stream";
         // 닉네임 가져오기
         string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
+        string player_name = SettingManager.Instance.settings.player_name;
+        string ai_language = SettingManager.Instance.settings.ai_language ?? "";
+        string ai_language_in = SettingManager.Instance.settings.ai_language_in ?? "";
+        string ai_language_out = SettingManager.Instance.settings.ai_language_out ?? "";
 
         // 요청 데이터 구성
         var requestData = new Dictionary<string, string>
         {
             { "query", query },
-            { "nickname", nickname } // 닉네임 추가
+            { "player", player_name }, // 설정의 플레이어 이름
+            { "char", nickname }, // 닉네임으로 캐릭터 이름 추가
+            { "ai_language", ai_language }, // 추론언어로 한입, 영입영출 등 조절(ko, en, jp)
+            { "ai_language_in", ai_language_in }, // 추론언어로 한입, 영입영출 등 조절(ko, en, jp)
+            { "ai_language_out", ai_language_out } // 추론언어로 한출, 영입영출 등 조절(ko, en, jp)
         };
 
         await FetchStreamingData(streamUrl, requestData);
@@ -210,14 +228,29 @@ public class APIManager : MonoBehaviour
     public async void GetKoWavFromAPI(string text)
     {
         // API 호출을 위한 URL 구성
-        string url = "http://127.0.0.1:5000/getSound/ko/" + Uri.EscapeDataString(text);
+        string url = "http://127.0.0.1:5000/getSound/ko"; // GET + Uri.EscapeDataString(text);
 
         // HttpWebRequest 객체 생성
         HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-        request.Method = "GET";
-        
+        request.Method = "POST";
+        request.ContentType = "application/json";
+
+        var requestData = new Dictionary<string, string>
+        {
+            { "text", text},
+        };
+        string jsonData = JsonConvert.SerializeObject(requestData);
+        byte[] byteArray = Encoding.UTF8.GetBytes(jsonData);
+
+
         try
         {
+            // 요청 본문에 데이터 쓰기
+            using (Stream dataStream = await request.GetRequestStreamAsync())
+            {
+                dataStream.Write(byteArray, 0, byteArray.Length);
+            }
+
             // 비동기 방식으로 요청 보내기
             using (HttpWebResponse response = (HttpWebResponse)await request.GetResponseAsync())
             {
@@ -252,6 +285,71 @@ public class APIManager : MonoBehaviour
         }
     }
 
+        public async void GetJpWavFromAPI(string text)
+    {
+        // API 호출을 위한 URL 구성
+        string url = "http://127.0.0.1:5000/getSound/jp"; 
+
+        // 닉네임 가져오기
+        string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
+
+        // HttpWebRequest 객체 생성
+        HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+        request.Method = "POST";
+        request.ContentType = "application/json";
+
+        var requestData = new Dictionary<string, string>
+        {
+            { "text", text},
+            { "char", nickname},
+        };
+        string jsonData = JsonConvert.SerializeObject(requestData);
+        byte[] byteArray = Encoding.UTF8.GetBytes(jsonData);
+
+
+        try
+        {
+            // 요청 본문에 데이터 쓰기
+            using (Stream dataStream = await request.GetRequestStreamAsync())
+            {
+                dataStream.Write(byteArray, 0, byteArray.Length);
+            }
+
+            // 비동기 방식으로 요청 보내기
+            using (HttpWebResponse response = (HttpWebResponse)await request.GetResponseAsync())
+            {
+                Debug.Log(response);
+                // 요청이 성공했는지 확인
+                if (response.StatusCode == HttpStatusCode.OK)
+                {
+                    // 응답 스트림을 읽어서 파일에 저장
+                    using (Stream responseStream = response.GetResponseStream())
+                    {
+                        if (responseStream != null)
+                        {
+                            byte[] wavData = ReadFully(responseStream);
+
+                            // persistentDataPath에 WAV 파일 저장
+                            SaveWavToFile(wavData);
+                        }
+                    }
+                }
+                else
+                {
+                    Debug.LogError($"Error fetching WAV file: {response.StatusCode}");
+                }
+            }
+        }
+        catch (WebException ex)
+        {
+            Debug.LogError($"WebException: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Exception: {ex.Message}");
+        }
+    }
+
     // 스트림을 바이트 배열로 변환하는 함수
     private byte[] ReadFully(Stream input)
     {
@@ -262,11 +360,10 @@ public class APIManager : MonoBehaviour
         }
     }
 
+    // 파일을 persistentDataPath에 저장
     private void SaveWavToFile(byte[] wavData)
     {
-        string filePath = Path.Combine(Application.persistentDataPath, "response.wav");
-
-        // 파일을 StreamingAssets 경로에 저장
+        string filePath = Path.Combine(Application.persistentDataPath, "response.wav");       
         try
         {
             File.WriteAllBytes(filePath, wavData);
