@@ -6,6 +6,7 @@ using UnityEngine;
 public class UIManager : MonoBehaviour
 {
     [SerializeField] private GameObject charChange; // CharChange
+    [SerializeField] private GameObject settings; // settings
 
     // 싱글톤 인스턴스
     private static UIManager instance;
@@ -23,7 +24,10 @@ public class UIManager : MonoBehaviour
             return;
         }
 
+        // 자체 함수로 비활성화
         charChange.SetActive(false);
+        settings.SetActive(false);
+
     }
 
     // 싱글톤 인스턴스에 접근하는 속성
@@ -43,6 +47,14 @@ public class UIManager : MonoBehaviour
     public void ShowCharChange()
     {
         UIWidget uIWidget = charChange.GetComponent<UIWidget>();
+        uIWidget.Show();
+        
+    }
+
+    // charChange-UIWidget의 Show 작동
+    public void showSettings()
+    {
+        UIWidget uIWidget = settings.GetComponent<UIWidget>();
         uIWidget.Show();
         
     }
