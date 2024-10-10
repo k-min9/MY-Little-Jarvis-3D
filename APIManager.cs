@@ -16,6 +16,8 @@ public class APIManager : MonoBehaviour
     private List<string> replyListEn = new List<string>();
     private bool isCompleted = false; // 반환이 완료되었는지 여부를 체크하는 플래그
     private bool isResponsedStarted = false; // 첫 반환이 돌아왔는지 여부
+    private string logFilePath; // 로그 파일 경로
+
 
     // 싱글톤 인스턴스
     private static APIManager instance;
@@ -45,12 +47,29 @@ public class APIManager : MonoBehaviour
             Destroy(gameObject);
             return;
         }
+
+        // 로그 파일 경로 생성 (날짜와 시간 기반으로)
+        string dateTime = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        logFilePath = Path.Combine(Application.persistentDataPath, $"log/api_{dateTime}.txt");
+
+        // 로그 파일 생성
+        Directory.CreateDirectory(Path.GetDirectoryName(logFilePath)); // 디렉토리가 없으면 생성
+        File.AppendAllText(logFilePath, $"Log started at: {DateTime.Now}\n");
+    }
+
+    // 로그 기록 메서드
+    private void LogToFile(string message)
+    {
+        File.AppendAllText(logFilePath, $"{DateTime.Now}: {message}\n");
     }
 
     // FetchStreamingData에서 호출할 함수
     private void ProcessReply(JObject jsonObject)
     {
-        // 초기화
+
+    LogToFile("ProcessReply started."); // ProcessReply 시작 로그
+
+    // 초기화
     replyListKo = new List<string>();
     replyListJp = new List<string>();
     replyListEn = new List<string>();
@@ -94,6 +113,9 @@ public class APIManager : MonoBehaviour
             string replyKo = string.Join(" ", replyListKo);
             string replyJp = string.Join(" ", replyListJp);
             string replyEn = string.Join(" ", replyListEn);
+            LogToFile("replyKo : " + replyKo); // ProcessReply 시작 로그
+            LogToFile("replyJp : " + replyJp); // ProcessReply 시작 로그
+            LogToFile("replyEn : " + replyEn); // ProcessReply 시작 로그
 
             AnswerBalloonManager.Instance.ModifyAnswerBalloonTextInfo(replyKo, replyJp, replyEn);  // Answerballoon 정보 갱신
             AnswerBalloonManager.Instance.ModifyAnswerBalloonText();  // 정보토대 답변
@@ -115,6 +137,8 @@ public class APIManager : MonoBehaviour
     {
         isCompleted = true;
         Debug.Log("All replies have been received.");
+        LogToFile("ProcessReply completed."); // ProcessReply 완료 로그
+
 
         // foreach (string reply in replyListJp)
         // {
