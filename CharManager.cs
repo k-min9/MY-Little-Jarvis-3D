@@ -11,6 +11,7 @@ public class CharManager : MonoBehaviour
 
     // 현재 활성화된 캐릭터와 인덱스
     private GameObject currentCharacter;
+    private float currentCharacterInitLocalScale = 20000f;
     private int charIndex = 0;
 
     // 캐릭터가 속할 Canvas
@@ -34,6 +35,12 @@ public class CharManager : MonoBehaviour
         InitCharacter();
     }
 
+    void Start()
+    {
+        // SettingManager의 Load 끝나고 Size 변경
+        setCharSize();
+    }
+
     // 첫 번째 캐릭터를 RectTransform (0,0,-70)에 생성하는 함수
     private void InitCharacter()
     {
@@ -46,11 +53,15 @@ public class CharManager : MonoBehaviour
         // 첫 번째 캐릭터 생성, Canvas의 자식으로 설정
         StatusManager.Instance.IsDragging = false;
         currentCharacter = Instantiate(charList[0], Vector3.zero, charList[0].transform.rotation, canvas.transform);
+        currentCharacterInitLocalScale = currentCharacter.transform.localScale.x;
+
+        // Handler에 값 setting
         setDragHandlerVar(currentCharacter);
         setClickHandlerVar(currentCharacter);
         setPhysicsManagerVar(currentCharacter);
         setAnswerBalloonVar(currentCharacter);
         setAnswerBalloonSimpleVar(currentCharacter);
+        setChatBalloonVar(currentCharacter);
         setAskBalloonVar(currentCharacter);
 
         // RectTransform을 찾아서 위치를 (0, 0, -70)으로 설정
@@ -72,7 +83,20 @@ public class CharManager : MonoBehaviour
         }
     }
 
-        // 현재 캐릭터의 public Getter 추가
+    // 캐릭터 크기 설정 함수 (퍼센트 기반)
+    public void setCharSize()
+    {   
+        float char_size = SettingManager.Instance.settings.char_size;
+        if (currentCharacter != null)
+        {
+            float scaleFactor = currentCharacterInitLocalScale * char_size / 100f; // 퍼센트를 소수점 비율로 변환
+            currentCharacter.transform.localScale = new Vector3(scaleFactor, scaleFactor, scaleFactor); // X, Y, Z 동일한 비율로 크기 조정
+            Debug.Log("Character size set to: " + char_size + "%");
+        }
+    }
+
+
+    // 현재 캐릭터의 public Getter 추가
     public GameObject GetCurrentCharacter()
     {
         return currentCharacter;
@@ -109,11 +133,18 @@ public class CharManager : MonoBehaviour
         // 새로운 캐릭터 생성, Canvas의 자식으로 설정
         StatusManager.Instance.IsDragging = false;
         currentCharacter = Instantiate(charList[index], previousPosition, previousRotation, canvas.transform);
+
+        // 기본 size 변경
+        currentCharacterInitLocalScale = currentCharacter.transform.localScale.x;
+        setCharSize();
+
+        // Handler에 값 setting
         setDragHandlerVar(currentCharacter);
         setClickHandlerVar (currentCharacter);
         setPhysicsManagerVar(currentCharacter);
         setAnswerBalloonVar(currentCharacter);
         setAnswerBalloonSimpleVar(currentCharacter);
+        setChatBalloonVar(currentCharacter);
         setAskBalloonVar(currentCharacter);
 
         // RectTransform 위치를 (0, 0, -70)으로 설정 (또는 이전 위치로 유지)
@@ -128,6 +159,12 @@ public class CharManager : MonoBehaviour
 
         // 현재 Dialogue 업데이트
         DialogueManager.instance.LoadDialoguesFromJSON();
+
+        // 변경 음성 출력(TODO : Setting으로 옮기기)
+        Dialogue greeting = DialogueManager.instance.GetRandomGreeting();
+        VoiceManager.Instance.PlayAudioFromPath(greeting.filePath);
+
+        // TODO : 이펙트(FX, SFX) 효과
 
         // 캐릭터 닉네임 출력 (Log)
         string nickname = GetNickname(currentCharacter);
@@ -174,6 +211,42 @@ public class CharManager : MonoBehaviour
         ChangeCharacter(charIndex);
     }
 
+    // 캐릭터 옷 변경 :
+    public void ChangeClothes()
+    {
+        CharAttributes charAttributes = currentCharacter.GetComponent<CharAttributes>();
+        
+        //  toggleClothes와 changeClothes가 둘 다 None일 경우, 안내와 return
+        if (charAttributes.toggleClothes == null && charAttributes.changeClothes==null) 
+        {
+            // TODO : 옷이 없다는 안내문
+            return;
+        // toggleClothes가 있음
+        } 
+        else if (charAttributes.toggleClothes != null)
+        {
+            // 현재 활성화일 경우 비활성화
+            if (charAttributes.toggleClothes.activeSelf) {
+                charAttributes.toggleClothes.SetActive(false);
+            } else {
+                // 비활성화일 경우 옷이 있으면 갈아입고 아닌 경우, 활성화
+                if (charAttributes.changeClothes!=null)
+                {
+                    ChangeCharacterFromGameObject(charAttributes.changeClothes);
+                    Dialogue greeting = DialogueManager.instance.GetRandomGreeting();
+                    VoiceManager.Instance.PlayAudioFromPath(greeting.filePath);
+                } else {
+                    charAttributes.toggleClothes.SetActive(true);
+                }
+            }
+        }
+        else
+        {
+            // 옷 갈아입기
+            ChangeCharacterFromGameObject(charAttributes.changeClothes);
+        }
+    }
+
     // 캐릭터 프리팹에서 Nickname 컴포넌트가 있는 경우, 닉네임을 가져오는 함수
     public string GetNickname(GameObject character)
     {
@@ -191,6 +264,11 @@ public class CharManager : MonoBehaviour
         CharAttributes nicknameComponent = character.GetComponent<CharAttributes>();
         if (nicknameComponent != null)
         {
+            if (nicknameComponent.voicePath == null || nicknameComponent.voicePath == "" ||  nicknameComponent.voicePath == "default")
+            {
+                string voicePath = "Sound/"+nicknameComponent.charcode+"/Voiceover.json";  // ex) Sound/ch0000/Voiceover.json
+                return voicePath;
+            }
             return nicknameComponent.voicePath;
         }
         return null;
@@ -267,6 +345,12 @@ public class CharManager : MonoBehaviour
         // 캐릭터의 하위에 있는 ClickHandler를 찾아 설정
         AnswerBalloonSimpleManager answerBalloonSimpleManager = FindObjectOfType<AnswerBalloonSimpleManager>();
         answerBalloonSimpleManager.characterTransform = charObj.GetComponent<RectTransform>();
+    }
+    public void setChatBalloonVar(GameObject charObj)
+    {
+        // 캐릭터의 하위에 있는 ClickHandler를 찾아 설정
+        ChatBalloonManager chatBalloonManager = FindObjectOfType<ChatBalloonManager>();
+        chatBalloonManager.characterTransform = charObj.GetComponent<RectTransform>();
     }
     public void setAskBalloonVar(GameObject charObj)
     {
