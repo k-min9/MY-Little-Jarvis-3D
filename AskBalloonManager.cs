@@ -1,4 +1,4 @@
-using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 
@@ -10,6 +10,41 @@ public class AskBalloonManager : MonoBehaviour
     [SerializeField] public RectTransform characterTransform; // askBalloon이 표시될 캐릭터의 Transform
     [SerializeField] private RectTransform askBalloonTransform; // askBalloon의 Transform
     public TextMeshProUGUI askBalloonText; // AnswerBalloon Text의 Transform
+
+    // 질문 관련 데이터
+    private string currentQuestion = ""; // 현재 묻는 질문
+    public struct QuestionInfo
+    {
+        public string questionKo;  // 한국어 질문
+        public string questionJp;  // 일본어 질문
+        public string questionEn;  // 영어 질문
+    }
+    private Dictionary<string, QuestionInfo> questionDict = new Dictionary<string, QuestionInfo>(); // 질문 사전
+
+    public void SetCurrentQuestion(string questionKey) {currentQuestion = questionKey;}
+
+    // 질문 데이터 초기화-등록
+    private void InitializeQuestions()
+    {
+        questionDict.Add("install_ai_server", new QuestionInfo
+        {
+            questionKo = "AI 서버 프로그램을 설치하겠습니까?",
+            questionJp = "AIサーバープログラムをインストールしますか？",
+            questionEn = "Do you want to install the AI Server program?"
+        });
+        questionDict.Add("start_ai_server", new QuestionInfo
+        {
+            questionKo = "AI 서버를 기동하시겠습니까?",
+            questionJp = "AIサーバーを起動しますか？",
+            questionEn = "Do you want to start the AI server?"
+        });
+        questionDict.Add("shutdown_ai_server", new QuestionInfo
+        {
+            questionKo = "AI 서버를 종료하시겠습니까?",
+            questionJp = "AIサーバーを終了しますか？",
+            questionEn = "Do you want to shut down the AI server?"
+        });
+    }
 
     // 싱글톤 인스턴스
     private static AskBalloonManager instance;
@@ -27,6 +62,7 @@ public class AskBalloonManager : MonoBehaviour
             return;
         }
 
+        InitializeQuestions();  // question 정보 등록
         HideAskBalloon(); // 시작 시 askBalloon 숨기기
     }
 
@@ -74,21 +110,35 @@ public class AskBalloonManager : MonoBehaviour
         StatusManager.Instance.IsAsking = false; 
     }
 
-    // askBalloon의 텍스트를 수정 (text 하드코딩)
+    // askBalloon의 텍스트를 수정
     public void ModifyAnswerBalloonText()
     {
-        string answerLanguage = SettingManager.Instance.settings.ui_language; // 표시 언어 초기화[ko, en, jp]
-        if (answerLanguage == "ko") {
-            askText.text = "AI 서버를 기동하시겠습니까?";
-        } else if (answerLanguage == "jp") {
-            askText.text = "AIサーバーを起動しますか？"; // 텍스트 변경
-        } else {
-            askText.text = "Do you want to start the AI server?"; // 텍스트 변경
+        if (string.IsNullOrEmpty(currentQuestion) || !questionDict.ContainsKey(currentQuestion))
+        {
+            Debug.LogError("Invalid current question or missing question info.");
+            return;
         }
-        
+
+        QuestionInfo questionInfo = questionDict[currentQuestion];
+        string answerLanguage = SettingManager.Instance.settings.ui_language; // 표시 언어 초기화[ko, en, jp]
+
+        // 언어에 따른 텍스트 설정
+        if (answerLanguage == "ko")
+        {
+            askText.text = questionInfo.questionKo;
+        }
+        else if (answerLanguage == "jp")
+        {
+            askText.text = questionInfo.questionJp;
+        }
+        else
+        {
+            askText.text = questionInfo.questionEn;
+        }
+
         // 높이 조정
         float textHeight = askBalloonText.preferredHeight;
-        askBalloonTransform.sizeDelta = new Vector2(askBalloonTransform.sizeDelta.x, textHeight + 120);       
+        askBalloonTransform.sizeDelta = new Vector2(askBalloonTransform.sizeDelta.x, textHeight + 150);
     }
 
     // askBalloon의 위치를 캐릭터 바로 위로 조정하는 함수
@@ -98,5 +148,38 @@ public class AskBalloonManager : MonoBehaviour
         
         // 캐릭터의 X 위치와 동일하게 설정
         askBalloonTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 270 * SettingManager.Instance.settings.char_size / 100f); // Y축 창크기 270만큼
+    }
+
+    // Yes 버튼 사용
+    public void AnswerYes()
+    {
+        if (currentQuestion == "install_ai_server") {
+            ServerManager.RunInstallExe();
+
+            HideAskBalloon();  // 답변했으니 기존 풍선 숨기기
+            return;
+        }
+        if (currentQuestion == "start_ai_server") {
+            ServerManager.StartServer();
+
+            // 안내
+            AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+            AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("AI Server Loading...");
+
+            // TODO : ping체크로 안내문 자동 종료
+
+            HideAskBalloon();  // 답변했으니 기존 풍선 숨기기
+            return;
+        }
+
+        Debug.Log("No mapped function");
+        HideAskBalloon();  // 추가질문없을 경우 그대로 종료
+
+    }
+
+    // No 버튼 사용
+    public void AnswerNo()
+    {
+        HideAskBalloon();  // 추가질문없을 경우 그대로 종료
     }
 }
