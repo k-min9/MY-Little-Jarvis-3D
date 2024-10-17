@@ -22,7 +22,7 @@ public class ChatHandler : MonoBehaviour
             // 여기서 입력된 텍스트를 처리하는 코드를 작성하세요
             // PerformActionBasedOnInput(input);
 
-            AskBalloonManager.Instance.HideAskBalloon();
+            ChatBalloonManager.Instance.HideChatBalloon();
         }
     }
 
