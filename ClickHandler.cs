@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityWeld.Binding;
+using System.IO;
 
 [Binding] 
 public class ClickHandler : MonoBehaviour, IPointerClickHandler 
@@ -21,40 +22,25 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
             if (ServerManager.IsJarvisServerRunning())
             {
                 // TODO : ping 확인하는 함수(최대 20회 초당 1회)
+
+                // TODO : 현재 답변중이 아니게 변경
+                StatusManager.Instance.isAnswering = false;
+
+                // 재생중인 음성 중지 및 queue 초기화
+                VoiceManager.Instance.ResetAudio();
+
+
                 ChatBalloonManager.Instance.ShowChatBalloon();
             } else {
                 // 서버 구동중이지 않음
                 if (SettingManager.Instance.settings.isAskedTurnOnServer)  // 서버구동 물어볼지 여부
                 {
-                    // 에디터일 경우 바로 ChatBalloon 보여주기
-                    #if UNITY_EDITOR
-                        ChatBalloonManager.Instance.ShowChatBalloon();
-                    #else
-                        // 서버 설치되어있는지 확인
-                        string streamingAssetsPath = Application.streamingAssetsPath;  // StreamingAssets 폴더 경로
-                        string jarvisServerPath = Path.Combine(streamingAssetsPath, "jarvis_server_jp.exe");
-                        if (File.Exists(jarvisServerPath))
-                        {
-                            // 서버 구동할지 물어보기
-                            AskBalloonManager.Instance.SetCurrentQuestion("start_ai_server");  // InitializeQuestions에서 목록 확인(많아질 경우 Enum으로 관리)
-                            AskBalloonManager.Instance.ShowAskBalloon();  // 들어가기
-                        }
-                        else
-                        {
-                            string installPath = Path.Combine(streamingAssetsPath, "Install_3D.exe");
-                            if (File.Exists(installPath))
-                            {
-                                // 서버 설치할지 물어보기
-                                AskBalloonManager.Instance.SetCurrentQuestion("install_ai_server");  // InitializeQuestions에서 목록 확인(많아질 경우 Enum으로 관리)
-                                AskBalloonManager.Instance.ShowAskBalloon();  // 들어가기
-                            }
-                            else 
-                            {
-                                // TODL : 서버 다운로드할지 물어보기
-                                Debug.Log("No Install File");
-                            }
-                        }
-                    #endif
+                // 에디터일 경우 바로 ChatBalloon 보여주기
+                #if UNITY_EDITOR
+                    ChatBalloonManager.Instance.ShowChatBalloon();
+                #else
+                    ServerManager.AskStartServer();
+                #endif
                 }
                 else 
                 {
@@ -97,6 +83,10 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
         if (isAnimatorTriggerExists(_animator, "doRandomMotion3"))
         {
             randomMotionTriggers.Add("doRandomMotion3");
+        }
+        if (isAnimatorTriggerExists(_animator, "doRandomMotion4"))
+        {
+            randomMotionTriggers.Add("doRandomMotion4");
         }
         // 리스트에 존재하는 트리거 중 랜덤한 하나를 선택하여 반환
         if (randomMotionTriggers.Count > 0)
