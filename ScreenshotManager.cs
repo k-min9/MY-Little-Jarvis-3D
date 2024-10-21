@@ -1,7 +1,8 @@
 using System;
-using System.Drawing;  // README trouble shooting
+using System.Drawing;
 using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityEngine.UI;
 using System.Collections;
 
 public class ScreenshotManager : MonoBehaviour
@@ -13,6 +14,39 @@ public class ScreenshotManager : MonoBehaviour
     private bool isSelectingArea = false;
     private Vector3 startMousePosition;
 
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetDC(IntPtr hwnd);
+    
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetDesktopWindow();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetWindowDC(IntPtr hWnd);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int nWidth, int nHeight);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr SelectObject(IntPtr hdc, IntPtr bmp);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool BitBlt(IntPtr hdcDest, int xDest, int yDest, int wDest, int hDest,
+                                      IntPtr hdcSrc, int xSrc, int ySrc, int Rop);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteObject(IntPtr hObject);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteDC(IntPtr hdc);
+
+    [DllImport("user32.dll")]
+    private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+
+    private const int SRCCOPY = 0x00CC0020;
+
     void Start()
     {
         backgroundOverlayPanel.SetActive(false); // Initially, background is disabled
@@ -23,13 +57,78 @@ public class ScreenshotManager : MonoBehaviour
     public void SetScreenshotArea()
     {
         isSelectingArea = true;
+
+        // // Capture the entire screen using Windows API
+        // Texture2D screenCapture = CaptureFullScreen();
+
+        // // Apply the captured screenshot as the background of backgroundOverlayPanel
+        // UnityEngine.UI.Image bgImage = backgroundOverlayPanel.GetComponent<UnityEngine.UI.Image>();
+        // if (bgImage != null)
+        // {
+        //     bgImage.sprite = Sprite.Create(screenCapture, new Rect(0, 0, screenCapture.width, screenCapture.height), new Vector2(0.5f, 0.5f));
+        //     bgImage.raycastTarget = false; // Ensure background doesn't block input
+        // }
         backgroundOverlayPanel.SetActive(true); // Activate background
 
-        Camera.main.clearFlags = CameraClearFlags.Color;
-        Camera.main.backgroundColor = new UnityEngine.Color(0, 0, 0, 0); // Set the background to transparent
-
-
         StartCoroutine(SelectArea());
+    }
+
+    public void GetBlueFullScreen()
+    {
+        // Load the sprite from the assets folder (make sure Square.png is imported in Unity)
+        Sprite squareSprite = Resources.Load<Sprite>("Sprites/Square");
+
+        if (squareSprite == null)
+        {
+            Debug.LogError("Square sprite not found. Make sure it's located at Assets/Sprites/Square.png.");
+            return;
+        }
+
+        // Access the Image component of the backgroundOverlayPanel
+        UnityEngine.UI.Image bgImage = backgroundOverlayPanel.GetComponent<UnityEngine.UI.Image>();
+
+        if (bgImage != null)
+        {
+            // Apply the Square sprite
+            bgImage.sprite = squareSprite;
+
+            // Set the color to fully opaque blue
+            bgImage.color = new UnityEngine.Color(0, 0, 1, 1);  // RGB for blue and Alpha for full opacity
+
+            // Ensure that the panel is active and visible
+            backgroundOverlayPanel.SetActive(true);
+        }
+        else
+        {
+            Debug.LogWarning("No Image component found on backgroundOverlayPanel.");
+        }
+    }
+
+    // Capture the entire screen using Windows API
+    private Texture2D CaptureFullScreen()
+    {
+        int width = Screen.width;
+        int height = Screen.height;
+        
+        Texture2D screenCapture = new Texture2D(width, height, TextureFormat.RGB24, false);
+        
+        IntPtr hdcSrc = GetDC(IntPtr.Zero);
+        IntPtr hdcDest = CreateCompatibleDC(hdcSrc);
+        IntPtr hBitmap = CreateCompatibleBitmap(hdcSrc, width, height);
+        IntPtr hOld = SelectObject(hdcDest, hBitmap);
+        
+        BitBlt(hdcDest, 0, 0, width, height, hdcSrc, 0, 0, 0x00CC0020); // SRCCOPY
+        
+        // Copy the captured bitmap to a Texture2D
+        screenCapture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+        screenCapture.Apply();
+        
+        // Cleanup
+        SelectObject(hdcDest, hOld);
+        DeleteObject(hBitmap);
+        ReleaseDC(IntPtr.Zero, hdcSrc);
+
+        return screenCapture;
     }
 
     private IEnumerator SelectArea()
@@ -83,37 +182,6 @@ public class ScreenshotManager : MonoBehaviour
             Debug.LogWarning("screenshotArea does not have a RectTransform.");
         }
     }
-
-    // P/Invoke declarations (same as previous example)
-    [DllImport("user32.dll")]
-    private static extern IntPtr GetDesktopWindow();
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr GetWindowDC(IntPtr hWnd);
-
-    [DllImport("gdi32.dll")]
-    private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
-
-    [DllImport("gdi32.dll")]
-    private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int nWidth, int nHeight);
-
-    [DllImport("gdi32.dll")]
-    private static extern IntPtr SelectObject(IntPtr hdc, IntPtr bmp);
-
-    [DllImport("gdi32.dll")]
-    private static extern bool BitBlt(IntPtr hdcDest, int xDest, int yDest, int wDest, int hDest,
-                                      IntPtr hdcSrc, int xSrc, int ySrc, int Rop);
-
-    [DllImport("gdi32.dll")]
-    private static extern bool DeleteObject(IntPtr hObject);
-
-    [DllImport("gdi32.dll")]
-    private static extern bool DeleteDC(IntPtr hdc);
-
-    [DllImport("user32.dll")]
-    private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
-
-    private const int SRCCOPY = 0x00CC0020;
 
     public void SaveScreenshot()
     {
