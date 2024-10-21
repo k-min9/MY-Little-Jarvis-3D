@@ -37,6 +37,37 @@ public class ServerManager : MonoBehaviour
         }
     }
 
+    // 서버 실행할지 물어보기
+    public static void AskStartServer()
+    {
+        // 서버 설치되어있는지 확인
+        string streamingAssetsPath = Application.streamingAssetsPath;  // StreamingAssets 폴더 경로
+        string executablePath = Application.dataPath;  // Unity 실행 파일이 있는 폴더 경로
+        string jarvisServerPath = Path.Combine(Path.GetDirectoryName(executablePath), "jarvis_server_jp.exe");
+        if (File.Exists(jarvisServerPath))
+        {
+            // 서버 구동할지 물어보기
+            AskBalloonManager.Instance.SetCurrentQuestion("start_ai_server");  // InitializeQuestions에서 목록 확인(많아질 경우 Enum으로 관리)
+            AskBalloonManager.Instance.ShowAskBalloon();  // 들어가기
+        }
+        else
+        {
+            string installPath = Path.Combine(streamingAssetsPath, "Install_3D.exe");
+            if (File.Exists(installPath))
+            {
+                // 서버 설치할지 물어보기
+                AskBalloonManager.Instance.SetCurrentQuestion("install_ai_server");  // InitializeQuestions에서 목록 확인(많아질 경우 Enum으로 관리)
+                AskBalloonManager.Instance.ShowAskBalloon();  // 들어가기
+            }
+            else 
+            {
+                // TODL : 서버 다운로드할지 물어보기
+                UnityEngine.Debug.Log("No Install File");
+            }
+        }
+    }
+
+
     // 서버 실행 함수
     public static Process StartServer()
     {
@@ -49,7 +80,9 @@ public class ServerManager : MonoBehaviour
         }
         
         string streamingAssetsPath = Application.streamingAssetsPath;  // StreamingAssets 폴더 경로
-        string jarvisServerPath = Path.Combine(streamingAssetsPath, "jarvis_server_jp.exe");
+        string executablePath = Application.dataPath;  // Unity 실행 파일이 있는 폴더 경로
+        string jarvisServerPath = Path.Combine(Path.GetDirectoryName(executablePath), "jarvis_server_jp.exe");
+
         if (File.Exists(jarvisServerPath))
         {
             // jarvis_server_jp.exe 실행
@@ -133,16 +166,48 @@ public class ServerManager : MonoBehaviour
     {
         try
         {
+            string serverType = SettingManager.Instance.settings.ui_language;
+            string language = SettingManager.Instance.settings.sound_language;  // preloading용 치명적이지는 않음
+
             ProcessStartInfo startInfo = new ProcessStartInfo
             {
                 FileName = serverExePath,
+                Arguments = $"{serverType} {language}", // 변수 전달
                 UseShellExecute = false,
                 CreateNoWindow = true, // 콘솔 창을 표시하지 않음
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
+                // RedirectStandardOutput = true,
+                // RedirectStandardError = true,
+                // WorkingDirectory = Path.GetDirectoryName(serverExePath) // 실행 파일의 폴더를 작업 디렉토리로 설정
             };
 
             Process serverProcess = Process.Start(startInfo);
+
+            // 로그 파일에 실시간으로 출력 (출력, 오류)
+            string logFilePath = Path.Combine(Application.dataPath, "jarvis_server_log.txt");  // 로그 파일 경로
+            using (StreamWriter logWriter = new StreamWriter(logFilePath, true))
+            {
+                serverProcess.OutputDataReceived += (sender, e) =>
+                {
+                    if (e.Data != null)
+                    {
+                        logWriter.WriteLine("[OUTPUT] " + e.Data);
+                        logWriter.Flush();
+                    }
+                };
+
+                serverProcess.ErrorDataReceived += (sender, e) =>
+                {
+                    if (e.Data != null)
+                    {
+                        logWriter.WriteLine("[ERROR] " + e.Data);
+                        logWriter.Flush();
+                    }
+                };
+
+                serverProcess.BeginOutputReadLine();  // 비동기적 출력 읽기 시작
+                serverProcess.BeginErrorReadLine();   // 비동기적 오류 읽기 시작
+            }
+
             UnityEngine.Debug.Log("jarvis_server_jp.exe 실행 완료");
             return serverProcess;
         }
@@ -180,6 +245,40 @@ public class ServerManager : MonoBehaviour
     {
         // 다운로드 관련 로직을 여기에 추가
         UnityEngine.Debug.Log("Install_3D.exe 다운로드 중...");
+    }
+
+    // 프로그램 종료시 실행
+    private void OnApplicationQuit()
+    {
+        KillJarvisServer();
+    }
+
+    // 서버 프로그램 종료
+    private void KillJarvisServer()
+    {
+        string processName = "jarvis_server_jp";
+        Process[] processes = Process.GetProcessesByName(processName);
+
+        if (processes.Length > 0)
+        {
+            foreach (Process process in processes)
+            {
+                try
+                {
+                    // 프로세스 종료
+                    process.Kill();
+                    UnityEngine.Debug.Log($"{processName}.exe has been killed.");
+                }
+                catch (System.Exception ex)
+                {
+                    UnityEngine.Debug.LogError($"Failed to kill {processName}.exe: {ex.Message}");
+                }
+            }
+        }
+        else
+        {
+            UnityEngine.Debug.Log($"{processName}.exe is not running.");
+        }
     }
 
 }
