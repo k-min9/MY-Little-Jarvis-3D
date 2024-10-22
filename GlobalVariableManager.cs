@@ -5,6 +5,7 @@ using UnityEngine;
 
 /**
 기본적인 Diaglogue는 json에 저장하고 불러온다.
+DialogueManager로 교체
 */
 [Serializable]
 public struct SettingVariable
@@ -55,7 +56,7 @@ public class GlobalVariableManager : MonoBehaviour
     void Start()
     {
         // StreamingAssets 폴더의 경로 설정
-        jsonFilePath = Path.Combine(Application.streamingAssetsPath, "Voices/Mari/Mari_Voiceover.json");
+        jsonFilePath = Path.Combine(Application.streamingAssetsPath, "Sound/Mari/Mari_Voiceover.json");
 
         LoadDialoguesFromJSON();
     }
