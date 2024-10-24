@@ -51,10 +51,10 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler
             this.m_ContextMenu.Clear();
 
             // 메뉴 추가
-            m_ContextMenu.AddMenuItem("SimpleBalloonTest", delegate { 
-                AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimple();
-                AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Work in Progress...");
-            });
+            // m_ContextMenu.AddMenuItem("SimpleBalloonTest", delegate { 
+            //     AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+            //     AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Work in Progress...");
+            // });
             m_ContextMenu.AddMenuItem("Settings", delegate { 
                 UIManager.Instance.showSettings();  // 캐릭터 변경 UI 보이기
             });
@@ -62,33 +62,29 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler
                 StatusManager.Instance.IsFalling = false;
                 StatusManager.Instance.IsPicking = false;
                 StatusManager.Instance.IsOptioning = false;
-                PhysicsManager.instance.SetIdleState();  // TODO : 캐릭터 spawn 만들 경우, 싱글톤에서 handler 까지 낮춰야 함
+                PhysicsManager.Instance.SetIdleState();  // TODO : 캐릭터 spawn 만들 경우, 싱글톤에서 handler 까지 낮춰야 함
             });
             m_ContextMenu.AddMenuItem("Go Left", delegate { 
                 StatusManager.Instance.IsFalling = false;
                 StatusManager.Instance.IsPicking = false;
                 StatusManager.Instance.IsOptioning = false;
-                PhysicsManager.instance.SetWalkLeftState();  // TODO : 캐릭터 spawn 만들 경우, 싱글톤에서 handler 까지 낮춰야 함
+                PhysicsManager.Instance.SetWalkLeftState();  // TODO : 캐릭터 spawn 만들 경우, 싱글톤에서 handler 까지 낮춰야 함
             });
             m_ContextMenu.AddMenuItem("Go Right", delegate { 
                 StatusManager.Instance.IsFalling = false;
                 StatusManager.Instance.IsPicking = false;
                 StatusManager.Instance.IsOptioning = false;
-                PhysicsManager.instance.SetWalkRightState();  // TODO : 캐릭터 spawn 만들 경우, 싱글톤에서 handler 까지 낮춰야 함
+                PhysicsManager.Instance.SetWalkRightState();  // TODO : 캐릭터 spawn 만들 경우, 싱글톤에서 handler 까지 낮춰야 함
             });
             m_ContextMenu.AddMenuItem("Change Char", delegate { 
-                // CharManager.Instance.ChangeNextChar(); // 다음캐릭터로 변경
                 UIManager.Instance.ShowCharChange();  // 캐릭터 변경 UI 보이기
             });
             m_ContextMenu.AddMenuItem("Change Clothes", delegate { 
-                // CharManager.Instance.ChangeNextChar(); // 다음캐릭터로 변경
-                UIManager.Instance.ShowCharChange();  // 캐릭터 변경 UI 보이기
+                CharManager.Instance.ChangeClothes();  // 캐릭터 옷 갈아입기
             });
             m_ContextMenu.AddMenuItem("Change Monitor", delegate { 
                 _transparentWindow.NextMonitor(); 
-            });
-            
-            
+            });      
             // m_ContextMenu.AddMenuItem("Set Screenshot Area", delegate {  
             //     ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();  // 최상위 ScreenshotManager
             //     sm.SetScreenshotArea();
@@ -98,7 +94,10 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler
             //     sm.SaveScreenshot(); 
             // });
             m_ContextMenu.AddMenuItem("Local AI Server", delegate { 
-                ServerManager.StartServer(); 
+                ServerManager.AskStartServer();
+            });
+            m_ContextMenu.AddMenuItem("Version", delegate { 
+                UIManager.Instance.ShowVersion();  // 캐릭터 변경 UI 보이기
             });
             m_ContextMenu.AddMenuItem("Exit", delegate { Application.Quit(); 
             });
