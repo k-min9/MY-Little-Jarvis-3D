@@ -74,7 +74,12 @@ public class TrayIconManager : MonoBehaviour
     private void OnApplicationQuit()
     {
         // Clean up the tray icon
-        trayIcon.Visible = false;
+        try {
+            trayIcon.Visible = false;
+        } catch {
+            Debug.Log("quit");
+        }
+        
     }
 
     // Import the ShowWindow function to minimize the window
