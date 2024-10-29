@@ -52,7 +52,6 @@ public class VoiceManager : MonoBehaviour
             // string fullPath = "file://" + Application.dataPath + audioPath;  // Assets 패키지화 할 경우 사용
             // string fullPath = "file://" + Application.streamingAssetsPath  + audioPath;  // Assets>StreamingAssets 활용시 사용
             string fullPath = Path.Combine(Application.streamingAssetsPath, audioPath);
-            Debug.Log("audioPath : " + fullPath);
             StartCoroutine(LoadAudioOGG(fullPath));
         } catch {
             
@@ -190,6 +189,23 @@ public class VoiceManager : MonoBehaviour
         }
 
         return null;
+    }
+
+    public void ResetAudio()
+    {
+        // 현재 재생 중인 오디오를 멈춤
+        if (audioSource.isPlaying)
+        {
+            audioSource.Stop();
+        }
+
+        // 오디오 큐를 비움
+        clipQueue.Clear();
+
+        // 재생 플래그를 false로 설정
+        isQueuePlaying = false;
+
+        Debug.Log("Audio playback stopped and queue cleared.");
     }
 
     // VoiceManager 인스턴스에 접근하는 함수
