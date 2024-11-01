@@ -49,7 +49,7 @@
 
 - TextMeshPro
 - Font : 상업화이용까지 가능한 폰트
-  - 일본어, 영어 : NotoSansJP
+  - 일본어, 영어 : NotoSansJP - kgsi/japanese_full.txt
   - 한국어 : Fallback으로 SUIT
 
 ## Script
@@ -93,5 +93,7 @@
 
 ### Windows API 사용
 
-- Plugins에 C:\Windows\Microsoft.NET\Framework64\v4.0.30319에서 가져온 System.Drawing.dll 이동
+- Plugins에 C:\Windows\Microsoft.NET\Framework64\v4.0.30319에서 가져온 dll 이동
+  - System.Drawing.dll : ScreenShotManager에서 사용
+  - System.Windows.Forms.dll : TrayIconManager에서 사용
 - Project Settings>Other Settings>API compatibility Level을 .Net Standard 2.1에서 Framework로 변경
