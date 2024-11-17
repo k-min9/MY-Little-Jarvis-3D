@@ -14,6 +14,24 @@ public class FaceTextureChanger : MonoBehaviour
     {
         // charamouth.png를 8개의 텍스처로 초기화 (상단부터 0~7번 선택)
         InitMouthTextures(initTexture, 8, 8, 20); // 최대 8개의 텍스처
+        SetMouth(0);
+    }
+
+    void Update()
+    {
+        // 키보드 숫자 1, 2, 3 입력을 감지하여 SetMouth 호출
+        if (Input.GetKeyDown(KeyCode.Alpha1))
+        {
+            SetMouth(1);
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha2))
+        {
+            SetMouth(2);
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha3))
+        {
+            SetMouth(3);
+        }
     }
 
 
@@ -66,6 +84,134 @@ public class FaceTextureChanger : MonoBehaviour
         }
 
         Debug.Log($"총 {mouthTextures.Length}개의 입 텍스처가 초기화되었습니다.");
+    }
+
+    // private Texture2D ResizeTexture(Texture2D source, int targetWidth, int targetHeight)
+    // {
+    //     // RenderTexture를 사용하여 텍스처 리샘플링
+    //     RenderTexture rt = RenderTexture.GetTemporary(targetWidth, targetHeight);
+    //     Graphics.Blit(source, rt);
+
+    //     RenderTexture previous = RenderTexture.active;
+    //     RenderTexture.active = rt;
+
+    //     // 새로운 크기로 읽기 가능한 텍스처 생성
+    //     Texture2D result = new Texture2D(targetWidth, targetHeight, TextureFormat.RGBA32, false);
+    //     result.ReadPixels(new Rect(0, 0, targetWidth, targetHeight), 0, 0);
+    //     result.Apply();
+
+    //     RenderTexture.active = previous;
+    //     RenderTexture.ReleaseTemporary(rt);
+
+    //     return result;
+    // }
+
+    private Texture2D ResizeTexture(Texture2D source, int newWidth, int newHeight)
+    {
+        RenderTexture rt = new RenderTexture(newWidth, newHeight, 0);
+        RenderTexture.active = rt;
+        Graphics.Blit(source, rt);
+
+        Texture2D result = new Texture2D(newWidth, newHeight, TextureFormat.RGBA32, false);
+        result.ReadPixels(new Rect(0, 0, newWidth, newHeight), 0, 0);
+        result.Apply();
+
+        RenderTexture.active = null;
+        rt.Release();
+
+        return result;
+    }
+
+
+    private Texture2D EnsureTextureReadable(Texture2D texture)
+    {
+        if (texture.isReadable)
+            return texture;
+
+        // 새 Texture2D 생성 (원본과 동일한 크기와 RGBA32 포맷)
+        Texture2D readableTexture = new Texture2D(texture.width, texture.height, TextureFormat.RGBA32, false);
+
+        // RenderTexture를 사용하여 원본 텍스처 복사
+        RenderTexture rt = RenderTexture.GetTemporary(texture.width, texture.height, 0);
+        Graphics.Blit(texture, rt);
+
+        RenderTexture previous = RenderTexture.active;
+        RenderTexture.active = rt;
+
+        readableTexture.ReadPixels(new Rect(0, 0, texture.width, texture.height), 0, 0);
+        readableTexture.Apply();
+
+        RenderTexture.active = previous;
+        RenderTexture.ReleaseTemporary(rt);
+
+        return readableTexture;
+    }
+
+
+    public void SetMouth(int index)
+    {
+        // 기본 얼굴 텍스처 확인
+        // Texture2D baseTexture = faceMaterial.mainTexture as Texture2D;
+        // baseTexture = EnsureTextureReadable(baseTexture);
+        faceTexture = EnsureTextureReadable(faceTexture);
+
+        // 최종 텍스처 생성 (기본 텍스처와 동일한 크기 및 포맷)
+        Texture2D finalTexture = new Texture2D(faceTexture.width, faceTexture.height, TextureFormat.RGBA32, false);
+        finalTexture.SetPixels(faceTexture.GetPixels());   // 기본 텍스처 복사
+
+        // 입 텍스처 삽입
+        // Texture2D mouthTexture = EnsureTextureReadable(mouthTextures[index]);
+        Texture2D mouthTexture = mouthTextures[index];
+
+        // mouthRect에 맞게 크기 조절
+        Texture2D resizedMouth = ResizeTexture(mouthTexture, (int)mouthRect.width, (int)mouthRect.height);
+        // SaveTextureToFile(resizedMouth, "resizedMouth.png");
+        
+        // 리샘플링된 픽셀 가져오기
+        Color[] resizedPixels = resizedMouth.GetPixels();
+        Color[] basePixels = finalTexture.GetPixels();
+
+        // 투명하지 않은 픽셀만 적용
+        int startX = (int)mouthRect.x;
+        int startY = (int)mouthRect.y;
+
+        for (int y = 0; y < resizedMouth.height; y++)
+        {
+            for (int x = 0; x < resizedMouth.width; x++)
+            {
+                int mouthIndex = y * resizedMouth.width + x;
+                int finalIndex = (startY + y) * finalTexture.width + (startX + x);
+
+                Color mouthPixel = resizedPixels[mouthIndex];
+
+                // 알파 값이 0보다 크다면 덮어쓰기
+                if (mouthPixel.a > 0)
+                {
+                    basePixels[finalIndex] = mouthPixel;
+                }
+            }
+        }
+
+        // 변경사항 적용
+        finalTexture.SetPixels(basePixels);
+        finalTexture.Apply();
+        SaveTextureToFile(finalTexture, "finalTexture.png");
+
+        // 변경사항 적용
+        finalTexture.Apply();
+
+        // 최종 텍스처를 마테리얼에 설정
+        faceMaterial.mainTexture = finalTexture;
+
+        Debug.Log($"SetMouth({index}) 성공적으로 호출됨.");
+    }
+
+    private void SaveTextureToFile(Texture2D texture, string filename)
+    {
+        byte[] bytes = texture.EncodeToPNG(); // PNG로 변환
+        string path = Application.dataPath + "/" + filename; // 저장 경로 설정
+        System.IO.File.WriteAllBytes(path, bytes); // 파일로 저장
+        Debug.Log($"텍스처가 저장되었습니다: {path}");
     }
 
 }
