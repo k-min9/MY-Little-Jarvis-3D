@@ -1,7 +1,9 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using UnityEngine.Networking;
 
 /**
 기본적인 Diaglogue는 json에 저장하고 불러온다.
@@ -52,25 +54,77 @@ public class DialogueManager : MonoBehaviour
             string voicePath = CharManager.Instance.GetVoicePath(CharManager.Instance.GetCurrentCharacter());
             jsonFilePath = Path.Combine(Application.streamingAssetsPath, voicePath);
 
+    #if UNITY_ANDROID && !UNITY_EDITOR
+            StartCoroutine(LoadJsonFile(jsonFilePath, (json) =>
+            {
+                AssignDialogues(json);
+            }));
+    #else
             string json = File.ReadAllText(jsonFilePath);
-            // Debug.Log(json);
-            DialogueCategoryWrapper wrapper = JsonUtility.FromJson<DialogueCategoryWrapper>(json);
-
-            // 각각의 대사 리스트에 데이터 할당
-            greetings = wrapper.greetings;
-            idle = wrapper.idle;
-            select = wrapper.select;
-            pick = wrapper.pick;
+            AssignDialogues(json);
+    #endif
         }
         catch (Exception ex)
         {
-            // 각각의 대사 리스트에 데이터 할당
-            greetings = new List<Dialogue>();
-            idle = new List<Dialogue>();
-            select = new List<Dialogue>();
-            pick = new List<Dialogue>();
+            Debug.LogError($"Error loading dialogues: {ex.Message}");
+            InitializeEmptyDialogues();
+        }
+    }
+
+    public IEnumerator IEnumLoadDialoguesFromJSON()
+    {
+        string voicePath = CharManager.Instance.GetVoicePath(CharManager.Instance.GetCurrentCharacter());
+        jsonFilePath = Path.Combine(Application.streamingAssetsPath, voicePath);
+
+        // Android에서 JSON 파일을 비동기적으로 로드
+        yield return StartCoroutine(LoadJsonFile(jsonFilePath, (json) =>
+        {
+            AssignDialogues(json);
+        }));
+    }
+
+    // 안드로이드에서 JSON 파일 읽기
+    private IEnumerator LoadJsonFile(string filePath, Action<string> callback)
+    {
+        UnityWebRequest request = UnityWebRequest.Get(filePath);
+        yield return request.SendWebRequest();
+
+        if (request.result == UnityWebRequest.Result.Success)
+        {
+            callback?.Invoke(request.downloadHandler.text);
+        }
+        else
+        {
+            Debug.LogError($"Error reading JSON from {filePath}: {request.error}");
+            callback?.Invoke(string.Empty);
+        }
+    }
+
+    // 대사 데이터를 JSON에서 할당
+    private void AssignDialogues(string json)
+    {
+        if (string.IsNullOrEmpty(json))
+        {
+            InitializeEmptyDialogues();
+            return;
         }
 
+        DialogueCategoryWrapper wrapper = JsonUtility.FromJson<DialogueCategoryWrapper>(json);
+
+        // 각각의 대사 리스트에 데이터 할당
+        greetings = wrapper.greetings;
+        idle = wrapper.idle;
+        select = wrapper.select;
+        pick = wrapper.pick;
+    }
+
+    // 대사 리스트 초기화
+    private void InitializeEmptyDialogues()
+    {
+        greetings = new List<Dialogue>();
+        idle = new List<Dialogue>();
+        select = new List<Dialogue>();
+        pick = new List<Dialogue>();
     }
 
     // JSON 파일 저장
