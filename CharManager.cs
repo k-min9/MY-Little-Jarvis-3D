@@ -1,5 +1,7 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Networking;
 
 public class CharManager : MonoBehaviour
 {
@@ -157,12 +159,17 @@ public class CharManager : MonoBehaviour
         // 현재 인덱스 업데이트
         charIndex = index;
 
+    #if UNITY_ANDROID && !UNITY_EDITOR  // 안드로이드
+        // 현재 Dialogue 업데이트 + 변경 음성 출력
+        StartCoroutine(LoadAndPlayGreeting());
+    #else
         // 현재 Dialogue 업데이트
         DialogueManager.instance.LoadDialoguesFromJSON();
 
-        // 변경 음성 출력(TODO : Setting으로 옮기기)
+        // 변경 음성 출력
         Dialogue greeting = DialogueManager.instance.GetRandomGreeting();
         VoiceManager.Instance.PlayAudioFromPath(greeting.filePath);
+    #endif
 
         // TODO : 이펙트(FX, SFX) 효과
 
@@ -177,6 +184,19 @@ public class CharManager : MonoBehaviour
             Debug.Log("Character has no nickname.");
         }
     }
+
+    public IEnumerator LoadAndPlayGreeting()
+    {
+        // JSON 로드 대기
+        yield return StartCoroutine(DialogueManager.instance.IEnumLoadDialoguesFromJSON());
+
+        // JSON 로드 완료 후 랜덤 대사 가져오기
+        Dialogue greeting = DialogueManager.instance.GetRandomGreeting();
+
+        // 변경 음성 출력
+        VoiceManager.Instance.PlayAudioFromPath(greeting.filePath);
+    }
+
 
     // 캐릭터 교체 from gameobject
     public void ChangeCharacterFromGameObject(GameObject obj)
@@ -233,8 +253,9 @@ public class CharManager : MonoBehaviour
                 if (charAttributes.changeClothes!=null)
                 {
                     ChangeCharacterFromGameObject(charAttributes.changeClothes);
-                    Dialogue greeting = DialogueManager.instance.GetRandomGreeting();
-                    VoiceManager.Instance.PlayAudioFromPath(greeting.filePath);
+                    // 왜 재생 음성 여기서도..?
+                    // Dialogue greeting = DialogueManager.instance.GetRandomGreeting();
+                    // VoiceManager.Instance.PlayAudioFromPath(greeting.filePath);
                 } else {
                     charAttributes.toggleClothes.SetActive(true);
                 }
