@@ -47,6 +47,7 @@ public class VoiceManager : MonoBehaviour
     // 경로로부터 오디오를 로드하고 재생하는 함수
     public void PlayAudioFromPath(string audioPath)
     {
+        // audioPath = "Sound/arona/Arona_Attendance_Enter_1.ogg";
         try
         {
             // string fullPath = "file://" + Application.dataPath + audioPath;  // Assets 패키지화 할 경우 사용
@@ -149,7 +150,15 @@ public class VoiceManager : MonoBehaviour
     public void LoadAudioWavToQueue()
     {
         string audioPath = Path.Combine(Application.persistentDataPath, "response.wav");
+
+        #if UNITY_ANDROID
+        // 안드로이드에서 파일 경로가 다를 경우 처리 방식 다르게 적용
+        string audioPathAndroid = "file://" + audioPath; // 안드로이드에서는 "file://" 경로를 사용해야 할 수 있음.
+        StartCoroutine(LoadAudioWavToQueueEnum(audioPathAndroid));
+        #else
+        // 안드로이드가 아닌 플랫폼에서는 일반적인 파일 경로를 사용
         StartCoroutine(LoadAudioWavToQueueEnum(audioPath));
+        #endif
     }
 
     // WAV 파일을 로드하고 Queue에 추가하는 코루틴
