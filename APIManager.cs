@@ -4,9 +4,11 @@ using System.IO;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using System.Collections;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
+using UnityEngine.Networking;
 
 public class APIManager : MonoBehaviour
 {
@@ -18,6 +20,8 @@ public class APIManager : MonoBehaviour
     private bool isResponsedStarted = false; // 첫 반환이 돌아왔는지 여부
     private string logFilePath; // 로그 파일 경로
 
+    // 서버 관련
+    public string ngrokUrl = null;  // 없으면 없는데로 오케이
 
     // 싱글톤 인스턴스
     private static APIManager instance;
@@ -55,6 +59,11 @@ public class APIManager : MonoBehaviour
         // 로그 파일 생성
         Directory.CreateDirectory(Path.GetDirectoryName(logFilePath)); // 디렉토리가 없으면 생성
         File.AppendAllText(logFilePath, $"Log started at: {DateTime.Now}\n");
+
+        // supabase에서 ngrok url 가져오기
+        StartCoroutine(FetchNgrokJsonData());
+        
+
     }
 
     // 로그 기록 메서드
@@ -227,7 +236,18 @@ public class APIManager : MonoBehaviour
     // chatHandler에서 호출
     public async void CallConversationStream(string query)
     {
-        string streamUrl = "http://127.0.0.1:5000/conversation_stream";
+        // API 호출을 위한 URL 구성
+        string baseUrl = "";
+#if UNITY_ANDROID && !UNITY_EDITOR
+        if (APIManager.Instance.ngrokUrl == null) {
+            baseUrl = "https://minmin496969.loca.lt";
+        } else {
+            baseUrl = APIManager.Instance.ngrokUrl;  // ex) https://8e5c-1-237-90-223.ngrok-free.app
+        }
+#else
+        baseUrl = "http://127.0.0.1:5000";
+#endif
+        string streamUrl = baseUrl+"/conversation_stream";
         // 닉네임 가져오기
         string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
         string player_name = SettingManager.Instance.settings.player_name;
@@ -252,8 +272,21 @@ public class APIManager : MonoBehaviour
     public async void GetKoWavFromAPI(string text)
     {
         // API 호출을 위한 URL 구성
-        string url = "http://127.0.0.1:5000/getSound/ko"; // GET + Uri.EscapeDataString(text);
+        string baseUrl = "";
+#if UNITY_ANDROID && !UNITY_EDITOR
+        if (APIManager.Instance.ngrokUrl == null) {
+            baseUrl = "https://minmin496969.loca.lt";
+        } else {
+            baseUrl = APIManager.instance.ngrokUrl;  // ex) https://8e5c-1-237-90-223.ngrok-free.app
+        }
+#else
+        baseUrl = "http://127.0.0.1:5000";
+#endif
+        string url = baseUrl+"/getSound/ko"; // GET + Uri.EscapeDataString(text);
 
+        // 닉네임 가져오기
+        string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
+        
         // HttpWebRequest 객체 생성
         HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
         request.Method = "POST";
@@ -262,6 +295,9 @@ public class APIManager : MonoBehaviour
         var requestData = new Dictionary<string, string>
         {
             { "text", text},
+            { "char", nickname},
+            { "lang", "ja"},
+            { "speed", SettingManager.Instance.settings.sound_speedMaster.ToString()}
         };
         string jsonData = JsonConvert.SerializeObject(requestData);
         byte[] byteArray = Encoding.UTF8.GetBytes(jsonData);
@@ -309,10 +345,20 @@ public class APIManager : MonoBehaviour
         }
     }
 
-        public async void GetJpWavFromAPI(string text)
+    public async void GetJpWavFromAPI(string text)
     {
         // API 호출을 위한 URL 구성
-        string url = "http://127.0.0.1:5000/getSound/jp"; 
+        string baseUrl = "";
+#if UNITY_ANDROID && !UNITY_EDITOR
+        if (APIManager.Instance.ngrokUrl == null) {
+            baseUrl = "https://minmin496969.loca.lt";
+        } else {
+            baseUrl = APIManager.Instance.ngrokUrl;  // ex) https://8e5c-1-237-90-223.ngrok-free.app
+        }
+#else
+        baseUrl = "http://127.0.0.1:5000";
+#endif
+        string url = baseUrl+"/getSound/jp"; // GET + Uri.EscapeDataString(text);
 
         // 닉네임 가져오기
         string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
@@ -326,6 +372,8 @@ public class APIManager : MonoBehaviour
         {
             { "text", text},
             { "char", nickname},
+            { "lang", "ja"},
+            { "speed", SettingManager.Instance.settings.sound_speedMaster.ToString()}
         };
         string jsonData = JsonConvert.SerializeObject(requestData);
         byte[] byteArray = Encoding.UTF8.GetBytes(jsonData);
@@ -342,7 +390,7 @@ public class APIManager : MonoBehaviour
             // 비동기 방식으로 요청 보내기
             using (HttpWebResponse response = (HttpWebResponse)await request.GetResponseAsync())
             {
-                Debug.Log(response);
+                Debug.Log(response.StatusCode);
                 // 요청이 성공했는지 확인
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
@@ -366,7 +414,8 @@ public class APIManager : MonoBehaviour
         }
         catch (WebException ex)
         {
-            Debug.LogError($"WebException: {ex.Message}");
+            // early stop 등의 거절도 여기로 보냈음
+            Debug.LogError($"WebException: {ex.Message}\nerror Text : {text}");
         }
         catch (Exception ex)
         {
@@ -387,6 +436,17 @@ public class APIManager : MonoBehaviour
     // 파일을 persistentDataPath에 저장
     private void SaveWavToFile(byte[] wavData)
     {
+        // WAV 파일의 길이를 계산
+        float wavDuration = GetWavDuration(wavData);
+        Debug.Log("wavDuration : " + wavDuration);
+
+        // 10초를 초과하면 저장/재생하지 않음
+        if (wavDuration > 10f)
+        {
+            Debug.LogWarning("WAV file is longer than 10 seconds. File will not be saved.");
+            return;
+        }
+
         string filePath = Path.Combine(Application.persistentDataPath, "response.wav");       
         try
         {
@@ -399,4 +459,102 @@ public class APIManager : MonoBehaviour
             Debug.LogError($"Error saving WAV file: {e.Message}");
         }
     }
+
+    // WAV 데이터에서 길이 계산
+    private float GetWavDuration(byte[] wavData)
+    {
+        // WAV 헤더를 분석
+        using (MemoryStream ms = new MemoryStream(wavData))
+        using (BinaryReader reader = new BinaryReader(ms))
+        {
+            // "RIFF" 체크
+            string riff = new string(reader.ReadChars(4));
+            if (riff != "RIFF")
+            {
+                Debug.LogError("Invalid WAV file: Missing RIFF header.");
+                return 0f;
+            }
+
+            reader.ReadInt32(); // Chunk Size (무시)
+            string wave = new string(reader.ReadChars(4));
+            if (wave != "WAVE")
+            {
+                Debug.LogError("Invalid WAV file: Missing WAVE header.");
+                return 0f;
+            }
+
+            // "fmt " 체크
+            string fmt = new string(reader.ReadChars(4));
+            if (fmt != "fmt ")
+            {
+                Debug.LogError("Invalid WAV file: Missing fmt header.");
+                return 0f;
+            }
+
+            int fmtChunkSize = reader.ReadInt32();
+            reader.ReadInt16(); // Audio Format (무시)
+            int numChannels = reader.ReadInt16();
+            int sampleRate = reader.ReadInt32();
+            reader.ReadInt32(); // Byte Rate (무시)
+            reader.ReadInt16(); // Block Align (무시)
+            int bitsPerSample = reader.ReadInt16();
+
+            // "data" 체크
+            string dataHeader = new string(reader.ReadChars(4));
+            if (dataHeader != "data")
+            {
+                Debug.LogError("Invalid WAV file: Missing data header.");
+                return 0f;
+            }
+
+            int dataSize = reader.ReadInt32();
+
+            // WAV 길이 계산
+            int totalSamples = dataSize / (bitsPerSample / 8 * numChannels);
+            return (float)totalSamples / sampleRate;
+        }
+    }
+
+    [System.Serializable]
+    public class NgorokJsonResponse
+    {
+        public string url;
+    }
+
+    // JSON 파일을 다운로드하고 url 값을 반환
+    private IEnumerator FetchNgrokJsonData()
+    {
+        string ngrokSupabaseUrl = "https://hvqoarxlvxrrtgvisgsi.supabase.co/storage/v1/object/public/json_bucket/my_little_jarvis_plus_ngrok_server.json";
+        using (UnityWebRequest request = UnityWebRequest.Get(ngrokSupabaseUrl))
+        {
+            // 서버 요청
+            yield return request.SendWebRequest();
+
+            // 에러 처리
+            if (request.result == UnityWebRequest.Result.ConnectionError || request.result == UnityWebRequest.Result.ProtocolError)
+            {
+                Debug.LogError($"Error fetching JSON data: {request.error}");
+            }
+            else
+            {
+                // JSON 데이터를 문자열로 가져옴
+                string jsonResponse = request.downloadHandler.text;
+
+                // JSON 데이터 파싱
+                NgorokJsonResponse data = JsonUtility.FromJson<NgorokJsonResponse>(jsonResponse);
+
+                // url 값 반환 및 출력
+                if (data != null && !string.IsNullOrEmpty(data.url))
+                {
+                    Debug.Log($"Fetched URL: {data.url}");
+                    ngrokUrl = data.url;
+                }
+                else
+                {
+                    Debug.LogError("Invalid JSON data or 'url' field is missing.");
+                }
+            }
+        }
+    }
+    
 }
