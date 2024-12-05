@@ -1,19 +1,20 @@
 using UnityEngine;
 
+// 캐릭터 최상위에 두는걸 추천(Todo : 나중에 Manager화 고려)
 public class FaceTextureChanger : MonoBehaviour
 {
-    public Material faceMaterial; // 적용될 마테리얼
-    public Texture2D faceTexture; // 기본 얼굴 텍스처
-    public Texture2D initTexture; // 초기화할 charamouth.png
-    public Texture2D[] mouthTextures; // 동적으로 바꿀 입 텍스처들
-    public Rect mouthRect; // 각 입 텍스처의 영역
+    public Material faceMaterial; // 마테리얼 파일 : EyeMouth.mat
+    public Texture2D faceTexture; // EyeMouth.png : readable, default
+    public Texture2D mouthTexture; // charamouth.png : readable, default
+    public Texture2D[] mouthTextures; // charamouth.png를 잘라서 바꿀 입 텍스처들 (입력 금지)
+    public Rect mouthRect; // 각 입 텍스처의 영역 (x,y시작점(좌하) * w,h)
 
     private Texture2D combinedTexture;
 
     void Start()
     {
         // charamouth.png를 8개의 텍스처로 초기화 (상단부터 0~7번 선택)
-        InitMouthTextures(initTexture, 8, 8, 20); // 최대 8개의 텍스처
+        InitMouthTextures(mouthTexture, 8, 8, 20); // 최대 8개의 텍스처
         SetMouth(0);
     }
 
