@@ -3,16 +3,23 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using System.IO;
 using System.Collections.Generic;
-using System.Threading;
 using System;
+using System.Collections;
+using UnityEngine.Networking;
+using TMPro;
 
 public class MicrophoneNormal : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 {
+
+    public TMP_InputField chatBalloonInputField;
+
     private AudioClip audioClip;
     private string microphoneDevice;
     private bool isRecording = false;
     private float startRecordingTime;
     private const float maxRecordingDuration = 30f; // 최대 30초 녹음
+
+    private byte[] wavData;
 
     public Button recordButton; // UI 버튼 참조
     public GameObject overlayFilter; // 버튼 누르는 동안 이미지 (UI 요소로 사용)
@@ -57,10 +64,11 @@ public class MicrophoneNormal : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
     public void OnPointerUp(PointerEventData eventData)
     {
-        if (isRecording)
-        {
-            StopRecording();
-        }
+        // 이중 체크 중
+        // if (isRecording)
+        // {
+        //     StopRecording();
+        // }
     }
 
     private void StartRecording()
@@ -76,7 +84,7 @@ public class MicrophoneNormal : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
         microphoneDevice = Microphone.devices[0]; // 첫 번째 마이크 선택
         audioClip = Microphone.Start(microphoneDevice, false, (int)maxRecordingDuration, 44100); // 최대 30초 녹음
-        // startRecordingTime = Time.time;
+        startRecordingTime = Time.time;
         isRecording = true;
     }
 
@@ -102,6 +110,7 @@ public class MicrophoneNormal : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         catch (Exception ex)
         {
             Debug.Log(ex);
+            return;
         }
         
 
@@ -141,7 +150,8 @@ public class MicrophoneNormal : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
 		samples.RemoveRange(i, samples.Count - i);
 
-		var clip = AudioClip.Create("TempClip", samples.Count, channels, hz, _3D, stream);
+		// var clip = AudioClip.Create("TempClip", samples.Count, channels, hz, _3D, stream);  // obsolete ver
+        var clip = AudioClip.Create("TempClip", samples.Count, channels, hz, false);
 
 		clip.SetData(samples.ToArray(), 0);
 
@@ -163,10 +173,13 @@ public class MicrophoneNormal : MonoBehaviour, IPointerDownHandler, IPointerUpHa
             float[] samples = new float[sampleCount];
             clip.GetData(samples, 0);
 
-            byte[] wavData = ConvertToWav(samples, clip.channels, clip.frequency);
+            wavData = ConvertToWav(samples, clip.channels, clip.frequency);
             fileStream.Write(wavData, 0, wavData.Length);
         }
         Debug.Log($"WAV file saved at: {filePath}");
+
+        // wav 전송 API 호출 테스트용()
+        StartCoroutine(SendWavFile(filePath, "ko", "normal"));
     }
 
     private byte[] ConvertToWav(float[] samples, int channels, int sampleRate)
@@ -207,4 +220,97 @@ public class MicrophoneNormal : MonoBehaviour, IPointerDownHandler, IPointerUpHa
             return stream.ToArray();
         }
     }
+
+// 반환 타입
+[System.Serializable]
+public class SttResponse
+{
+    public string text;
+    public string lang;
+}
+
+public IEnumerator SendWavFile(string filePath, string sttLang, string sttLevel)
+{
+
+// 직접 wavdata 구성시 사용
+// #if UNITY_ANDROID && !UNITY_EDITOR
+//     // Android에서는 UnityWebRequest로 파일 읽기
+//     string uri = "file://" + filePath;
+//     using (UnityWebRequest fileRequest = UnityWebRequest.Get(uri))
+//     {
+//         yield return fileRequest.SendWebRequest();
+
+//         if (fileRequest.result != UnityWebRequest.Result.Success)
+//         {
+//             Debug.LogError($"Error reading WAV file on Android: {fileRequest.error}");
+//             yield break;
+//         }
+//         wavData = fileRequest.downloadHandler.data;
+//     }
+// #else
+//     // 다른 플랫폼에서는 File.ReadAllBytes 사용
+//     if (!File.Exists(filePath))
+//     {
+//         Debug.LogError($"File not found: {filePath}");
+//         yield break;
+//     }
+//     wavData = File.ReadAllBytes(filePath);
+// #endif
+
+    // UnityWebRequest로 서버에 데이터 업로드
+    // API 호출을 위한 URL 구성
+    string baseUrl = "";
+#if UNITY_ANDROID && !UNITY_EDITOR
+    if (APIManager.Instance.ngrokUrl == null) {
+        baseUrl = "https://minmin496969.loca.lt";
+    } else {
+        baseUrl = APIManager.Instance.ngrokUrl;  // ex) https://8e5c-1-237-90-223.ngrok-free.app
+    }
+#else
+    baseUrl = "http://127.0.0.1:5000";
+#endif
+    string url = baseUrl+"/stt"; // http://localhost:5000/stt
+    
+    WWWForm formData = new WWWForm();
+    // formData.AddBinaryData("file", wavData, Path.GetFileName(filePath), "audio/wav");
+    formData.AddBinaryData("file", wavData, "stt.wav", "audio/wav");
+    formData.AddField("lang", "ko");
+    formData.AddField("level", "small");
+
+    UnityWebRequest request = UnityWebRequest.Post(url, formData);
+ 
+    // 요청 전송
+    yield return request.SendWebRequest();
+
+    // 결과 처리
+    if (request.result != UnityWebRequest.Result.Success)
+    {
+        Debug.LogError($"Error uploading WAV file: {request.error}");
+    }
+    else
+    {
+        // Debug.Log($"Upload successful! Response: {request.downloadHandler.text}");
+        try
+        {
+            // JSON 응답 파싱
+            string responseText = request.downloadHandler.text;
+
+            var responseJson = JsonUtility.FromJson<SttResponse>(responseText);
+            Debug.Log($"STT Text: {responseJson.text}");
+            Debug.Log($"Detected Language: {responseJson.lang}");
+
+            string query = responseJson.text ?? "";
+
+            chatBalloonInputField.text = query;
+
+            // 대화 시작
+            APIManager.Instance.CallConversationStream(query);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Error parsing JSON response: {ex.Message}");
+        }
+    }
+}
+
 }
