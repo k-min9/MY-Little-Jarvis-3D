@@ -12,60 +12,94 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
 
     public void OnPointerClick(PointerEventData eventData)
     {
-        if (StatusManager.Instance.IsDragging)    
-            return;
-        
+        // 드래그 중이나 옵션 설정중일 경우 return
+        if (StatusManager.Instance.IsDragging || StatusManager.Instance.IsOptioning) return;
+
+        // 안드로이드 터치
+#if UNITY_ANDROID && !UNITY_EDITOR
+        HandleClickMobile();
+#else
         // 좌클릭
-        if (eventData.button == PointerEventData.InputButton.Left) {
+        if (eventData.button == PointerEventData.InputButton.Left)
+        {
+            HandleLeftClick();
+        }
+        // 중앙클릭
+        if (eventData.button == PointerEventData.InputButton.Middle)
+        {
+            HandleMiddleClick();
+        }
+#endif
+    }
 
-            // 서버가 구동중인지 확인
-            if (ServerManager.IsJarvisServerRunning())
-            {
-                // TODO : ping 확인하는 함수(최대 20회 초당 1회)
-
-                // TODO : 현재 답변중이 아니게 변경
-                StatusManager.Instance.isAnswering = false;
-
-                // 재생중인 음성 중지 및 queue 초기화
-                VoiceManager.Instance.ResetAudio();
-
-
+    private void HandleClickMobile()
+    {
+        if (SettingManager.Instance.settings.isAskedTurnOnServer)  // TODO 변경 : Android 용 AI 모드 여부 변수로 변경
+        {
                 ChatBalloonManager.Instance.ShowChatBalloon();
-            } else {
-                // 서버 구동중이지 않음
-                if (SettingManager.Instance.settings.isAskedTurnOnServer)  // 서버구동 물어볼지 여부
+        }       
+        else
+        {
+            if (isAnimatorTriggerExists(_animator, "doSpecial"))
+            {
+                _animator.SetTrigger("doSpecial");
+                StatusManager.Instance.SetStatusTrueForSecond(value => StatusManager.Instance.IsOptioning = value, 7.5f);
+            }
+            else if (isAnimatorTriggerExists(_animator, "doSelect"))
+            {
+                Dialogue select = DialogueManager.Instance.GetRandomSelect();
+                DoDialogueBehaviour(select);
+            }
+            else
+            {
+                PlayRandomAnimation();
+            }
+        }
+    }
+
+    private void HandleLeftClick()
+    {
+        // 기존 좌클릭 처리 로직
+        if (ServerManager.IsJarvisServerRunning())
+        {
+            StatusManager.Instance.isAnswering = false;
+            VoiceManager.Instance.ResetAudio();
+            ChatBalloonManager.Instance.ShowChatBalloon();
+        }
+        else
+        {
+            if (SettingManager.Instance.settings.isAskedTurnOnServer)
+            {
+#if UNITY_EDITOR
+                ChatBalloonManager.Instance.ShowChatBalloon();
+#else
+                ServerManager.AskStartServer();
+#endif
+            }
+            else
+            {
+                if (isAnimatorTriggerExists(_animator, "doSpecial"))
                 {
-                // 에디터일 경우 바로 ChatBalloon 보여주기
-                #if UNITY_EDITOR
-                    ChatBalloonManager.Instance.ShowChatBalloon();
-                #else
-                    ServerManager.AskStartServer();
-                #endif
+                    _animator.SetTrigger("doSpecial");
+                    StatusManager.Instance.SetStatusTrueForSecond(value => StatusManager.Instance.IsOptioning = value, 7.5f);
                 }
-                else 
+                else if (isAnimatorTriggerExists(_animator, "doSelect"))
                 {
-                    // 애니메이션 재생, special>select(대사있음)>random 순으로
-                    if (isAnimatorTriggerExists(_animator, "doSpecial")) {  // special
-                        _animator.SetTrigger("doSpecial");
-                        StatusManager.Instance.SetStatusTrueForSecond(value => StatusManager.Instance.IsOptioning = value, 7.5f); // 15초간 isOptioning을 true로
-                    } else if (isAnimatorTriggerExists(_animator, "doSelect")) {  // select
-                        Dialogue select = DialogueManager.instance.GetRandomSelect();
-                        DoDialogueBehaviour(select); // select 행동 
-                    } else {  // random
-                        PlayRandomAnimation(); // 랜덤 애니메이션 재생
-                    }
+                    Dialogue select = DialogueManager.Instance.GetRandomSelect();
+                    DoDialogueBehaviour(select);
+                }
+                else
+                {
+                    PlayRandomAnimation();
                 }
             }
         }
-        // 중앙클릭
-        if (eventData.button == PointerEventData.InputButton.Middle) {
-            Dialogue idle = DialogueManager.instance.GetRandomIdle();
-            DoDialogueBehaviour(idle);// idle 행동 
-        }
-        // 우클릭 - Menu Triggger로 이동
-        // if (eventData.button == PointerEventData.InputButton.Right)
-        // {
-        // }
+    }
+
+    private void HandleMiddleClick()
+    {
+        Dialogue idle = DialogueManager.Instance.GetRandomIdle();
+        DoDialogueBehaviour(idle);
     }
 
     private void PlayRandomAnimation()
