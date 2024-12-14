@@ -26,6 +26,14 @@ public class ChatHandler : MonoBehaviour
         }
     }
 
+    // 입력 제출 처리 테스트
+    public void HandleInputSubmitTest()
+    {
+        string input = inputField.text;
+        Debug.Log("입력된 텍스트 (테스트용): " + input);
+        APIManager.Instance.CallConversationStream(input);
+    }
+
     // 입력에 따라 수행할 작업을 정의하는 함수
     private void PerformActionBasedOnInput(string input)
     {

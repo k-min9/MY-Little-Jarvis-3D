@@ -10,9 +10,6 @@ using TMPro;
 
 public class MicrophoneNormal : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 {
-
-    public TMP_InputField chatBalloonInputField;
-
     private AudioClip audioClip;
     private string microphoneDevice;
     private bool isRecording = false;
@@ -301,7 +298,7 @@ public IEnumerator SendWavFile(string filePath, string sttLang, string sttLevel)
 
             string query = responseJson.text ?? "";
 
-            chatBalloonInputField.text = query;
+            NoticeBalloonManager.Instance.ModifyNoticeBalloonText(query);
 
             // 대화 시작
             APIManager.Instance.CallConversationStream(query);

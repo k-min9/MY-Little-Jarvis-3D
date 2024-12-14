@@ -28,12 +28,16 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
     {
         // 기존 말풍선 제거
         AnswerBalloonManager.Instance.HideAnswerBalloon();
+        AnswerBalloonSimpleManager.Instance.HideAnswerBalloonSimple();
 
         // 기존 애니메이션 정지
         PhysicsManager.Instance.animator.Play("idle", 0, 0);  // 현재 애니메이션 강제 중지;
 
+        // 기존 음성 초기화
+        VoiceManager.Instance.ResetAudio();
+
         // Pick 상태 전환시의 음성 재생
-        Dialogue pick = DialogueManager.instance.GetRandomPick();
+        Dialogue pick = DialogueManager.Instance.GetRandomPick();
         VoiceManager.Instance.PlayAudioFromPath(pick.filePath);  // 음성 재생
         StatusManager.Instance.IsDragging = true;
         _animator.SetBool("isPick", true);

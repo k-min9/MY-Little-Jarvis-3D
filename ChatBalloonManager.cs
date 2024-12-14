@@ -22,7 +22,7 @@ public class ChatBalloonManager : MonoBehaviour
         }
         else
         {
-            Destroy(gameObject);
+            // Destroy(gameObject);
             return;
         }
 
@@ -73,6 +73,11 @@ public class ChatBalloonManager : MonoBehaviour
     {
         chatBalloon.SetActive(false);
         StatusManager.Instance.IsChatting = false; 
+//         // 안드로이드 테스트용
+// #if UNITY_ANDROID && !UNITY_EDITOR
+//         chatBalloon.SetActive(true);
+//         StatusManager.Instance.IsChatting = true; 
+// #endif
     }
 
     // chatBalloon의 위치를 캐릭터 바로 위로 조정하는 함수
