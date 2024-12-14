@@ -11,6 +11,24 @@ public class VoiceManager : MonoBehaviour
     private Queue<AudioClip> clipQueue = new Queue<AudioClip>(); // AudioClip을 저장하는 Queue
     private bool isQueuePlaying = false;  // 현재 재생 여부를 추적하는 플래그
 
+    // VoiceManager 인스턴스에 접근하는 함수
+    public static VoiceManager Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = FindObjectOfType<VoiceManager>();
+                if (instance == null)
+                {
+                    GameObject go = new GameObject("VoiceManager");
+                    instance = go.AddComponent<VoiceManager>();
+                }
+            }
+            return instance;
+        }
+    }
+    
     private void Awake()
     {
         // 싱글톤 패턴을 적용하여 유일한 인스턴스 유지
@@ -21,7 +39,7 @@ public class VoiceManager : MonoBehaviour
         }
         else
         {
-            Destroy(gameObject);
+            // Destroy(gameObject);
             return;
         }
     }
@@ -29,8 +47,8 @@ public class VoiceManager : MonoBehaviour
     void Start()
     {
         // 시작하자마자 재생
-        Dialogue greeting = DialogueManager.instance.GetRandomGreeting();
-        PlayAudioFromPath(greeting.filePath);
+        // Dialogue greeting = DialogueManager.Instance.GetRandomGreeting();
+        // PlayAudioFromPath(greeting.filePath);
         // PlayWavFromPersistentPath();
     }
 
@@ -38,7 +56,7 @@ public class VoiceManager : MonoBehaviour
     private void Update()
     {
         // AudioSource가 재생 중이지 않고, Queue에 클립이 있으면 다음 클립을 재생
-        if (!audioSource.isPlaying && clipQueue.Count > 0)
+        if (clipQueue.Count > 0 && !audioSource.isPlaying)
         {
             PlayNextClip();
         }
@@ -153,7 +171,7 @@ public class VoiceManager : MonoBehaviour
 
         #if UNITY_ANDROID
         // 안드로이드에서 파일 경로가 다를 경우 처리 방식 다르게 적용
-        string audioPathAndroid = "file://" + audioPath; // 안드로이드에서는 "file://" 경로를 사용해야 할 수 있음.
+        string audioPathAndroid = "file://" + audioPath; // 안드로이드+UnityWebRequest 에서는 "file://" 경로 필요
         StartCoroutine(LoadAudioWavToQueueEnum(audioPathAndroid));
         #else
         // 안드로이드가 아닌 플랫폼에서는 일반적인 파일 경로를 사용
@@ -215,23 +233,5 @@ public class VoiceManager : MonoBehaviour
         isQueuePlaying = false;
 
         Debug.Log("Audio playback stopped and queue cleared.");
-    }
-
-    // VoiceManager 인스턴스에 접근하는 함수
-    public static VoiceManager Instance
-    {
-        get
-        {
-            if (instance == null)
-            {
-                instance = FindObjectOfType<VoiceManager>();
-                if (instance == null)
-                {
-                    GameObject go = new GameObject("VoiceManager");
-                    instance = go.AddComponent<VoiceManager>();
-                }
-            }
-            return instance;
-        }
     }
 }

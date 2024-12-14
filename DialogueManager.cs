@@ -21,6 +21,17 @@ public class DialogueManager : MonoBehaviour
 {
     // 싱글톤 인스턴스
     public static DialogueManager instance;
+    public static DialogueManager Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = FindObjectOfType<DialogueManager>();
+            }
+            return instance;
+        }
+    }
 
     // 대사 리스트
     public List<Dialogue> greetings = new List<Dialogue>();
@@ -40,10 +51,13 @@ public class DialogueManager : MonoBehaviour
         }
         else
         {
-            Destroy(gameObject); // 이미 인스턴스가 존재하면 파괴
+            // Destroy(gameObject); // 이미 인스턴스가 존재하면 파괴
         }
+    }
 
-        LoadDialoguesFromJSON();
+    private void Start()
+    {
+        LoadDialoguesFromJSON();  // 현재 캐릭터의 JSON 파일 읽기 (CharManager 이후에 실행되어야 함. 안그러면 꼬임)
     }
 
     // 현재 캐릭터의 JSON 파일 읽기

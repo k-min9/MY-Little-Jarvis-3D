@@ -25,7 +25,7 @@ public class UIManager : MonoBehaviour
         }
         else
         {
-            Destroy(gameObject);
+            // Destroy(gameObject);
             return;
         }
 
@@ -33,6 +33,12 @@ public class UIManager : MonoBehaviour
         charChange.SetActive(false);
         version.SetActive(false);
         settings.SetActive(false);
+
+//         // 안드로이드 or 테스트용
+// #if UNITY_ANDROID || UNITY_EDITOR
+//         charChange.SetActive(true);
+//         settings.SetActive(true);
+// #endif
     }
 
     // 싱글톤 인스턴스에 접근하는 속성

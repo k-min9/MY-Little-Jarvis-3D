@@ -49,7 +49,7 @@ public class GlobalVariableManager : MonoBehaviour
         }
         else
         {
-            Destroy(gameObject); // 이미 인스턴스가 존재하면 파괴
+            // Destroy(gameObject); // 이미 인스턴스가 존재하면 파괴
         }
     }
 

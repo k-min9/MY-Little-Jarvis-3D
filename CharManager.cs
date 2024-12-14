@@ -6,7 +6,18 @@ using UnityEngine.Networking;
 public class CharManager : MonoBehaviour
 {
     // 싱글톤 인스턴스
-    public static CharManager Instance { get; private set; }
+    public static CharManager instance;
+    public static CharManager Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = FindObjectOfType<CharManager>();
+            }
+            return instance;
+        }
+    }
 
     // 캐릭터 프리팹 리스트
     public List<GameObject> charList;
@@ -21,20 +32,20 @@ public class CharManager : MonoBehaviour
 
     void Awake()
     {
+        // InitCharacter 호출해서 첫 번째 캐릭터를 생성
+        InitCharacter();
+
         // 싱글톤 설정
-        if (Instance == null)
+        if (instance == null)
         {
-            Instance = this;
+            instance = this;
             DontDestroyOnLoad(gameObject); // 씬이 바뀌어도 파괴되지 않도록 설정
         }
         else
         {
-            Destroy(gameObject);
-            return;
+            // Destroy(gameObject);
+            // return;
         }
-
-        // InitCharacter 호출해서 첫 번째 캐릭터를 생성
-        InitCharacter();
     }
 
     void Start()
@@ -73,6 +84,21 @@ public class CharManager : MonoBehaviour
             rectTransform.anchoredPosition3D = new Vector3(0, 0, -70);
         }
 
+        // 현재 인덱스 업데이트
+        charIndex = 0;
+
+    #if UNITY_ANDROID && !UNITY_EDITOR  // 안드로이드
+        // 현재 Dialogue 업데이트 + 변경 음성 출력
+        StartCoroutine(LoadAndPlayGreeting());
+    #else
+        // 현재 Dialogue 업데이트
+        DialogueManager.Instance.LoadDialoguesFromJSON();
+
+        // 변경 음성 출력
+        Dialogue greeting = DialogueManager.Instance.GetRandomGreeting();
+        VoiceManager.Instance.PlayAudioFromPath(greeting.filePath);
+    #endif
+
         // 캐릭터 닉네임 출력
         string nickname = GetNickname(currentCharacter);
         if (!string.IsNullOrEmpty(nickname))
@@ -93,7 +119,7 @@ public class CharManager : MonoBehaviour
         {
             float scaleFactor = currentCharacterInitLocalScale * char_size / 100f; // 퍼센트를 소수점 비율로 변환
             currentCharacter.transform.localScale = new Vector3(scaleFactor, scaleFactor, scaleFactor); // X, Y, Z 동일한 비율로 크기 조정
-            Debug.Log("Character size set to: " + char_size + "%");
+            // Debug.Log("Character size set to: " + char_size + "%");
         }
     }
 
@@ -164,10 +190,10 @@ public class CharManager : MonoBehaviour
         StartCoroutine(LoadAndPlayGreeting());
     #else
         // 현재 Dialogue 업데이트
-        DialogueManager.instance.LoadDialoguesFromJSON();
+        DialogueManager.Instance.LoadDialoguesFromJSON();
 
         // 변경 음성 출력
-        Dialogue greeting = DialogueManager.instance.GetRandomGreeting();
+        Dialogue greeting = DialogueManager.Instance.GetRandomGreeting();
         VoiceManager.Instance.PlayAudioFromPath(greeting.filePath);
     #endif
 
@@ -188,10 +214,10 @@ public class CharManager : MonoBehaviour
     public IEnumerator LoadAndPlayGreeting()
     {
         // JSON 로드 대기
-        yield return StartCoroutine(DialogueManager.instance.IEnumLoadDialoguesFromJSON());
+        yield return StartCoroutine(DialogueManager.Instance.IEnumLoadDialoguesFromJSON());
 
         // JSON 로드 완료 후 랜덤 대사 가져오기
-        Dialogue greeting = DialogueManager.instance.GetRandomGreeting();
+        Dialogue greeting = DialogueManager.Instance.GetRandomGreeting();
 
         // 변경 음성 출력
         VoiceManager.Instance.PlayAudioFromPath(greeting.filePath);
@@ -254,7 +280,7 @@ public class CharManager : MonoBehaviour
                 {
                     ChangeCharacterFromGameObject(charAttributes.changeClothes);
                     // 왜 재생 음성 여기서도..?
-                    // Dialogue greeting = DialogueManager.instance.GetRandomGreeting();
+                    // Dialogue greeting = DialogueManager.Instance.GetRandomGreeting();
                     // VoiceManager.Instance.PlayAudioFromPath(greeting.filePath);
                 } else {
                     charAttributes.toggleClothes.SetActive(true);

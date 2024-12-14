@@ -48,6 +48,17 @@ public class AskBalloonManager : MonoBehaviour
 
     // 싱글톤 인스턴스
     private static AskBalloonManager instance;
+    public static AskBalloonManager Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = FindObjectOfType<AskBalloonManager>();
+            }
+            return instance;
+        }
+    }
 
     private void Awake()
     {
@@ -58,7 +69,7 @@ public class AskBalloonManager : MonoBehaviour
         }
         else
         {
-            Destroy(gameObject);
+            // Destroy(gameObject);
             return;
         }
 
@@ -77,20 +88,6 @@ public class AskBalloonManager : MonoBehaviour
         if (StatusManager.Instance.IsPicking || StatusManager.Instance.IsAnswering)
         {
             HideAskBalloon();
-        }
-    }
-
-
-    // 싱글톤 인스턴스에 접근하는 속성
-    public static AskBalloonManager Instance
-    {
-        get
-        {
-            if (instance == null)
-            {
-                instance = FindObjectOfType<AskBalloonManager>();
-            }
-            return instance;
         }
     }
 

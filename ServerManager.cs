@@ -32,7 +32,7 @@ public class ServerManager : MonoBehaviour
         }
         else
         {
-            Destroy(gameObject);
+            // Destroy(gameObject);
             return;
         }
     }

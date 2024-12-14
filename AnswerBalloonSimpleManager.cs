@@ -30,7 +30,7 @@ public class AnswerBalloonSimpleManager : MonoBehaviour
         }
         else
         {
-            Destroy(gameObject);
+            // Destroy(gameObject);
             return;
         }
 
