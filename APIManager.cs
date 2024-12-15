@@ -16,12 +16,14 @@ public class APIManager : MonoBehaviour
     private List<string> replyListKo = new List<string>();
     private List<string> replyListJp = new List<string>();
     private List<string> replyListEn = new List<string>();
+    private string query_trans = "";
     private bool isCompleted = false; // 반환이 완료되었는지 여부를 체크하는 플래그
     private bool isResponsedStarted = false; // 첫 반환이 돌아왔는지 여부
     private string logFilePath; // 로그 파일 경로
 
     // 서버 관련
     public string ngrokUrl = null;  // 없으면 없는데로 오케이
+    public string ngrokStatus = null;  // open, closed  TODO : Close일때 서버켜달라고 요청하기
 
     // 싱글톤 인스턴스
     private static APIManager instance;
@@ -48,7 +50,7 @@ public class APIManager : MonoBehaviour
         }
         else
         {
-            Destroy(gameObject);
+            // Destroy(gameObject);
             return;
         }
 
@@ -60,9 +62,10 @@ public class APIManager : MonoBehaviour
         Directory.CreateDirectory(Path.GetDirectoryName(logFilePath)); // 디렉토리가 없으면 생성
         File.AppendAllText(logFilePath, $"Log started at: {DateTime.Now}\n");
 
-        // supabase에서 ngrok url 가져오기
+        // supabase에서 ngrok url 가져오기 (에디터에서는 제외)
+#if !UNITY_EDITOR
         StartCoroutine(FetchNgrokJsonData());
-        
+#endif        
 
     }
 
@@ -113,8 +116,10 @@ public class APIManager : MonoBehaviour
                 }
                 if (!string.IsNullOrEmpty(answerEn))
                 {
-                    // Debug.Log($"English Reply: {answerEn}");
                     replyListEn.Add(answerEn);
+                    if (SettingManager.Instance.settings.sound_language == "en") {
+                        answerVoice = answerEn;
+                    }
                 }
             }
             // answerballoon 갱신
@@ -131,7 +136,7 @@ public class APIManager : MonoBehaviour
 
             // 음성 API 호출
             if (answerVoice != null) {
-                if (SettingManager.Instance.settings.sound_language == "ko") {
+                if (SettingManager.Instance.settings.sound_language == "ko" || SettingManager.Instance.settings.sound_language == "en") {
                     GetKoWavFromAPI(answerVoice);
                 }
                 if (SettingManager.Instance.settings.sound_language == "jp") {
@@ -145,14 +150,19 @@ public class APIManager : MonoBehaviour
     private void OnFinalResponseReceived()
     {
         isCompleted = true;
+        AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteNormal();  // 대답완료 sprite
+
         Debug.Log("All replies have been received.");
         LogToFile("ProcessReply completed."); // ProcessReply 완료 로그
-
-
+        
         // foreach (string reply in replyListJp)
         // {
         //     Debug.Log(reply); // 각 reply를 출력
         // }
+        string replyEn = string.Join(" ", replyListEn);
+        Debug.Log("Answer Finished : " + replyEn);
+        MemoryManager.Instance.SaveConversationMemory("player", query_trans);
+        MemoryManager.Instance.SaveConversationMemory("character", replyEn);
     }
 
     // 스트리밍 데이터를 가져오는 메서드
@@ -193,14 +203,19 @@ public class APIManager : MonoBehaviour
                         {
                             try
                             {
+                                var jsonObject = JObject.Parse(line);
+                                // Debug.Log("jsonObject.ToString()");
+                                // Debug.Log(jsonObject.ToString());
+
                                 if (!isResponsedStarted) {
                                     AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
+                                    AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();  // 대답중 sprite
                                     isResponsedStarted = true;
-                                }
 
-                                var jsonObject = JObject.Parse(line);
-                                Debug.Log("jsonObject.ToString()");
-                                Debug.Log(jsonObject.ToString());
+                                    // Debug.Log(jsonObject["query"]);
+                                    // Debug.Log(jsonObject["query"]["text"]);
+                                    query_trans = jsonObject["query"]["text"].ToString();
+                                }
                                 ProcessReply(jsonObject); // 각 JSON 응답을 처리
                             }
                             catch (JsonReaderException e)
@@ -255,6 +270,9 @@ public class APIManager : MonoBehaviour
         string ai_language_in = SettingManager.Instance.settings.ai_language_in ?? "";
         string ai_language_out = SettingManager.Instance.settings.ai_language_out ?? "";
 
+        var memory = MemoryManager.Instance.GetAllConversationMemory();
+        string memoryJson = JsonConvert.SerializeObject(memory);
+
         // 요청 데이터 구성
         var requestData = new Dictionary<string, string>
         {
@@ -263,7 +281,8 @@ public class APIManager : MonoBehaviour
             { "char", nickname }, // 닉네임으로 캐릭터 이름 추가
             { "ai_language", ai_language }, // 추론언어로 한입, 영입영출 등 조절(ko, en, jp)
             { "ai_language_in", ai_language_in }, // 추론언어로 한입, 영입영출 등 조절(ko, en, jp)
-            { "ai_language_out", ai_language_out } // 추론언어로 한출, 영입영출 등 조절(ko, en, jp)
+            { "ai_language_out", ai_language_out }, // 추론언어로 한출, 영입영출 등 조절(ko, en, jp)
+            { "memory", memoryJson } 
         };
 
         await FetchStreamingData(streamUrl, requestData);
@@ -277,7 +296,7 @@ public class APIManager : MonoBehaviour
         if (APIManager.Instance.ngrokUrl == null) {
             baseUrl = "https://minmin496969.loca.lt";
         } else {
-            baseUrl = APIManager.instance.ngrokUrl;  // ex) https://8e5c-1-237-90-223.ngrok-free.app
+            baseUrl = APIManager.Instance.ngrokUrl;  // ex) https://8e5c-1-237-90-223.ngrok-free.app
         }
 #else
         baseUrl = "http://127.0.0.1:5000";
@@ -296,7 +315,7 @@ public class APIManager : MonoBehaviour
         {
             { "text", text},
             { "char", nickname},
-            { "lang", "ja"},
+            { "lang", SettingManager.Instance.settings.sound_language.ToString() },
             { "speed", SettingManager.Instance.settings.sound_speedMaster.ToString()}
         };
         string jsonData = JsonConvert.SerializeObject(requestData);
@@ -390,7 +409,6 @@ public class APIManager : MonoBehaviour
             // 비동기 방식으로 요청 보내기
             using (HttpWebResponse response = (HttpWebResponse)await request.GetResponseAsync())
             {
-                Debug.Log(response.StatusCode);
                 // 요청이 성공했는지 확인
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
@@ -519,14 +537,22 @@ public class APIManager : MonoBehaviour
     public class NgorokJsonResponse
     {
         public string url;
+        public string status;  // open, closed
     }
 
     // JSON 파일을 다운로드하고 url 값을 반환
     private IEnumerator FetchNgrokJsonData()
     {
-        string ngrokSupabaseUrl = "https://hvqoarxlvxrrtgvisgsi.supabase.co/storage/v1/object/public/json_bucket/my_little_jarvis_plus_ngrok_server.json";
+        // string ngrokSupabaseUrl = "https://lxmkzckwzasvmypfoapl.supabase.co/storage/v1/object/private/json_bucket/my_little_jarvis_plus_ngrok_server.json";
+
+        string ngrokSupabaseUrl = "https://lxmkzckwzasvmypfoapl.supabase.co/storage/v1/object/sign/json_bucket/my_little_jarvis_plus_ngrok_server.json?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJqc29uX2J1Y2tldC9teV9saXR0bGVfamFydmlzX3BsdXNfbmdyb2tfc2VydmVyLmpzb24iLCJpYXQiOjE3MzM4Mzg4MjYsImV4cCI6MjA0OTE5ODgyNn0.ykDVTXYVXNnKJL5lXILSk0iOqt0_7UeKZqOd1Qv_pSY&t=2024-12-10T13%3A53%3A47.907Z";
+        string supabaseApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4bWt6Y2t3emFzdm15cGZvYXBsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM4MzUxNzQsImV4cCI6MjA0OTQxMTE3NH0.zmEKHhIcQa4ODekS2skgknlXi8Hbd8JjpjBlFZpPsJ8"; 
+        
         using (UnityWebRequest request = UnityWebRequest.Get(ngrokSupabaseUrl))
         {
+            // 인증 헤더 추가
+            request.SetRequestHeader("Authorization", $"Bearer {supabaseApiKey}");
+
             // 서버 요청
             yield return request.SendWebRequest();
 
@@ -548,6 +574,13 @@ public class APIManager : MonoBehaviour
                 {
                     Debug.Log($"Fetched URL: {data.url}");
                     ngrokUrl = data.url;
+                    ngrokStatus = data.status;
+
+                    if (ngrokStatus == "closed") {
+                        NoticeBalloonManager.Instance.ModifyNoticeBalloonText("Supabase Server Closed");
+                    } else if (ngrokStatus != "open") {
+                        NoticeBalloonManager.Instance.ModifyNoticeBalloonText("Supabase Server Not Opened");
+                    }
                 }
                 else
                 {
