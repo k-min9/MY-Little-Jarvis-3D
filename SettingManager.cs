@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections;
 
 public class SettingManager : MonoBehaviour
 {
@@ -19,9 +20,14 @@ public class SettingManager : MonoBehaviour
 
     [SerializeField] private Dropdown soundLanguageDropdown;
     [SerializeField] private Slider soundVolumeMasterSlider;  // 현재는 마스터 볼륨만 있으면
+    [SerializeField] private Slider soundSpeedMasterSlider;  // 현재는 마스터 볼륨만 있으면
 
     [SerializeField] private Dropdown serverTypeDropdown;
     [SerializeField] private Toggle isAskedTurnOnServerToggle;
+    [SerializeField] private Toggle isAPITest;
+
+    // 표시용 UI
+    public Text soundSpeedMasterText;
 
 
     // 설정 데이터 클래스
@@ -45,10 +51,12 @@ public class SettingManager : MonoBehaviour
         public int sound_language_idx;  // 0 : ko, 1 : jp
         public string sound_language;  
         public float sound_volumeMaster;
+        public float sound_speedMaster;
 
         public int server_type_idx;  // 0 : GPU, 1 : CPU
         public string server_type;
         public bool isAskedTurnOnServer;
+        public bool isAPITest;
     }
 
     // 설정 데이터 인스턴스
@@ -56,7 +64,6 @@ public class SettingManager : MonoBehaviour
 
     // 싱글톤 인스턴스
     public static SettingManager instance;
-        // 싱글톤 인스턴스에 접근하는 속성
     public static SettingManager Instance
     {
         get
@@ -75,7 +82,13 @@ public class SettingManager : MonoBehaviour
     public void SetAiLanguage() { int value=aiLangDropdown.value; settings.ai_language_idx = value; settings.ai_language=getLangFromIdx(value); SaveSettings(); }
     public void SetAiLanguageIn(string value) { settings.ai_language_in = value; SaveSettings(); }
     public void SetAiLanguageOut(string value) { settings.ai_language_out = value; SaveSettings(); }
-    public void SetIsAlwaysOnTop(bool value) { settings.isAlwaysOnTop = value; WindowManager.SetWindowAlwaysOnTop(value); SaveSettings(); }
+    public void SetIsAlwaysOnTop(bool value) { 
+        settings.isAlwaysOnTop = value; 
+        #if !UNITY_ANDROID
+        WindowManager.SetWindowAlwaysOnTop(value); 
+        # endif
+        SaveSettings(); 
+    }
 
     public void SetCharLastUsed(string value) { settings.char_lastUsed = value; SaveSettings(); }
     public void SetCharSize(float value) { settings.char_size = value; CharManager.Instance.setCharSize(); SaveSettings(); }
@@ -84,9 +97,11 @@ public class SettingManager : MonoBehaviour
 
     public void SetSoundLanguageType() { int value=soundLanguageDropdown.value; settings.sound_language_idx = value; settings.sound_language=getLangFromIdx(value); SaveSettings(); }
     public void SetSoundVolumeMaster(float value) { settings.sound_volumeMaster = value; SaveSettings(); }
+    public void SetSoundSpeedMaster(float value) { settings.sound_speedMaster = value; SaveSettings(); soundSpeedMasterText.text="Speed (" + (int)settings.sound_speedMaster + "%)";}
 
     public void SetServerType() { int value=serverTypeDropdown.value; settings.server_type_idx = value; settings.server_type=getServerTypeFromIdx(value); SaveSettings(); }
     public void SetIsAskedTurnOnServer(bool value) { settings.isAskedTurnOnServer = value; SaveSettings(); }
+    public void SetIsAPITest(bool value) { settings.isAPITest = value; SaveSettings(); }
 
 
     private string configFilePath;
@@ -100,17 +115,31 @@ public class SettingManager : MonoBehaviour
         }
         else
         {
-            Destroy(gameObject);
+            // Destroy(gameObject);
             return;
         }
 
-        // 기본 설정 로딩
-        configFilePath = Path.Combine(Application.persistentDataPath, "config/setting.json");
+        // 저장 경로를 Application.persistentDataPath로 설정
+        string directoryPath = Path.Combine(Application.persistentDataPath, "config");
+        configFilePath = Path.Combine(directoryPath, "settings.json");
+
+        // 디렉토리가 없을 경우 생성
+        if (!Directory.Exists(directoryPath))
+        {
+            Directory.CreateDirectory(directoryPath);
+        }
         LoadSettings();
+
+        // 플랫폼별 UI 적용
+        # if UNITY_ANDROID
+        isAlwaysOnTopToggle.gameObject.SetActive(false);
+        # endif
     }
 
     void Start()
     {
+        SetUIAfterLoading();
+
         // 최상위에 두는지 확인하고 세팅
         WindowManager.SetWindowAlwaysOnTop(settings.isAlwaysOnTop); 
     }
@@ -159,8 +188,11 @@ public class SettingManager : MonoBehaviour
             SetDefaultValues();
             SaveSettings();
         }
+    }
 
-        // UI세팅
+    // UI 세팅 적용
+    private void SetUIAfterLoading()
+    {
         playerNameInputField.text = settings.player_name;
         uiLangDropdown.value = settings.ui_language_idx;
         aiLangDropdown.value = settings.ai_language_idx;
@@ -172,9 +204,11 @@ public class SettingManager : MonoBehaviour
 
         soundLanguageDropdown.value = settings.sound_language_idx;
         soundVolumeMasterSlider.value = settings.sound_volumeMaster;
+        soundSpeedMasterSlider.value = settings.sound_speedMaster;
 
         serverTypeDropdown.value = settings.server_type_idx;
         isAskedTurnOnServerToggle.isOn = settings.isAskedTurnOnServer;
+        isAPITest.isOn = settings.isAPITest;
     }
 
     // 설정 데이터를 JSON 파일에 저장하는 함수
@@ -185,16 +219,9 @@ public class SettingManager : MonoBehaviour
             // 설정 데이터를 JSON으로 변환
             string json = JsonUtility.ToJson(settings, true);
 
-            // 디렉토리가 없을 경우 생성
-            string directoryPath = Path.GetDirectoryName(configFilePath);
-            if (!Directory.Exists(directoryPath))
-            {
-                Directory.CreateDirectory(directoryPath);
-            }
-
             // JSON 파일 쓰기
             File.WriteAllText(configFilePath, json);
-            Debug.Log("Settings saved successfully");
+            // Debug.Log("Settings saved successfully : \n" + json);
         }
         catch (UnauthorizedAccessException e)
         {
@@ -235,9 +262,11 @@ public class SettingManager : MonoBehaviour
         settings.sound_language_idx = 0;
         settings.sound_language = "ko";
         settings.sound_volumeMaster = 70;
+        settings.sound_speedMaster = 100;
 
         settings.server_type_idx = 0;  // 0 : GPU, 1 : CPU
         settings.server_type = "GPU";
         settings.isAskedTurnOnServer = true;
+        settings.isAPITest = false;
     }
 }
