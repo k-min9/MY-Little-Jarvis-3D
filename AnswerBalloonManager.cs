@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
 using TMPro;
 using System;
 
@@ -11,6 +12,11 @@ public class AnswerBalloonManager : MonoBehaviour
     [SerializeField] public RectTransform characterTransform; // AnswerBalloon이 표시될 캐릭터의 Transform
     [SerializeField] private RectTransform answerBalloonTransform; // AnswerBalloon의 Transform
     public TextMeshProUGUI answerBalloonText; // AnswerBalloon Text의 Transform
+
+    // Image-Sprite
+    [SerializeField] private Image answerBalloonImage;
+    [SerializeField] private Sprite lightSprite;
+    [SerializeField] private Sprite normalSprite;
 
     private float hideTimer = 0f; // 타이머 변수 추가
 
@@ -31,7 +37,7 @@ public class AnswerBalloonManager : MonoBehaviour
         }
         else
         {
-            Destroy(gameObject);
+            // Destroy(gameObject);
             return;
         }
 
@@ -86,6 +92,18 @@ public class AnswerBalloonManager : MonoBehaviour
         answerText.text = string.Empty; // 텍스트 초기화
         StatusManager.Instance.IsAnswering = true; // StatusManager 상태 업데이트
         UpdateAnswerBalloonPosition();  // AnswerBalloon 위치 조정하
+    }
+
+    // 대답중 sprite
+    public void ChangeAnswerBalloonSpriteLight()
+    {
+        answerBalloonImage.sprite = lightSprite;
+    }
+
+    // 대답 완료 sprite
+    public void ChangeAnswerBalloonSpriteNormal()
+    {
+        answerBalloonImage.sprite = normalSprite;
     }
 
     // AnswerBalloon을 보이고 텍스트를 초기화하는 함수
