@@ -16,6 +16,7 @@ public class APIManager : MonoBehaviour
     private List<string> replyListKo = new List<string>();
     private List<string> replyListJp = new List<string>();
     private List<string> replyListEn = new List<string>();
+
     private string query_trans = "";
     private bool isCompleted = false; // 반환이 완료되었는지 여부를 체크하는 플래그
     private bool isResponsedStarted = false; // 첫 반환이 돌아왔는지 여부
@@ -88,6 +89,14 @@ public class APIManager : MonoBehaviour
 
         // 반환된 JSON 객체에서 "reply_list"를 가져오기
         JToken replyToken = jsonObject["reply_list"];
+        string chatIdx = jsonObject["chat_idx"].ToString();
+        // Debug.Log("ProcessReply chatIdx chk");
+        // Debug.Log(chatIdx + "/" + GameManager.Instance.chatIdxSuccess.ToString());
+
+        // 이중 체크 중...
+        // if (chatIdx != GameManager.Instance.chatIdxSuccess.ToString()) {
+        //     return;  // 현재 대화가 아님
+        // }
 
         if (replyToken != null && replyToken.Type == JTokenType.Array)
         {
@@ -137,10 +146,10 @@ public class APIManager : MonoBehaviour
             // 음성 API 호출
             if (answerVoice != null) {
                 if (SettingManager.Instance.settings.sound_language == "ko" || SettingManager.Instance.settings.sound_language == "en") {
-                    GetKoWavFromAPI(answerVoice);
+                    GetKoWavFromAPI(answerVoice, chatIdx);
                 }
                 if (SettingManager.Instance.settings.sound_language == "jp") {
-                    GetJpWavFromAPI(answerVoice);
+                    GetJpWavFromAPI(answerVoice, chatIdx);
                 }
             }
         }
@@ -169,6 +178,8 @@ public class APIManager : MonoBehaviour
     public async Task FetchStreamingData(string url, Dictionary<string, string> data)
     {
         string jsonData = JsonConvert.SerializeObject(data);
+        string curChatIdx = data["chatIdx"];
+        int curChatIdxNum = int.Parse(curChatIdx);
 
         try
         {
@@ -203,20 +214,31 @@ public class APIManager : MonoBehaviour
                         {
                             try
                             {
-                                var jsonObject = JObject.Parse(line);
-                                // Debug.Log("jsonObject.ToString()");
-                                // Debug.Log(jsonObject.ToString());
+                                // 풍선기준 최신대화여야 함
+                                if (curChatIdxNum >= GameManager.Instance.chatIdxBalloon) {
+                                    // 최신화 하면서 기존 음성 queue 내용 지워버리기
+                                    if (GameManager.Instance.chatIdxBalloon != curChatIdxNum) {
+                                        GameManager.Instance.chatIdxBalloon = curChatIdxNum;
+                                        VoiceManager.Instance.ResetAudio();
+                                    }
 
-                                if (!isResponsedStarted) {
-                                    AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
-                                    AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();  // 대답중 sprite
-                                    isResponsedStarted = true;
+                                    var jsonObject = JObject.Parse(line);
+                                    // Debug.Log(jsonObject.ToString());
 
-                                    // Debug.Log(jsonObject["query"]);
-                                    // Debug.Log(jsonObject["query"]["text"]);
-                                    query_trans = jsonObject["query"]["text"].ToString();
+                                    if (!isResponsedStarted) {
+                                        AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
+                                        AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();  // 대답중 sprite
+                                        isResponsedStarted = true;
+
+                                        // Debug.Log(jsonObject["query"]);
+                                        // Debug.Log(jsonObject["query"]["text"]);
+                                        query_trans = jsonObject["query"]["text"].ToString();
+                                    }
+
+                                    ProcessReply(jsonObject); // 각 JSON 응답을 처리
+                                } else {
+                                    Debug.Log("과거대화 : " + curChatIdxNum.ToString() + "/" + GameManager.Instance.chatIdxBalloon.ToString());
                                 }
-                                ProcessReply(jsonObject); // 각 JSON 응답을 처리
                             }
                             catch (JsonReaderException e)
                             {
@@ -225,7 +247,10 @@ public class APIManager : MonoBehaviour
                         }
                     }
 
-                    OnFinalResponseReceived(); // 최종 반환 완료 시 함수 호출
+                    if (curChatIdx == GameManager.Instance.chatIdxSuccess) {
+                        OnFinalResponseReceived(); // 최종 반환 완료 시 함수 호출
+                    }
+                    
                 }
             }
         }
@@ -249,8 +274,13 @@ public class APIManager : MonoBehaviour
     }
 
     // chatHandler에서 호출
-    public async void CallConversationStream(string query)
+    public async void CallConversationStream(string query, string chatIdx="-1")
     {
+        // 공용변수 최신화
+        if(chatIdx!="-1") {
+            GameManager.Instance.chatIdxSuccess = chatIdx;
+        }
+
         // API 호출을 위한 URL 구성
         string baseUrl = "";
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -282,13 +312,14 @@ public class APIManager : MonoBehaviour
             { "ai_language", ai_language }, // 추론언어로 한입, 영입영출 등 조절(ko, en, jp)
             { "ai_language_in", ai_language_in }, // 추론언어로 한입, 영입영출 등 조절(ko, en, jp)
             { "ai_language_out", ai_language_out }, // 추론언어로 한출, 영입영출 등 조절(ko, en, jp)
-            { "memory", memoryJson } 
+            { "memory", memoryJson },
+            { "chatIdx", chatIdx}
         };
 
         await FetchStreamingData(streamUrl, requestData);
     }
 
-    public async void GetKoWavFromAPI(string text)
+    public async void GetKoWavFromAPI(string text, string chatIdx)
     {
         // API 호출을 위한 URL 구성
         string baseUrl = "";
@@ -316,7 +347,8 @@ public class APIManager : MonoBehaviour
             { "text", text},
             { "char", nickname},
             { "lang", SettingManager.Instance.settings.sound_language.ToString() },
-            { "speed", SettingManager.Instance.settings.sound_speedMaster.ToString()}
+            { "speed", SettingManager.Instance.settings.sound_speedMaster.ToString()},
+            { "chatIdx", chatIdx}
         };
         string jsonData = JsonConvert.SerializeObject(requestData);
         byte[] byteArray = Encoding.UTF8.GetBytes(jsonData);
@@ -336,6 +368,14 @@ public class APIManager : MonoBehaviour
                 // 요청이 성공했는지 확인
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
+                    // 헤더에서 Chat-Idx 값을 가져와, 현재 대화보다 과거일 경우에는 queue에 넣지 않음
+                    string chatIdxHeader = response.Headers["Chat-Idx"];
+                    int chatIdxHeaderNum = int.Parse(chatIdxHeader);
+                    if (GameManager.Instance.chatIdxBalloon > chatIdxHeaderNum) {
+                        Debug.Log("과거대화 : " + GameManager.Instance.chatIdxBalloon.ToString() + "/" + chatIdxHeaderNum.ToString());
+                        return;
+                    }
+
                     // 응답 스트림을 읽어서 파일에 저장
                     using (Stream responseStream = response.GetResponseStream())
                     {
@@ -364,7 +404,7 @@ public class APIManager : MonoBehaviour
         }
     }
 
-    public async void GetJpWavFromAPI(string text)
+    public async void GetJpWavFromAPI(string text, string chatIdx)
     {
         // API 호출을 위한 URL 구성
         string baseUrl = "";
@@ -392,7 +432,8 @@ public class APIManager : MonoBehaviour
             { "text", text},
             { "char", nickname},
             { "lang", "ja"},
-            { "speed", SettingManager.Instance.settings.sound_speedMaster.ToString()}
+            { "speed", SettingManager.Instance.settings.sound_speedMaster.ToString()},
+            { "chatIdx", chatIdx}
         };
         string jsonData = JsonConvert.SerializeObject(requestData);
         byte[] byteArray = Encoding.UTF8.GetBytes(jsonData);
@@ -415,6 +456,15 @@ public class APIManager : MonoBehaviour
                     // 응답 스트림을 읽어서 파일에 저장
                     using (Stream responseStream = response.GetResponseStream())
                     {
+
+                        // 헤더에서 Chat-Idx 값을 가져와, 현재 대화보다 과거일 경우에는 queue에 넣지 않음
+                        string chatIdxHeader = response.Headers["Chat-Idx"];
+                        int chatIdxHeaderNum = int.Parse(chatIdxHeader);
+                        if (GameManager.Instance.chatIdxBalloon > chatIdxHeaderNum) {
+                            Debug.Log("과거대화 : " + GameManager.Instance.chatIdxBalloon.ToString() + "/" + chatIdxHeaderNum.ToString());
+                            return;
+                        }
+
                         if (responseStream != null)
                         {
                             byte[] wavData = ReadFully(responseStream);
@@ -456,7 +506,7 @@ public class APIManager : MonoBehaviour
     {
         // WAV 파일의 길이를 계산
         float wavDuration = GetWavDuration(wavData);
-        Debug.Log("wavDuration : " + wavDuration);
+        // Debug.Log("wavDuration : " + wavDuration);
 
         // 10초를 초과하면 저장/재생하지 않음
         if (wavDuration > 10f)
@@ -470,7 +520,7 @@ public class APIManager : MonoBehaviour
         {
             File.WriteAllBytes(filePath, wavData);
             VoiceManager.Instance.LoadAudioWavToQueue();
-            Debug.Log($"WAV file saved to: {filePath}");
+            // Debug.Log($"WAV file saved to: {filePath}");
         }
         catch (IOException e)
         {
