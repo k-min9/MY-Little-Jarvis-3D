@@ -8,19 +8,25 @@ public class FaceTextureChanger : MonoBehaviour
     public Texture2D mouthTexture; // charamouth.png : readable, default
     public Texture2D[] mouthTextures; // charamouth.png를 잘라서 바꿀 입 텍스처들 (입력 금지)
     public Rect mouthRect; // 각 입 텍스처의 영역 (x,y시작점(좌하) * w,h)
+    public int mouthStatus = 0;  // 현재 이 캐릭터의 입 모양
+    public int mouthIndex = 9999;  // 몇 틱 동안 현재 입 모양을 유지했는지. 최초에 바로 움직이게 9999
 
     private Texture2D combinedTexture;
 
     void Start()
     {
         // charamouth.png를 8개의 텍스처로 초기화 (상단부터 0~7번 선택)
-        InitMouthTextures(mouthTexture, 8, 8, 20); // 최대 8개의 텍스처
-        SetMouth(0);
+        InitMouthTextures(mouthTexture, 8, 8, 55); // 최대 55개의 텍스처
+        SetMouth(32);
     }
 
     void Update()
     {
-        // 키보드 숫자 1, 2, 3 입력을 감지하여 SetMouth 호출
+        // Test 용 : 키보드 숫자 1, 2, 3 입력을 감지하여 SetMouth 호출, 0은 입 없애기
+        if (Input.GetKeyDown(KeyCode.Alpha0))
+        {
+            SetMouth(0);
+        }
         if (Input.GetKeyDown(KeyCode.Alpha1))
         {
             SetMouth(1);
@@ -151,22 +157,27 @@ public class FaceTextureChanger : MonoBehaviour
 
     public void SetMouth(int index)
     {
+        mouthStatus = index;
+        mouthIndex = 0;
+
+        // 입 없애기
+        if (index == 0) {
+            faceMaterial.mainTexture = faceTexture;
+            return;
+        }
+
         // 기본 얼굴 텍스처 확인
-        // Texture2D baseTexture = faceMaterial.mainTexture as Texture2D;
-        // baseTexture = EnsureTextureReadable(baseTexture);
-        faceTexture = EnsureTextureReadable(faceTexture);
+        // faceTexture = EnsureTextureReadable(faceTexture);
 
         // 최종 텍스처 생성 (기본 텍스처와 동일한 크기 및 포맷)
         Texture2D finalTexture = new Texture2D(faceTexture.width, faceTexture.height, TextureFormat.RGBA32, false);
         finalTexture.SetPixels(faceTexture.GetPixels());   // 기본 텍스처 복사
 
         // 입 텍스처 삽입
-        // Texture2D mouthTexture = EnsureTextureReadable(mouthTextures[index]);
         Texture2D mouthTexture = mouthTextures[index];
 
         // mouthRect에 맞게 크기 조절
         Texture2D resizedMouth = ResizeTexture(mouthTexture, (int)mouthRect.width, (int)mouthRect.height);
-        // SaveTextureToFile(resizedMouth, "resizedMouth.png");
         
         // 리샘플링된 픽셀 가져오기
         Color[] resizedPixels = resizedMouth.GetPixels();
@@ -196,7 +207,9 @@ public class FaceTextureChanger : MonoBehaviour
         // 변경사항 적용
         finalTexture.SetPixels(basePixels);
         finalTexture.Apply();
-        SaveTextureToFile(finalTexture, "finalTexture.png");
+        #if UNITY_EDITOR
+        SaveTextureToFile(finalTexture, "finalTexture.png");  // Test 결과 확인용 파일 저장
+        #endif
 
         // 변경사항 적용
         finalTexture.Apply();
@@ -212,7 +225,7 @@ public class FaceTextureChanger : MonoBehaviour
         byte[] bytes = texture.EncodeToPNG(); // PNG로 변환
         string path = Application.dataPath + "/" + filename; // 저장 경로 설정
         System.IO.File.WriteAllBytes(path, bytes); // 파일로 저장
-        Debug.Log($"텍스처가 저장되었습니다: {path}");
+        // Debug.Log($"텍스처가 저장되었습니다: {path}");
     }
 
 }
