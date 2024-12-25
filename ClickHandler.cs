@@ -13,7 +13,9 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
     public void OnPointerClick(PointerEventData eventData)
     {
         // 드래그 중이나 옵션 설정중일 경우 return
-        if (StatusManager.Instance.IsDragging || StatusManager.Instance.IsOptioning) return;
+        if (StatusManager.Instance.IsDragging 
+        // || StatusManager.Instance.IsOptioning
+        ) return;
 
         // 안드로이드 터치
 #if UNITY_ANDROID && !UNITY_EDITOR
