@@ -28,6 +28,12 @@ public class FallingObject : MonoBehaviour
 
     void Update()
     {
+        if (!SettingManager.Instance.settings.isGravity) 
+        {
+            StatusManager.Instance.IsFalling = false;
+            return;
+        }
+
         if (!IsCollidingWithOtherObjects(rectTransform.anchoredPosition) && !StatusManager.Instance.IsFalling)
         {
             StartFalling();
