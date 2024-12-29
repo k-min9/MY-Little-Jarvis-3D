@@ -164,6 +164,49 @@ public class StatusManager : MonoBehaviour
         }
     }
 
+    void Update()
+    {
+        // 대화중이면 입 움직이기
+        if (VoiceManager.Instance.isQueuePlaying)
+        {   
+            updateMouthStatus();
+        } else {
+            initMouthStatus();
+        }
+    }
+
+    // 입 움직이게 : 13,14 왔다갔다 > 오디오클립 연계로 입후 반응 없어도 멈추게 변경
+    void updateMouthStatus() {
+        // 변수 그때 그때 세팅 (TODO : CharChange, InitChange에서 최적화 가능)
+        FaceTextureChanger faceTextureChanger;
+        faceTextureChanger = CharManager.Instance.GetCurrentCharacter().GetComponentInChildren<FaceTextureChanger>();
+        if (faceTextureChanger==null) return;     
+
+        // 2초에 한번 입모양 변경
+        faceTextureChanger.mouthIndex += 1;
+        if (faceTextureChanger.mouthIndex < 120) return;
+        faceTextureChanger.mouthIndex = 0;
+
+        if (faceTextureChanger.mouthStatus == 5) {
+            faceTextureChanger.SetMouth(6);
+        } else {
+            faceTextureChanger.SetMouth(5);
+        }
+    }
+
+    // 입 상태 초기화
+    void initMouthStatus() {
+        // 변수 그때 그때 세팅 (TODO : CharChange, InitChange에서 최적화 가능)
+        FaceTextureChanger faceTextureChanger;
+        faceTextureChanger = CharManager.Instance.GetCurrentCharacter().GetComponentInChildren<FaceTextureChanger>();
+        if (faceTextureChanger==null) return;        
+
+        // 입이 열린상태면 닫기
+        if (faceTextureChanger.mouthStatus == 32 || faceTextureChanger.mouthStatus == 0) return;
+        faceTextureChanger.SetMouth(32);
+        faceTextureChanger.mouthIndex = 9999;  // 순서주의
+    }
+
     // X초간 status를 True로
     // 예시 : StatusManager.Instance.SetStatusTrueForSecond(value => StatusManager.Instance.IsOptioning = value, 3f); // 3초간 isOptioning을 true로
     private Coroutine statusCoroutine = null;
