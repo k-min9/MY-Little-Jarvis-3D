@@ -10,6 +10,7 @@ using System;
 public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 {
     private TransparentWindow _transparentWindow;
+    private CharAttributes _charAttributes;
     private ContextMenu m_ContextMenu;
     private bool itemChkFlag = false;
     private float chkTimer = 0f; // 타이머 변수 추가
@@ -21,6 +22,8 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     {
         this.m_ContextMenu = WidgetUtility.Find<ContextMenu>("ContextMenu");
         this._transparentWindow = FindObjectOfType<TransparentWindow>();  // GameObject에 있음
+        this._charAttributes = FindObjectOfType<CharAttributes>();
+
     }
 
     private void Update()
@@ -106,18 +109,38 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         m_ContextMenu.AddMenuItem("Change Char", delegate { 
             UIManager.Instance.ShowCharChange();
         });
-        m_ContextMenu.AddMenuItem("Change Clothes", delegate { 
-            CharManager.Instance.ChangeClothes();
-        });
+
+        if (_charAttributes.toggleClothes != null || _charAttributes.changeClothes!=null) {
+            m_ContextMenu.AddMenuItem("Change Clothes", delegate { 
+                CharManager.Instance.ChangeClothes();
+            });
+        }
+
         m_ContextMenu.AddMenuItem("Erase Memory", delegate { 
             MemoryManager.Instance.ResetConversationMemory();
 
             AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
             AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Memory Erased");
         });
-        // m_ContextMenu.AddMenuItem("Change Monitor", delegate { 
-        //     _transparentWindow.NextMonitor(); 
-        // });
+
+        if (TalkMenuManager.Instance.isShowing == false) {
+            m_ContextMenu.AddMenuItem("Show TalkMenu", delegate { 
+                TalkMenuManager.Instance.ShowTalkMenu();
+            });
+        }
+
+        m_ContextMenu.AddMenuItem("Show ", delegate { 
+            MemoryManager.Instance.ResetConversationMemory();
+
+            AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+            AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Memory Erased");
+        });
+
+        #if UNITY_STANDALONE_WIN
+        m_ContextMenu.AddMenuItem("Change Monitor", delegate { 
+            _transparentWindow.NextMonitor(); 
+        });
+        #endif
         // m_ContextMenu.AddMenuItem("Set Screenshot Area", delegate {  
         //     ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();  // 최상위 ScreenshotManager
         //     sm.SetScreenshotArea();
