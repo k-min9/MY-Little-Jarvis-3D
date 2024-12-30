@@ -175,7 +175,7 @@ public class MicrophoneNormal : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         }
         Debug.Log($"WAV file saved at: {filePath}");
 
-        // wav 전송 API 호출 테스트용()
+        // wav 전송 API 호출
         StartCoroutine(SendWavFile(filePath, "ko", "normal"));
     }
 
@@ -224,8 +224,10 @@ public class SttResponse
 {
     public string text;
     public string lang;
+    public string chatIdx;
 }
 
+// 변수 세개 다 현재 안쓰임
 public IEnumerator SendWavFile(string filePath, string sttLang, string sttLevel)
 {
 
@@ -268,11 +270,14 @@ public IEnumerator SendWavFile(string filePath, string sttLang, string sttLevel)
 #endif
     string url = baseUrl+"/stt"; // http://localhost:5000/stt
     
+    GameManager.Instance.chatIdx += 1;
+
     WWWForm formData = new WWWForm();
     // formData.AddBinaryData("file", wavData, Path.GetFileName(filePath), "audio/wav");
     formData.AddBinaryData("file", wavData, "stt.wav", "audio/wav");
     formData.AddField("lang", "ko");
     formData.AddField("level", "small");
+    formData.AddField("chatIdx", GameManager.Instance.chatIdx);
 
     UnityWebRequest request = UnityWebRequest.Post(url, formData);
  
@@ -293,15 +298,16 @@ public IEnumerator SendWavFile(string filePath, string sttLang, string sttLevel)
             string responseText = request.downloadHandler.text;
 
             var responseJson = JsonUtility.FromJson<SttResponse>(responseText);
-            Debug.Log($"STT Text: {responseJson.text}");
-            Debug.Log($"Detected Language: {responseJson.lang}");
+            // Debug.Log($"STT Text: {responseJson.text}");
+            // Debug.Log($"Detected Language: {responseJson.lang}");
+            // Debug.Log($"ChatIdx: {responseJson.chatIdx}");
 
             string query = responseJson.text ?? "";
 
             NoticeBalloonManager.Instance.ModifyNoticeBalloonText(query);
 
             // 대화 시작
-            APIManager.Instance.CallConversationStream(query);
+            APIManager.Instance.CallConversationStream(query, responseJson.chatIdx);
         }
         catch (Exception ex)
         {
