@@ -9,7 +9,7 @@ public class VoiceManager : MonoBehaviour
     [SerializeField] public AudioSource audioSource; // 오디오를 재생할 AudioSource
     private static VoiceManager instance; // 싱글톤 인스턴스
     private Queue<AudioClip> clipQueue = new Queue<AudioClip>(); // AudioClip을 저장하는 Queue
-    private bool isQueuePlaying = false;  // 현재 재생 여부를 추적하는 플래그
+    public bool isQueuePlaying = false;  // 현재 재생 여부를 추적하는 플래그
 
     // VoiceManager 인스턴스에 접근하는 함수
     public static VoiceManager Instance
@@ -59,6 +59,10 @@ public class VoiceManager : MonoBehaviour
         if (clipQueue.Count > 0 && !audioSource.isPlaying)
         {
             PlayNextClip();
+        }
+        else if (clipQueue.Count == 0 && !audioSource.isPlaying)
+        {
+            isQueuePlaying = false;
         }
     }
 
@@ -205,6 +209,7 @@ public class VoiceManager : MonoBehaviour
         if (audioSource.isPlaying)
         {
             audioSource.Stop();
+            isQueuePlaying = false;
         }
     }
 
