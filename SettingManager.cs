@@ -17,6 +17,7 @@ public class SettingManager : MonoBehaviour
     [SerializeField] private Slider charSizeSlider;
     [SerializeField] private Slider charSpeedSlider;
     [SerializeField] private Slider charMobilitySlider;
+    [SerializeField] private Toggle isGravityToggle;
 
     [SerializeField] private Dropdown soundLanguageDropdown;
     [SerializeField] private Slider soundVolumeMasterSlider;  // 현재는 마스터 볼륨만 있으면
@@ -47,6 +48,7 @@ public class SettingManager : MonoBehaviour
         public float char_size;
         public float char_mobility;
         public float char_speed;
+        public bool isGravity;
 
         public int sound_language_idx;  // 0 : ko, 1 : jp
         public string sound_language;  
@@ -94,6 +96,7 @@ public class SettingManager : MonoBehaviour
     public void SetCharSize(float value) { settings.char_size = value; CharManager.Instance.setCharSize(); SaveSettings(); }
     public void SetCharSpeed(float value) { settings.char_speed = value; SaveSettings(); }
     public void SetCharMobility(float value) { settings.char_mobility = value; SaveSettings(); }
+    public void SetIsGravity(bool value) { settings.isGravity = value; SaveSettings(); }
 
     public void SetSoundLanguageType() { int value=soundLanguageDropdown.value; settings.sound_language_idx = value; settings.sound_language=getLangFromIdx(value); SaveSettings(); }
     public void SetSoundVolumeMaster(float value) { settings.sound_volumeMaster = value; SaveSettings(); }
@@ -201,6 +204,7 @@ public class SettingManager : MonoBehaviour
         charSizeSlider.value = settings.char_size;
         charSpeedSlider.value = settings.char_speed;
         charMobilitySlider.value = settings.char_mobility;
+        isGravityToggle.isOn = settings.isGravity;
 
         soundLanguageDropdown.value = settings.sound_language_idx;
         soundVolumeMasterSlider.value = settings.sound_volumeMaster;
@@ -258,6 +262,7 @@ public class SettingManager : MonoBehaviour
         settings.char_lastUsed = "mari";
         settings.char_mobility = 5;
         settings.char_speed = 100;
+        settings.isGravity = true;
 
         settings.sound_language_idx = 0;
         settings.sound_language = "ko";
