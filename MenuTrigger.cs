@@ -129,12 +129,15 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
             });
         }
 
-        m_ContextMenu.AddMenuItem("Show ", delegate { 
-            MemoryManager.Instance.ResetConversationMemory();
-
-            AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
-            AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Memory Erased");
-        });
+        if (NoticeBalloonManager.Instance.noticeBalloon.activeSelf) {
+            m_ContextMenu.AddMenuItem("Hide TalkInfo", delegate { 
+                NoticeBalloonManager.Instance.HideNoticeBalloon();
+            });
+        } else {
+            m_ContextMenu.AddMenuItem("Show TalkInfo", delegate { 
+                NoticeBalloonManager.Instance.ShowNoticeBalloon();
+            });
+        }
 
         #if UNITY_STANDALONE_WIN
         m_ContextMenu.AddMenuItem("Change Monitor", delegate { 
