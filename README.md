@@ -97,3 +97,9 @@
   - System.Drawing.dll : ScreenShotManager에서 사용
   - System.Windows.Forms.dll : TrayIconManager에서 사용
 - Project Settings>Other Settings>API compatibility Level을 .Net Standard 2.1에서 Framework로 변경
+
+### Android Studio 연동
+
+- AAR 프로젝트
+- Dependency 이슈 : AndroidX
+  - unity-jar-resolver를 이용해 Dependency.xml 구축
