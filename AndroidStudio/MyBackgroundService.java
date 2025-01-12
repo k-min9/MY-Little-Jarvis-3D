@@ -15,6 +15,7 @@ import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.AudioTrack;
+import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.os.Build;
 import android.os.Handler;
@@ -25,22 +26,37 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonSyntaxException;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.TimeUnit;
 
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
+import okhttp3.OkHttpClient;
 import okhttp3.RequestBody;
+import okhttp3.ResponseBody;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -163,6 +179,11 @@ public class MyBackgroundService extends Service {
         };
     }
 
+    private void stopVadRunnable() {
+        isVADModeActive = false; // 플래그 비활성화
+        handler.removeCallbacks(vadRunnable); // Runnable 정지
+    }
+
     public void startVAD() {
         Log.d("SERVICE", "startVAD start");
 
@@ -256,7 +277,7 @@ public class MyBackgroundService extends Service {
                     saveBufferToWavFile(newBuffer, filePath, 16000); // 16000은 샘플레이트
 
                     // 그냥 음성재생체크용
-                    playWav("response.wav");
+//                    playWav("response.wav");
                     sendWav("response.wav");
                 }
 
@@ -502,6 +523,7 @@ public class MyBackgroundService extends Service {
         super.onDestroy();
         stopRecording();
         stopForeground(true);  // 알림 초기화
+        stopVadRunnable();
         Log.i("SERVICE", "Service destroyed.");
     }
 
@@ -708,11 +730,9 @@ public class MyBackgroundService extends Service {
                     if (jsonResponse != null) {
                         String transText = jsonResponse.get("text").getAsString();
                         String transLang = jsonResponse.get("lang").getAsString();
-                        int chatIdx = jsonResponse.get("chatIdx").getAsInt();
+                        String chatIdx = jsonResponse.get("chatIdx").getAsString();
 
-                        System.out.println("Transcribed Text: " + transText);
-                        System.out.println("Language: " + transLang);
-                        System.out.println("Chat Index: " + chatIdx);
+                        callConversationStream(transText, chatIdx);
                     }
                 } else {
                     System.err.println("Request failed. Response Code: " + response.code());
@@ -725,6 +745,244 @@ public class MyBackgroundService extends Service {
             }
         });
     }
+
+    public void callConversationStream(String query, String chatIdx) {
+
+        String streamUrl = baseUrl + "/conversation_stream";
+
+        String nickname = "arona";
+        String playerName = "";
+        String aiLanguage = "";
+        String aiLanguageIn = "";
+        String aiLanguageOut = "";
+
+        String memoryJson = "";
+
+        // 요청 데이터 생성
+        Map<String, String> requestData = new HashMap<>();
+        requestData.put("query", query);
+        requestData.put("player", playerName);
+        requestData.put("char", nickname);
+        requestData.put("ai_language", aiLanguage);
+        requestData.put("ai_language_in", aiLanguageIn);
+        requestData.put("ai_language_out", aiLanguageOut);
+        requestData.put("memory", memoryJson);
+        requestData.put("chatIdx", chatIdx);
+
+        fetchStreamingData(streamUrl, requestData);
+    }
+
+    public void fetchStreamingData(String url, Map<String, String> data) {
+        String jsonData = new Gson().toJson(data);
+        String curChatIdx = data.get("chatIdx");
+        int curChatIdxNum = Integer.parseInt(curChatIdx);
+
+        OkHttpClient client = new OkHttpClient.Builder()
+                .connectTimeout(100, TimeUnit.SECONDS)
+                .readTimeout(100,TimeUnit.SECONDS).build();
+
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(baseUrl)
+                .client(client)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build();
+
+        ApiService apiService = retrofit.create(ApiService.class);
+
+        RequestBody requestBody = RequestBody.create(MediaType.parse("application/json"), jsonData);
+        Call<ResponseBody> call = apiService.streamConversation(requestBody);
+
+        call.enqueue(new Callback<ResponseBody>() {
+            @Override
+            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+                if (response.isSuccessful()) {
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.body().byteStream()))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            Log.d("SERVICE API","line : " + line);
+                            if (!line.isEmpty()) {
+                                try {
+                                    JsonParser parser = new JsonParser();
+                                    JsonObject jsonObject = parser.parse(line).getAsJsonObject();
+
+                                    // 최신 대화 처리 로직 미반영
+                                    processReply(jsonObject);
+                                } catch (JsonSyntaxException e) {
+                                    Log.e("SERVICE API","JSON decode error: " + e.getMessage());
+                                }
+                            }
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                } else {
+                    System.err.println("Request failed. Response Code: " + response.code());
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ResponseBody> call, Throwable t) {
+                t.printStackTrace();
+            }
+        });
+    }
+
+    private void processReply(JsonObject jsonObject) {
+        Log.d("SERVICE API","ProcessReply started.");
+        Log.d("SERVICE API", "jsonObject : " + String.valueOf(jsonObject));
+
+        List<String> replyListKo = new ArrayList<>();
+        List<String> replyListJp = new ArrayList<>();
+        List<String> replyListEn = new ArrayList<>();
+
+        JsonArray replyArray = jsonObject.getAsJsonArray("reply_list");
+        String chatIdx = jsonObject.get("chat_idx").getAsString();
+
+        if (replyArray != null) {
+            String answerVoice = null;
+
+            for (JsonElement replyElement : replyArray) {
+                JsonObject reply = replyElement.getAsJsonObject();
+
+                String answerJp = reply.has("answer_jp") ? reply.get("answer_jp").getAsString() : "";
+                String answerKo = reply.has("answer_ko") ? reply.get("answer_ko").getAsString() : "";
+                String answerEn = reply.has("answer_en") ? reply.get("answer_en").getAsString() : "";
+
+                answerVoice = answerJp;
+
+//                if (!answerJp.isEmpty()) {
+//                    replyListJp.add(answerJp);
+//                    if ("jp".equals(SettingManager.getInstance().getSettings().getSoundLanguage())) {
+//                        answerVoice = answerJp;
+//                    }
+//                }
+//
+//                if (!answerKo.isEmpty()) {
+//                    replyListKo.add(answerKo);
+//                    if ("ko".equals(SettingManager.getInstance().getSettings().getSoundLanguage())) {
+//                        answerVoice = answerKo;
+//                    }
+//                }
+//
+//                if (!answerEn.isEmpty()) {
+//                    replyListEn.add(answerEn);
+//                    if ("en".equals(SettingManager.getInstance().getSettings().getSoundLanguage())) {
+//                        answerVoice = answerEn;
+//                    }
+//                }
+            }
+
+            String replyKo = String.join(" ", replyListKo);
+            String replyJp = String.join(" ", replyListJp);
+            String replyEn = String.join(" ", replyListEn);
+
+            Log.d("SERVICE API","Reply (Ko): " + replyKo);
+            Log.d("SERVICE API","Reply (Jp): " + replyJp);
+            Log.d("SERVICE API","Reply (En): " + replyEn);
+            Log.d("SERVICE API","answerVoice: " + answerVoice);
+
+            getJpWavFromAPI(answerVoice, chatIdx);
+
+
+        }
+    }
+
+    public void getJpWavFromAPI(String text, String chatIdx) {
+        // Retrofit 설정
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(baseUrl)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build();
+        ApiService apiService = retrofit.create(ApiService.class);
+
+        // 요청 데이터 생성
+        JsonObject requestData = new JsonObject();
+        requestData.addProperty("text", text);
+        requestData.addProperty("char", "arona"); // 캐릭터 이름 예시
+        requestData.addProperty("lang", "ja");
+        requestData.addProperty("speed", "100"); // 예: 속도 100%
+        requestData.addProperty("chatIdx", chatIdx);
+
+        // API 호출
+        Call<ResponseBody> call = apiService.synthesizeSound(requestData);
+        call.enqueue(new Callback<ResponseBody>() {
+            @Override
+            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+                if (response.isSuccessful()) {
+                    try {
+                        // 응답 파일 저장 경로 설정
+                        File outputFile = new File(getExternalFilesDir(null), "output.wav");
+
+                        // 파일 저장
+                        if (saveResponseToFile(response.body(), outputFile)) {
+                            Log.d("API", "WAV 파일 저장 성공: " + outputFile.getAbsolutePath());
+
+                            // 음성 재생 관리
+                            manageAudioPlayback(outputFile);
+                        }
+                    } catch (Exception e) {
+                        Log.e("API", "오류 발생: " + e.getMessage());
+                    }
+                } else {
+                    Log.e("API", "요청 실패, 상태 코드: " + response.code());
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ResponseBody> call, Throwable t) {
+                Log.e("API", "요청 실패: " + t.getMessage());
+            }
+        });
+    }
+
+    private boolean saveResponseToFile(ResponseBody body, File file) {
+        try (InputStream inputStream = body.byteStream();
+             OutputStream outputStream = new FileOutputStream(file)) {
+
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+            return true;
+        } catch (IOException e) {
+            Log.e("API", "파일 저장 중 오류 발생: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private MediaPlayer mediaPlayer;
+    private final Queue<File> audioQueue = new LinkedList<>();
+
+    private void manageAudioPlayback(File audioFile) {
+        if (mediaPlayer == null) {
+            mediaPlayer = new MediaPlayer();
+        }
+
+        // 현재 재생 중이라면 큐에 추가
+        if (mediaPlayer.isPlaying()) {
+            audioQueue.offer(audioFile);
+            return;
+        }
+
+        try {
+            // 음성 재생 설정
+            mediaPlayer.reset();
+            mediaPlayer.setDataSource(audioFile.getAbsolutePath());
+            mediaPlayer.prepare();
+            mediaPlayer.start();
+
+            mediaPlayer.setOnCompletionListener(mp -> {
+                if (!audioQueue.isEmpty()) {
+                    manageAudioPlayback(audioQueue.poll()); // 큐에 다음 음성 재생
+                }
+            });
+        } catch (IOException e) {
+            Log.e("Audio", "재생 오류: " + e.getMessage());
+        }
+    }
+
+
 
     // 필요할 경우 음성재생용 sampleRATE를 여기서 설정해서 audioTrack 선언시 사용해야 함
     private int getSampleRate(File file) {
