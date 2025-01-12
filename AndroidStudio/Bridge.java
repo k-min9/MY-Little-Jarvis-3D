@@ -14,6 +14,8 @@ import android.util.Log;
 public class Bridge extends Application {
     private static Context context;
     static Activity unityActivity;
+    static String baseUrl;
+
     private static final int NOTIFICATION_ID = 1;
     private static final String CHANNEL_ID = "ForegroundServiceChannel";
     private static Handler notificationHandler = new Handler();
@@ -63,6 +65,12 @@ public class Bridge extends Application {
 //        }
         Log.i("BRIDGE", "ReceiveActivityInstance ended.");
     }
+
+    public static void ReceiveBaseUrl(String tempUrl) {
+        baseUrl = tempUrl;
+        Log.i("BRIDGE", "ReceiveBaseUrl received. : " + baseUrl);
+    }
+
     public static void StartService() {
         if (unityActivity != null) {
             // 알림 생성 및 반복 발행

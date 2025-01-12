@@ -1,5 +1,7 @@
 package com.example.mylittlejarvisandroid;
 
+import static com.example.mylittlejarvisandroid.Bridge.baseUrl;
+
 import android.Manifest;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -9,6 +11,7 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.AudioTrack;
@@ -22,14 +25,27 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
+
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.RequestBody;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
 
 public class MyBackgroundService extends Service {
 
@@ -47,7 +63,7 @@ public class MyBackgroundService extends Service {
 
 
     private String microphoneDevice;
-    private boolean madeLoopLap;
+//    private boolean madeLoopLap;  // Android Studio에서는 필요없어보임
     private int clipSamples = 16000;  // _clip.samples * _clip.channels;
     private int lastMicPos;
     private boolean isVoiceDetected;
@@ -119,6 +135,22 @@ public class MyBackgroundService extends Service {
         Log.i("SERVICE", "RECORD_AUDIO start.");
     }
 
+    private void setupAudioTrack() {
+        audioTrack = new AudioTrack.Builder()
+                .setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build())
+                .setAudioFormat(new AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(32000)  // SAMPLE_RATE 16000이 아니라 Server output 기준 적용 > 그 외에는 getSampleRate 함수 참조
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build())
+                .setBufferSizeInBytes(BUFFER_SIZE)
+                .setTransferMode(AudioTrack.MODE_STREAM)  // 작은 WAV 파일의 경우 MODE_STATIC이 더 적합
+                .build();
+    }
+
     private void setupVadRunnable() {
         vadRunnable = new Runnable() {
             @Override
@@ -135,6 +167,7 @@ public class MyBackgroundService extends Service {
         Log.d("SERVICE", "startVAD start");
 
         setupAudioRecord();
+        setupAudioTrack();
 
         if (audioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
             Log.e("SERVICE", "AudioRecord initialization failed!");
@@ -146,7 +179,7 @@ public class MyBackgroundService extends Service {
         Log.d("SERVICE", "startVAD startRecording");
 
         // 변수 초기화
-        madeLoopLap = false;
+//        madeLoopLap = false;
         lastChunkPos = 0;
         vadStopBegin = null;
         chunksLength = (int) (frequency * chunksLengthSec);  // 16000 * 0.5s
@@ -170,9 +203,9 @@ public class MyBackgroundService extends Service {
 
         Log.d("SERVICE", "CheckVAD micPosition : " + micPosition + " / readSamples : " + readSamples);
 
-        if (micPosition < lastMicPosition) {
-            madeLoopLap = true;
-        }
+//        if (micPosition < lastMicPosition) {
+//            madeLoopLap = true;
+//        }
         lastMicPosition = micPosition;
 
         updateChunks(micPosition);
@@ -221,6 +254,10 @@ public class MyBackgroundService extends Service {
                     String filePath = getApplicationContext().getExternalFilesDir(null) + "/audio_" + System.currentTimeMillis() + ".wav";
                     Log.d("SERVICE", "newBuffer save filePath");
                     saveBufferToWavFile(newBuffer, filePath, 16000); // 16000은 샘플레이트
+
+                    // 그냥 음성재생체크용
+                    playWav("response.wav");
+                    sendWav("response.wav");
                 }
 
                 // Update last chunk position and recalculate chunk size
@@ -360,15 +397,18 @@ public class MyBackgroundService extends Service {
         return ((float) byteValue) / Byte.MAX_VALUE;
     }
 
+    // Unity와는 다른 구현
     private int getMicBufferLength(int micPos) {
-        // Check if we just started recording and stopped it immediately, with no actual recording
-        if (micPos == 0 && !madeLoopLap) {
-            return 0; // No data recorded yet
-        }
-
-        // Calculate the length of the microphone buffer based on the circular buffer status
-        int len = madeLoopLap ? clipSamples : micPos; // If loop has occurred, use the full clip size
-        return len;
+        return micPos;
+        
+//        // Check if we just started recording and stopped it immediately, with no actual recording
+//        if (micPos == 0 && !madeLoopLap) {
+//            return 0; // No data recorded yet
+//        }
+//
+//        // Calculate the length of the microphone buffer based on the circular buffer status
+//        int len = madeLoopLap ? clipSamples : micPos; // If loop has occurred, use the full clip size
+//        return len;
     }
 
 
@@ -605,4 +645,98 @@ public class MyBackgroundService extends Service {
         return header;
     }
 
+    private void playWav(String fileName) {
+        Log.d("SERVICE", "playWav Start : " + fileName);
+        File file = new File(getExternalFilesDir(null), fileName);
+
+        if (!file.exists()) {
+            Log.e("SERVICE", "WAV file not found: " + file.getAbsolutePath());
+            return;
+        }
+
+//        Log.d("SERVICE", "playWav File Info sampleRate : " + getSampleRate(file));
+        try (FileInputStream inputStream = new FileInputStream(file)) {
+            // WAV 헤더 스킵 (44바이트)
+            inputStream.skip(44);
+
+            audioTrack.play();
+            Log.d("SERVICE", "AudioTrack playing: " + fileName);
+
+            // PCM 데이터를 읽어 재생
+            byte[] buffer = new byte[BUFFER_SIZE];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                audioTrack.write(buffer, 0, bytesRead);
+            }
+
+            Log.d("SERVICE", "Audio playback completed: " + fileName);
+        } catch (IOException e) {
+            Log.e("SERVICE", "Error playing WAV: " + e.getMessage());
+        }
+    }
+
+    public void sendWav(String fileName) {
+        String serverUrl =  baseUrl + "/stt";
+        File file = new File(getExternalFilesDir(null), fileName);
+
+        if (!file.exists()) {
+            System.err.println("File not found: " + file.getAbsolutePath());
+            return;
+        }
+
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(baseUrl)
+                .addConverterFactory(GsonConverterFactory.create()) // JSON 파싱 변환기
+                .build();
+        ApiService apiService = retrofit.create(ApiService.class);
+
+        // 파일 및 텍스트 파라미터 생성
+        RequestBody requestFile = RequestBody.create(MediaType.parse("audio/wav"), file);
+        MultipartBody.Part filePart = MultipartBody.Part.createFormData("file", file.getName(), requestFile);
+
+        RequestBody lang = RequestBody.create(MediaType.parse("text/plain"), "ko");
+        RequestBody level = RequestBody.create(MediaType.parse("text/plain"), "small");
+        RequestBody chatIdx = RequestBody.create(MediaType.parse("text/plain"), "1");
+
+        // API 호출
+        Call<JsonObject> call = apiService.uploadAudio(filePart, lang, level, chatIdx);
+        call.enqueue(new Callback<JsonObject>() {
+            @Override
+            public void onResponse(Call<JsonObject> call, Response<JsonObject> response) {
+                if (response.isSuccessful()) {
+                    JsonObject jsonResponse = response.body();
+                    if (jsonResponse != null) {
+                        String transText = jsonResponse.get("text").getAsString();
+                        String transLang = jsonResponse.get("lang").getAsString();
+                        int chatIdx = jsonResponse.get("chatIdx").getAsInt();
+
+                        System.out.println("Transcribed Text: " + transText);
+                        System.out.println("Language: " + transLang);
+                        System.out.println("Chat Index: " + chatIdx);
+                    }
+                } else {
+                    System.err.println("Request failed. Response Code: " + response.code());
+                }
+            }
+
+            @Override
+            public void onFailure(Call<JsonObject> call, Throwable t) {
+                t.printStackTrace();
+            }
+        });
+    }
+
+    // 필요할 경우 음성재생용 sampleRATE를 여기서 설정해서 audioTrack 선언시 사용해야 함
+    private int getSampleRate(File file) {
+        try (FileInputStream inputStream = new FileInputStream(file)) {
+            byte[] header = new byte[44];
+            inputStream.read(header, 0, 44);
+            // 샘플 레이트는 24~27 바이트에 저장됨 (리틀 엔디안)
+            return ((header[27] & 0xFF) << 24) | ((header[26] & 0xFF) << 16)
+                    | ((header[25] & 0xFF) << 8) | (header[24] & 0xFF);
+        } catch (Exception e) {
+            Log.e("SERVICE", "Cannot find sample Rate");
+            return 0;
+        }
+    }
 }
