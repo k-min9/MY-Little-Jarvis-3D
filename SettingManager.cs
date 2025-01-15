@@ -10,6 +10,7 @@ public class SettingManager : MonoBehaviour
 
     // 입력값 정리
     [SerializeField] private TMP_InputField playerNameInputField;
+    [SerializeField] private TMP_InputField serverIdInputField;
     [SerializeField] private Dropdown uiLangDropdown;
     [SerializeField] private Dropdown aiLangDropdown;
     [SerializeField] private Toggle isAlwaysOnTopToggle;
@@ -36,6 +37,7 @@ public class SettingManager : MonoBehaviour
     public class SettingsData
     {
         public string player_name;
+        public string server_id;
         public int ui_language_idx;  // 0 : ko, 1 : jp, 2: en
         public string ui_language;  
         public int ai_language_idx;  // 0 : ko, 1 : jp, 2: en
@@ -50,7 +52,7 @@ public class SettingManager : MonoBehaviour
         public float char_speed;
         public bool isGravity;
 
-        public int sound_language_idx;  // 0 : ko, 1 : jp
+        public int sound_language_idx;  // 0 : ko, 1 : jp, 2: en
         public string sound_language;  
         public float sound_volumeMaster;
         public float sound_speedMaster;
@@ -80,6 +82,7 @@ public class SettingManager : MonoBehaviour
 
     // setter
     public void SetPlayerName(string value) { settings.player_name = value; SaveSettings(); }
+    public void SetServerID(string value) { settings.server_id = value; SaveSettings(); }
     public void SetUiLanguage() { int value=uiLangDropdown.value; settings.ui_language_idx = value; settings.ui_language=getLangFromIdx(value); SaveSettings(); }
     public void SetAiLanguage() { int value=aiLangDropdown.value; settings.ai_language_idx = value; settings.ai_language=getLangFromIdx(value); SaveSettings(); }
     public void SetAiLanguageIn(string value) { settings.ai_language_in = value; SaveSettings(); }
@@ -197,6 +200,7 @@ public class SettingManager : MonoBehaviour
     private void SetUIAfterLoading()
     {
         playerNameInputField.text = settings.player_name;
+        serverIdInputField.text = settings.server_id;
         uiLangDropdown.value = settings.ui_language_idx;
         aiLangDropdown.value = settings.ai_language_idx;
         isAlwaysOnTopToggle.isOn = settings.isAlwaysOnTop;
@@ -250,6 +254,7 @@ public class SettingManager : MonoBehaviour
     private void SetDefaultValues()
     {
         settings.player_name = "Sensei";
+        settings.server_id = "temp";
         settings.ui_language_idx = 0;
         settings.ui_language = "ko";
         settings.ai_language_idx = 2;
@@ -264,8 +269,8 @@ public class SettingManager : MonoBehaviour
         settings.char_speed = 100;
         settings.isGravity = true;
 
-        settings.sound_language_idx = 0;
-        settings.sound_language = "ko";
+        settings.sound_language_idx = 1;  // jp
+        settings.sound_language = "jp";
         settings.sound_volumeMaster = 70;
         settings.sound_speedMaster = 100;
 
