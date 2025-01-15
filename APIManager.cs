@@ -62,12 +62,18 @@ public class APIManager : MonoBehaviour
         // 로그 파일 생성
         Directory.CreateDirectory(Path.GetDirectoryName(logFilePath)); // 디렉토리가 없으면 생성
         File.AppendAllText(logFilePath, $"Log started at: {DateTime.Now}\n");
+    }
 
+    private void Start()
+    {
+// #if !UNITY_EDITOR
         // supabase에서 ngrok url 가져오기 (에디터에서는 제외)
-#if !UNITY_EDITOR
-        StartCoroutine(FetchNgrokJsonData());
-#endif        
+        CallFetchNgrokJsonData();
+// #endif    
+    }
 
+    public void CallFetchNgrokJsonData() {
+        StartCoroutine(FetchNgrokJsonData());
     }
 
     // 로그 기록 메서드
@@ -258,19 +264,6 @@ public class APIManager : MonoBehaviour
         {
             Debug.Log($"Exception: {ex.Message}");
         }
-    }
-
-    // CallConversationStream 함수를 Start에서 호출
-    private void Start()
-    {
-        // Test용 코드
-        // string query = "내일 날씨가 어떨까?";
-
-        // Test용 stream 답변생성
-        // CallConversationStream(query);
-
-        // Test용 wav 생성
-        // GetKoWavFromAPI(query);
     }
 
     // chatHandler에서 호출
@@ -595,7 +588,9 @@ public class APIManager : MonoBehaviour
     {
         // string ngrokSupabaseUrl = "https://lxmkzckwzasvmypfoapl.supabase.co/storage/v1/object/private/json_bucket/my_little_jarvis_plus_ngrok_server.json";
 
-        string ngrokSupabaseUrl = "https://lxmkzckwzasvmypfoapl.supabase.co/storage/v1/object/sign/json_bucket/my_little_jarvis_plus_ngrok_server.json?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJqc29uX2J1Y2tldC9teV9saXR0bGVfamFydmlzX3BsdXNfbmdyb2tfc2VydmVyLmpzb24iLCJpYXQiOjE3MzM4Mzg4MjYsImV4cCI6MjA0OTE5ODgyNn0.ykDVTXYVXNnKJL5lXILSk0iOqt0_7UeKZqOd1Qv_pSY&t=2024-12-10T13%3A53%3A47.907Z";
+        string server_id = SettingManager.Instance.settings.server_id;
+        Debug.Log("server_id : " + server_id);
+        string ngrokSupabaseUrl = "https://lxmkzckwzasvmypfoapl.supabase.co/storage/v1/object/sign/json_bucket/my_little_jarvis_plus_ngrok_server_"+server_id+".json?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJqc29uX2J1Y2tldC9teV9saXR0bGVfamFydmlzX3BsdXNfbmdyb2tfc2VydmVyLmpzb24iLCJpYXQiOjE3MzM4Mzg4MjYsImV4cCI6MjA0OTE5ODgyNn0.ykDVTXYVXNnKJL5lXILSk0iOqt0_7UeKZqOd1Qv_pSY&t=2024-12-10T13%3A53%3A47.907Z";
         string supabaseApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4bWt6Y2t3emFzdm15cGZvYXBsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM4MzUxNzQsImV4cCI6MjA0OTQxMTE3NH0.zmEKHhIcQa4ODekS2skgknlXi8Hbd8JjpjBlFZpPsJ8"; 
         
         using (UnityWebRequest request = UnityWebRequest.Get(ngrokSupabaseUrl))
@@ -624,6 +619,7 @@ public class APIManager : MonoBehaviour
                 {
                     Debug.Log($"Fetched URL: {data.url}");
                     ngrokUrl = data.url;
+                    // BackgroundService.Instance.baseUrl = data.url;  // backgroundService에 중요
                     ngrokStatus = data.status;
 
                     if (ngrokStatus == "closed") {
