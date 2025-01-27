@@ -1,16 +1,21 @@
-using System.Diagnostics;
-using UnityEngine;
-using System.IO;
+using System;
 using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.Networking;
+using Newtonsoft.Json;
+using UnityEngine.UI;
 
-public class ServerManager : MonoBehaviour 
+public class ServerManager : MonoBehaviour
 {
-    private bool isConnected = false;
+    public string baseUrl = "";
+    private string ngrokUrl;
+    private string ngrokStatus;
+
+    public Text serverStatusText;
 
     // 싱글톤 인스턴스
     private static ServerManager instance;
-
-    // 싱글톤 인스턴스에 접근하는 속성
     public static ServerManager Instance
     {
         get
@@ -23,262 +28,207 @@ public class ServerManager : MonoBehaviour
         }
     }
 
-    private void Awake()
+    private void Start()
     {
-        // 싱글톤 패턴 구현
-        if (instance == null)
+        StartCoroutine(SetBaseUrl());
+    }
+
+    // Base URL 설정 (FetchNgrokJsonData 이후)
+    private IEnumerator SetBaseUrl()
+    {
+        // 1. Fetch ngrok URL
+        yield return StartCoroutine(FetchNgrokJsonData());
+
+        // 2. Determine and set base URL
+        yield return StartCoroutine(DetermineBaseUrl());
+
+        if (!string.IsNullOrEmpty(baseUrl))
         {
-            instance = this;
+            Debug.Log("Final Base URL: " + baseUrl);
         }
         else
         {
-            // Destroy(gameObject);
-            return;
+            Debug.LogError("Base URL 설정 실패");
         }
     }
 
-    // 서버 실행할지 물어보기
-    public static void AskStartServer()
+    // URL 순서대로 확인하고 baseUrl 설정
+    private IEnumerator DetermineBaseUrl()
     {
-        // 서버 설치되어있는지 확인
-        string streamingAssetsPath = Application.streamingAssetsPath;  // StreamingAssets 폴더 경로
-        string executablePath = Application.dataPath;  // Unity 실행 파일이 있는 폴더 경로
-        string jarvisServerPath = Path.Combine(Path.GetDirectoryName(executablePath), "jarvis_server_jp.exe");
-        if (File.Exists(jarvisServerPath))
-        {
-            // 서버 구동할지 물어보기
-            AskBalloonManager.Instance.SetCurrentQuestion("start_ai_server");  // InitializeQuestions에서 목록 확인(많아질 경우 Enum으로 관리)
-            AskBalloonManager.Instance.ShowAskBalloon();  // 들어가기
-        }
-        else
-        {
-            string installPath = Path.Combine(streamingAssetsPath, "Install_3D.exe");
-            if (File.Exists(installPath))
-            {
-                // 서버 설치할지 물어보기
-                AskBalloonManager.Instance.SetCurrentQuestion("install_ai_server");  // InitializeQuestions에서 목록 확인(많아질 경우 Enum으로 관리)
-                AskBalloonManager.Instance.ShowAskBalloon();  // 들어가기
-            }
-            else 
-            {
-                // TODL : 서버 다운로드할지 물어보기
-                UnityEngine.Debug.Log("No Install File");
-            }
-        }
-    }
+        bool isReachable = false;
 
-
-    // 서버 실행 함수
-    public static Process StartServer()
-    {
-        // 이미 실행되고 있으면 안내 후 return
-        if (IsJarvisServerRunning())
+        // 1. Check localhost connection
+        yield return StartCoroutine(IsUrlReachable("http://127.0.0.1:5000/health", result => isReachable = result));
+        if (isReachable)
         {
-            AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
-            AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Already Served");
-            return null;
-        }
-        
-        string streamingAssetsPath = Application.streamingAssetsPath;  // StreamingAssets 폴더 경로
-        string executablePath = Application.dataPath;  // Unity 실행 파일이 있는 폴더 경로
-        string jarvisServerPath = Path.Combine(Path.GetDirectoryName(executablePath), "jarvis_server_jp.exe");
-
-        if (File.Exists(jarvisServerPath))
-        {
-            // jarvis_server_jp.exe 실행
-            Process serverProcess = RunJarvisServer(jarvisServerPath);
-            AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
-            AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Init server...");
-
-            // StartCoroutine(SendFirstPing()); // TODO : 서버 실행 후 핑 보내기 시작
-        }
-        else
-        {
-            // jarvis_server_jp.exe 파일이 없으면 Install_3D.exe 실행할지 여부 묻기
-            string installPath = Path.Combine(streamingAssetsPath, "Install_3D.exe");
-            if (!File.Exists(installPath))
-            {
-                if (AskUserToDownload("Install_3D.exe가 없습니다. 다운로드 하시겠습니까?"))
-                {
-                    DownloadInstall3D(); // 다운로드 함수 (미구현)
-                }
-                return null;
-            }
-
-            if (AskUserToExecute("Install_3D.exe를 실행하시겠습니까?"))
-            {
-                AskBalloonManager.Instance.SetCurrentQuestion("start_ai_server");  // InitializeQuestions에서 목록 확인(많아질 경우 Enum으로 관리)
-                AskBalloonManager.Instance.ShowAskBalloon();  // 들어가기
-            }
+            baseUrl = "http://127.0.0.1:5000";
+            yield break;
         }
 
-        return null;
-    }
-
-    // jarvis_server.exe 핑 전송 코루틴
-    private IEnumerator SendFirstPing()
-    {
-        int attempts = 0;
-        while (attempts < 10)
+        // 2. Check ngrokUrl
+        Debug.Log("ngrokUrl : " + ngrokUrl);
+        if (!string.IsNullOrEmpty(ngrokUrl))
         {
-            // string response = APIManager.sendPing();
-            string response = "ok";
-            if (response == "ok")
+            yield return StartCoroutine(IsUrlReachable(ngrokUrl + "/health", result => isReachable = result));
+            if (isReachable)
             {
-                isConnected = true;
-                UnityEngine.Debug.Log("서버와 연결되었습니다.");
+                baseUrl = ngrokUrl;
                 yield break;
             }
-
-            yield return new WaitForSeconds(5f); // 5초 대기
-            attempts++;
         }
 
-        if (!IsJarvisServerRunning())
+        // 3. Check loca.lt connection
+        yield return StartCoroutine(IsUrlReachable("https://minmin496969.loca.lt/health", result => isReachable = result));
+        if (isReachable)
         {
-            UnityEngine.Debug.Log("jarvis_server.exe가 실행되어 있지 않습니다.");
+            baseUrl = "https://minmin496969.loca.lt";
+            yield break;
+        }
+
+        // 4. If all checks fail
+        Debug.LogError("URL 조합 실패");
+        baseUrl = "";
+    }
+
+    // URL 연결 가능 여부 확인
+    private IEnumerator IsUrlReachable(string url, Action<bool> callback)
+    {
+        using (UnityWebRequest request = UnityWebRequest.Get(url))
+        {
+            request.timeout = 3;
+            yield return request.SendWebRequest();
+
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                callback(true);
+            }
+            else
+            {
+                callback(false);
+            }
+        }
+    }
+
+    // 서버 상태 확인
+    public void CallCheckServerStatus()
+    {
+        // Base URL 설정 후 상태 확인
+        StartCoroutine(CheckServerStatus());
+    }
+
+    public IEnumerator CheckServerStatus()
+    {
+        serverStatusText.text = "Checking...";
+
+        // Base URL 설정
+        yield return StartCoroutine(SetBaseUrl());
+        
+        // Base URL 상태 확인 및 Text 선택
+        if (string.IsNullOrEmpty(baseUrl))
+        {
+            serverStatusText.text = "Fail";
+            Debug.Log("서버 상태: Fail");
+        }
+        else if (baseUrl.Contains("127.0.0.1"))
+        {
+            serverStatusText.text = "Local";
+            Debug.Log("서버 상태: Local");
+        }
+        else if (baseUrl.Contains("ngrok"))
+        {
+            serverStatusText.text = "Ngrok";
+            Debug.Log("서버 상태: Ngrok");
+        }
+        else if (baseUrl.Contains("loca.lt"))
+        {
+            serverStatusText.text = "LocalTunnel";
+            Debug.Log("서버 상태: Loca.lt");
+        }
+    }
+
+    // FetchNgrokJsonData 구현 (server_id 대기 포함)
+    private IEnumerator FetchNgrokJsonData()
+    {
+        // 최대 3초 동안 server_id 대기
+        string server_id = "temp";
+        float elapsedTime = 0f;
+        const float timeout = 3f;
+
+        while (string.IsNullOrEmpty(SettingManager.Instance.settings?.server_id) && elapsedTime < timeout)
+        {
+            elapsedTime += Time.deltaTime;
+            // Debug.Log("Waiting for server_id to be initialized...");
+            yield return null; // 다음 프레임까지 대기
+        }
+
+        // 타임아웃 발생 시 기본 값 사용
+        if (string.IsNullOrEmpty(SettingManager.Instance.settings?.server_id))
+        {
+            Debug.LogWarning("server_id 초기화 시간 초과. 기본 값 사용.");
         }
         else
         {
-            UnityEngine.Debug.Log("서버 응답이 없습니다.");
+            server_id = SettingManager.Instance.settings.server_id;
         }
-    }
 
-    // Install_3D.exe 실행 함수
-    public static Process RunInstallExe()
-    {
-        string streamingAssetsPath = Application.streamingAssetsPath;
-        string installPath = Path.Combine(streamingAssetsPath, "Install_3D.exe");
-        ProcessStartInfo startInfo = new ProcessStartInfo
+        Debug.Log("server_id : " + server_id);
+
+        // Supabase 요청 URL 및 API 키
+        string ngrokSupabaseUrl = "<MY Token>";
+        string supabaseApiKey = "<MY KEY>"
+
+        using (UnityWebRequest request = UnityWebRequest.Get(ngrokSupabaseUrl))
         {
-            FileName = installPath,
-            UseShellExecute = false,
-            CreateNoWindow = true // 콘솔 창을 표시하지 않음
-        };
-        Process installProcess = Process.Start(startInfo);
-        // installProcess.WaitForExit();
-        UnityEngine.Debug.Log("Install_3D.exe 실행 완료");
-        return installProcess;
-    }
+            // 인증 헤더 추가
+            request.SetRequestHeader("Authorization", $"Bearer {supabaseApiKey}");
 
-    // jarvis_server_jp.exe 실행 함수 (콘솔 창 없이)
-    public static Process RunJarvisServer(string serverExePath)
-    {
-        try
-        {
-            string serverType = SettingManager.Instance.settings.ui_language;
-            string language = SettingManager.Instance.settings.sound_language;  // preloading용 치명적이지는 않음
+            // 서버 요청
+            yield return request.SendWebRequest();
 
-            ProcessStartInfo startInfo = new ProcessStartInfo
+            // 에러 처리
+            if (request.result == UnityWebRequest.Result.ConnectionError || request.result == UnityWebRequest.Result.ProtocolError)
             {
-                FileName = serverExePath,
-                Arguments = $"{serverType} {language}", // 변수 전달
-                UseShellExecute = false,
-                CreateNoWindow = true, // 콘솔 창을 표시하지 않음
-                // RedirectStandardOutput = true,
-                // RedirectStandardError = true,
-                // WorkingDirectory = Path.GetDirectoryName(serverExePath) // 실행 파일의 폴더를 작업 디렉토리로 설정
-            };
-
-            Process serverProcess = Process.Start(startInfo);
-
-            // 로그 파일에 실시간으로 출력 (출력, 오류)
-            string logFilePath = Path.Combine(Application.dataPath, "jarvis_server_log.txt");  // 로그 파일 경로
-            using (StreamWriter logWriter = new StreamWriter(logFilePath, true))
-            {
-                serverProcess.OutputDataReceived += (sender, e) =>
-                {
-                    if (e.Data != null)
-                    {
-                        logWriter.WriteLine("[OUTPUT] " + e.Data);
-                        logWriter.Flush();
-                    }
-                };
-
-                serverProcess.ErrorDataReceived += (sender, e) =>
-                {
-                    if (e.Data != null)
-                    {
-                        logWriter.WriteLine("[ERROR] " + e.Data);
-                        logWriter.Flush();
-                    }
-                };
-
-                serverProcess.BeginOutputReadLine();  // 비동기적 출력 읽기 시작
-                serverProcess.BeginErrorReadLine();   // 비동기적 오류 읽기 시작
+                Debug.LogError($"Error fetching JSON data: {request.error}");
             }
-
-            UnityEngine.Debug.Log("jarvis_server_jp.exe 실행 완료");
-            return serverProcess;
-        }
-        catch (System.Exception e)
-        {
-            UnityEngine.Debug.Log($"jarvis_server_jp.exe 실행 중 오류 발생: {e.Message}");
-            return null;
-        }
-    }
-
-    // jarvis_server.exe 실행 중인지 확인하는 함수
-    public static bool IsJarvisServerRunning()
-    {
-        return Process.GetProcessesByName("jarvis_server_jp").Length > 0 || Process.GetProcessesByName("jarvis_server").Length > 0;
-    }
-
-    // 유저에게 실행 여부 물어보는 함수 (가정: UI 팝업 또는 콘솔 입력 방식)
-    private static bool AskUserToExecute(string message)
-    {
-        // 유저에게 물어보고 True/False 반환 (UI 구현 필요)
-        UnityEngine.Debug.Log(message);
-        return true; // 가정: 항상 실행한다고 가정
-    }
-
-    // 유저에게 다운로드 여부 물어보는 함수
-    private static bool AskUserToDownload(string message)
-    {
-        // 유저에게 물어보고 True/False 반환 (UI 구현 필요)
-        UnityEngine.Debug.Log(message);
-        return true; // 가정: 항상 다운로드 한다고 가정
-    }
-
-    // Install_3D.exe 다운로드 함수 (미구현)
-    private static void DownloadInstall3D()
-    {
-        // 다운로드 관련 로직을 여기에 추가
-        UnityEngine.Debug.Log("Install_3D.exe 다운로드 중...");
-    }
-
-    // 프로그램 종료시 실행
-    private void OnApplicationQuit()
-    {
-        KillJarvisServer();
-    }
-
-    // 서버 프로그램 종료
-    private void KillJarvisServer()
-    {
-        string processName = "jarvis_server_jp";
-        Process[] processes = Process.GetProcessesByName(processName);
-
-        if (processes.Length > 0)
-        {
-            foreach (Process process in processes)
+            else
             {
-                try
+                // JSON 데이터를 문자열로 가져옴
+                string jsonResponse = request.downloadHandler.text;
+
+                // JSON 데이터 파싱
+                var fullData = JsonConvert.DeserializeObject<Dictionary<string, NgrokJsonResponse>>(jsonResponse);
+                if (fullData != null && fullData.ContainsKey(server_id))
                 {
-                    // 프로세스 종료
-                    process.Kill();
-                    UnityEngine.Debug.Log($"{processName}.exe has been killed.");
+                    NgrokJsonResponse data = fullData[server_id];
+                    Debug.Log($"Fetched URL: {data.url}");
+
+                    ngrokUrl = data.url;
+                    ngrokStatus = data.status;
+
+                    if (ngrokStatus == "closed")
+                    {
+                        NoticeBalloonManager.Instance.ModifyNoticeBalloonText("Supabase Server Closed");
+                    }
+                    else if (ngrokStatus != "open")
+                    {
+                        NoticeBalloonManager.Instance.ModifyNoticeBalloonText("Supabase Server Not Opened");
+                    }
                 }
-                catch (System.Exception ex)
+                else
                 {
-                    UnityEngine.Debug.LogError($"Failed to kill {processName}.exe: {ex.Message}");
+                    ngrokUrl = null;
+                    ngrokStatus = null;
+                    Debug.LogError($"Server ID '{server_id}' not found in JSON data.");
                 }
             }
         }
-        else
-        {
-            UnityEngine.Debug.Log($"{processName}.exe is not running.");
-        }
     }
+}
 
+// Ngrok JSON 응답 클래스
+[Serializable]
+public class NgrokJsonResponse
+{
+    public string url;
+    public string status;
 }
