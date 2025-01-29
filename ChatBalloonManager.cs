@@ -80,6 +80,18 @@ public class ChatBalloonManager : MonoBehaviour
 // #endif
     }
 
+    public void ToggleChatBalloon()
+    {
+        if (chatBalloon.activeSelf)
+        {
+            HideChatBalloon();
+        }
+        else 
+        {
+            ShowChatBalloon();
+        }
+    }
+
     // chatBalloon의 위치를 캐릭터 바로 위로 조정하는 함수
     private void UpdateChatBalloonPosition()
     {
