@@ -36,9 +36,11 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
 
     private void HandleClickMobile()
     {
-        if (SettingManager.Instance.settings.isAskedTurnOnServer)  // TODO 변경 : Android 용 AI 모드 여부 변수로 변경
+        if (SettingManager.Instance.settings.isShowChatBoxOnClick)
         {
-                ChatBalloonManager.Instance.ShowChatBalloon();
+            StatusManager.Instance.isAnswering = false;
+            VoiceManager.Instance.ResetAudio();
+            ChatBalloonManager.Instance.ToggleChatBalloon();
         }       
         else
         {
@@ -62,21 +64,22 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
     private void HandleLeftClick()
     {
         // 기존 좌클릭 처리 로직
-        if (ServerManager.IsJarvisServerRunning())
+        if (SettingManager.Instance.settings.isShowChatBoxOnClick)
         {
             StatusManager.Instance.isAnswering = false;
             VoiceManager.Instance.ResetAudio();
-            ChatBalloonManager.Instance.ShowChatBalloon();
+            ChatBalloonManager.Instance.ToggleChatBalloon();
         }
         else
         {
-            if (SettingManager.Instance.settings.isAskedTurnOnServer)
+            if (false && SettingManager.Instance.settings.isAskedTurnOnServer)  // TODO : SettingManager쪽은 완전히 없애버리자.
             {
-#if UNITY_EDITOR
-                ChatBalloonManager.Instance.ShowChatBalloon();
-#else
-                ServerManager.AskStartServer();
-#endif
+                // 과거의 유산
+// #if UNITY_EDITOR
+                ChatBalloonManager.Instance.ToggleChatBalloon();
+// #else
+//                 ServerManager.AskStartServer();
+// #endif
             }
             else
             {
