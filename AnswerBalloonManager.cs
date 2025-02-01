@@ -134,6 +134,7 @@ public class AnswerBalloonManager : MonoBehaviour
     // 언어전환을 고려한 string setting
     public void ModifyAnswerBalloonTextInfo(string replyKo, string replyJp, string replyEn) 
     {
+        // Debug.Log("ModifyAnswerBalloonTextInfo Start : " + replyEn);
         answerLanguage = SettingManager.Instance.settings.ui_language; // 표시 언어 초기화[ko, en, jp]
         textKo = replyKo;
         textJp = replyJp;

@@ -40,7 +40,7 @@ public class TalkMenuManager : MonoBehaviour
             return;
         }
 
-        HideTalkMenu(); // 시작 시 TalkMenu 숨기기
+        // HideTalkMenu(); // 시작 시 TalkMenu 숨기기
     }
 
     // 상태 갱신 로직

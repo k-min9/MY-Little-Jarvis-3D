@@ -171,7 +171,9 @@ public class StatusManager : MonoBehaviour
         {   
             updateMouthStatus();
         } else {
+        #if !UNITY_EDITOR
             initMouthStatus();
+        #endif
         }
     }
 
