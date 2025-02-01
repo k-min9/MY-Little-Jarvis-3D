@@ -22,6 +22,8 @@ public class CharManager : MonoBehaviour
     // 캐릭터 프리팹 리스트
     public List<GameObject> charList;
 
+    public ParticleSystem fx_change;  // 캐릭터 변경시 이펙트
+
     // 현재 활성화된 캐릭터와 인덱스
     private GameObject currentCharacter;
     private float currentCharacterInitLocalScale = 20000f;
@@ -200,6 +202,9 @@ public class CharManager : MonoBehaviour
     #endif
 
         // TODO : 이펙트(FX, SFX) 효과
+        fx_change.transform.position = canvas.transform.TransformPoint(previousPosition);
+        fx_change.Play();
+
 
         // 캐릭터 닉네임 출력 (Log)
         string nickname = GetNickname(currentCharacter);
