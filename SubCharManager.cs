@@ -20,6 +20,7 @@ public class SubCharManager : MonoBehaviour
     }
 
     // 캐릭터 프리팹 리스트
+    public GameObject subCharsContainer;
     public List<GameObject> charList;
 
     public ParticleSystem fx_change;  // 캐릭터 변경시 이펙트
@@ -35,15 +36,13 @@ public class SubCharManager : MonoBehaviour
 
     void Awake()
     {
-        // 싱글톤 설정
-        if (instance == null)
-        {
-            instance = this;
-            DontDestroyOnLoad(gameObject); // 씬이 바뀌어도 파괴되지 않도록 설정
-        }
-
         // 초기화
         canvas = FindObjectOfType<Canvas>();
+
+        
+        // 빈 GameObject 생성 (사각형들을 정리하기 위함)
+        subCharsContainer = new GameObject("SubChars");
+        subCharsContainer.transform.SetParent(canvas.transform, false);
     }
 
     // 해당 SubChar은 currentCharacter 변경. 기존 currentCharacter SubChar로. charList(AI 지원.Gamemanager)에 있는 대상이어야 함
@@ -210,6 +209,8 @@ public class SubCharManager : MonoBehaviour
         float canvasWidth = canvas.GetComponent<RectTransform>().rect.width;
         float randomX = Random.Range(-canvasWidth / 2 + 100, canvasWidth / 2 - 100);
         GameObject character = Instantiate(obj, new Vector3(randomX, 0, -70), obj.transform.rotation, canvas.transform);
+        character.transform.SetParent(subCharsContainer.transform, false);  // parent 정리
+
         // 소환후 변경하는 방법일 경우시 아래와 같이 사용         rectTransform.anchoredPosition3D = ;
         RectTransform rectTransform = character.GetComponent<RectTransform>();
         if (rectTransform != null)
@@ -228,6 +229,20 @@ public class SubCharManager : MonoBehaviour
         // Sub 캐릭터의 Component 초기화
         SubStatusManager subStatusManager = character.AddComponent<SubStatusManager>();  // SubStatusManager 추가
         {
+            // FallingObject 컴포넌트 제거
+            FallingObject fallingObject = character.GetComponent<FallingObject>();
+            if (fallingObject != null)
+            {
+                Destroy(fallingObject);
+            }
+
+            // SubFallingObject 컴포넌트 추가
+            if (character.GetComponent<SubFallingObject>() == null)
+            {
+                character.gameObject.AddComponent<SubFallingObject>();
+            }
+        }
+        {
             // MenuTrigger 컴포넌트 제거
             MenuTrigger menuTrigger = character.GetComponent<MenuTrigger>();
             if (menuTrigger != null)
@@ -235,7 +250,7 @@ public class SubCharManager : MonoBehaviour
                 Destroy(menuTrigger);
             }
 
-            // MenuSubTrigger 컴포넌트 추가
+            // SubMenuTrigger 컴포넌트 추가
             if (character.GetComponent<SubMenuTrigger>() == null)
             {
                 character.gameObject.AddComponent<SubMenuTrigger>();
@@ -497,4 +512,13 @@ public class SubCharManager : MonoBehaviour
     //     TalkMenuManager talkMenuManager = FindObjectOfType<TalkMenuManager>();
     //     talkMenuManager.characterTransform = charObj.GetComponent<RectTransform>();
     // }
+
+    // subCharsContainer 이하 subChars 전부 erase
+    public void ClearAllSummonChar()
+    {
+        foreach (Transform child in subCharsContainer.transform)
+        {
+            Destroy(child.gameObject);
+        }
+    }
 }
