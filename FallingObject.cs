@@ -5,9 +5,8 @@ public class FallingObject : MonoBehaviour
 {
     public float fallSpeed = 800f;
     private RectTransform rectTransform;
-    private float bottomBoundary;
-    public List<RectTransform> otherObjects;
     private Animator animator;
+    private float bottomBoundary;
 
     void Start()
     {
@@ -15,15 +14,10 @@ public class FallingObject : MonoBehaviour
         animator = GetComponent<Animator>();
 
         Canvas canvas = GetComponentInParent<Canvas>();
-        if (canvas != null)
-        {
-            // 작업 표시줄의 위치를 고려한 하단 경계 계산
-            // Rect taskbarRect = TaskbarInfo.GetTaskbarRect();
-            // float taskbarHeight = taskbarRect.height;
-            bottomBoundary = -(canvas.GetComponent<RectTransform>().rect.height / 2) + rectTransform.rect.height * 0.5f; // + taskbarHeight;
-        }
-
         // animator.SetBool("IsFalling", isFalling);
+
+        // bottomBoundary = -(canvas.GetComponent<RectTransform>().rect.height / 2) + rectTransform.rect.height * 0.5f; // + taskbarHeight; 
+        bottomBoundary = -(canvas.GetComponent<RectTransform>().rect.height / 2);  //  + 50f;
     }
 
     void Update()
@@ -33,39 +27,33 @@ public class FallingObject : MonoBehaviour
             StatusManager.Instance.IsFalling = false;
             return;
         }
-
-        if (!IsCollidingWithOtherObjects(rectTransform.anchoredPosition) && !StatusManager.Instance.IsFalling)
-        {
-            StartFalling();
+        if (StatusManager.Instance.IsPicking) {
+            return;
         }
 
-        if (StatusManager.Instance.IsFalling && !StatusManager.Instance.IsPicking)
-        {
-            Vector2 newPosition = rectTransform.anchoredPosition;
-            newPosition.y -= fallSpeed * Time.deltaTime;
+        Vector2 newPosition = rectTransform.anchoredPosition;
+        newPosition.y -= fallSpeed * Time.deltaTime; // 예상 변화 = 800*1/60
 
-            if (newPosition.y > bottomBoundary && !IsCollidingWithOtherObjects(newPosition))
-            {
+        float top = WindowCollisionManager.Instance.GetTopOfCollisionRect(newPosition);
+        if(top <= -90000f) {  // 충돌X
+            if (!StatusManager.Instance.IsFalling) { 
+                // 낙하시작
+                StartFalling();
+            } else {
+                // 이미 낙하중 (가속도 로직 넣으려면 여기)
+
+            }
+            newPosition.y = Mathf.Max(bottomBoundary, newPosition.y);
+            rectTransform.anchoredPosition = newPosition;
+        } else {  // 충돌
+            if (StatusManager.Instance.IsFalling) { 
+                // 낙하 중지 + 이동거리 재계산
+                StopFalling();
+                newPosition.y = Mathf.Max(bottomBoundary, top-0.8f);  // window 좌표는 정수라 약간의 보정이 필요함
                 rectTransform.anchoredPosition = newPosition;
             }
-            else
-            {
-                rectTransform.anchoredPosition = new Vector2(rectTransform.anchoredPosition.x, Mathf.Max(bottomBoundary, rectTransform.anchoredPosition.y));
-                StopFalling();
-            }
+            
         }
-    }
-
-    private bool IsCollidingWithOtherObjects(Vector2 newPosition)
-    {
-        foreach (RectTransform other in otherObjects)
-        {
-            if (other != rectTransform && RectTransformUtility.RectangleContainsScreenPoint(other, newPosition))
-            {
-                return true;
-            }
-        }
-        return false;
     }
 
     public void StartFalling()
