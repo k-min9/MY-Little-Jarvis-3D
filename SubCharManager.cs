@@ -55,11 +55,10 @@ public class SubCharManager : MonoBehaviour
     public void setCharSize(GameObject character, int percent = 100)
     {   
         float char_size = SettingManager.Instance.settings.char_size;
-        if (character != null)
+        CharAttributes charAttributes = character.GetComponent<CharAttributes>();
+        if (character != null && charAttributes.initLocalScale > 0)
         {
-            float currentCharacterInitLocalScale = character.transform.localScale.x;  // 이거 불변인가...?
-            Debug.Log("currentCharacterInitLocalScale : " + currentCharacterInitLocalScale);
-            float scaleFactor = currentCharacterInitLocalScale * char_size * percent / 10000f; // 퍼센트를 소수점 비율로 변환
+            float scaleFactor = charAttributes.initLocalScale * char_size * percent / 10000f; // 퍼센트를 소수점 비율로 변환
             character.transform.localScale = new Vector3(scaleFactor, scaleFactor, scaleFactor); // X, Y, Z 동일한 비율로 크기 조정
         }
     }
@@ -191,16 +190,16 @@ public class SubCharManager : MonoBehaviour
         // 기존 캐릭터 제거 전 RectTransform 위치 저장
         Vector3 previousPosition = new Vector3(0, 0, -70); // 기본 위치는 (0, 0, -70)
         Quaternion previousRotation = Quaternion.identity; // 기본 회전은 identity
-        RectTransform prevRectTransform = null;
+        // RectTransform prevRectTransform = null;
         if (chara != null)  // 옷갈아입기등의 캐릭터 변경
         {
-            prevRectTransform = chara.GetComponent<RectTransform>();
-            if (prevRectTransform != null)
-            {
-                //TODO : Change Effect Here
-                previousPosition = prevRectTransform.anchoredPosition3D;
-                previousRotation = chara.transform.rotation; // 기존 회전 값 저장(프리팹초기값 사용도 고려)
-            }
+            // prevRectTransform = chara.GetComponent<RectTransform>();
+            // if (prevRectTransform != null)
+            // {
+            //     //TODO : Change Effect Here
+            //     previousPosition = prevRectTransform.anchoredPosition3D;
+            //     previousRotation = chara.transform.rotation; // 기존 회전 값 저장(프리팹초기값 사용도 고려)
+            // }
             Destroy(chara);
         }
 
@@ -223,6 +222,7 @@ public class SubCharManager : MonoBehaviour
         }        
 
         // 기본 size 변경 > 필요할 경우 넣어주기
+        setCharSize(character);
         // currentCharacterInitLocalScale = currentCharacter.transform.localScale.x;
         // setCharSize();
 
@@ -284,6 +284,20 @@ public class SubCharManager : MonoBehaviour
             {
                 colliderTransform.gameObject.AddComponent<SubClickHandler>();
             }
+
+            // WheelHandler 컴포넌트 제거
+            WheelHandler wheelHandler = colliderTransform.GetComponent<WheelHandler>();
+            if (wheelHandler != null)
+            {
+                Destroy(wheelHandler);
+            }
+
+            // SubWheelHandler 추가
+            if (colliderTransform.GetComponent<SubWheelHandler>() == null)
+            {
+                colliderTransform.gameObject.AddComponent<SubWheelHandler>();
+            }
+
         } else {
             Debug.Log("colliderTransform null");
         }
@@ -325,16 +339,23 @@ public class SubCharManager : MonoBehaviour
         Dialogue greeting = DialogueCacheManager.instance.GetRandomGreeting(charAttributes.nickname);
         SubVoiceManager.Instance.PlayAudioFromPath(greeting.filePath);
 
-        // TODO : 이펙트(FX, SFX) 효과
-        // fx_change.transform.position = canvas.transform.TransformPoint(previousPosition);
-        // fx_change.Play();
-        GameObject fxInstance = Instantiate(fxCharAppearPrefab, instance.transform.position, Quaternion.identity);
+        // FX
+        GameObject fxInstance = Instantiate(fxCharAppearPrefab, Vector3.zero, Quaternion.identity);
         ParticleSystem fxParticle = fxInstance.GetComponent<ParticleSystem>();
+        fxParticle.transform.parent = character.transform;
+
+        // 프리팹의 기본 크기
+        float defaultScale = fxCharAppearPrefab.transform.localScale.x; // 프리팹사이즈 150
+        float parentScale = character.transform.localScale.x; // 부모사이즈 20000
+        float scaleFactor = defaultScale / parentScale; // 동적 스케일 계산
+
+        fxInstance.transform.localScale = Vector3.one * scaleFactor; // 동적 스케일 적용
+        fxInstance.transform.localPosition = Vector3.zero; // 위치를 로컬 기준 (0, 0, 0)으로 설정
         if (fxParticle != null)
         {
             fxParticle.Play();
         }
-        Destroy(fxInstance, 0.3f); // 0.3초 후 파괴
+        Destroy(fxInstance, 1f); // 1초 후 파괴
 
 
         // // 캐릭터 닉네임 출력 (Log)
