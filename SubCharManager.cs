@@ -190,25 +190,29 @@ public class SubCharManager : MonoBehaviour
         // 기존 캐릭터 제거 전 RectTransform 위치 저장
         Vector3 previousPosition = new Vector3(0, 0, -70); // 기본 위치는 (0, 0, -70)
         Quaternion previousRotation = Quaternion.identity; // 기본 회전은 identity
-        // RectTransform prevRectTransform = null;
+        RectTransform prevRectTransform = null;
+        GameObject character;
         if (chara != null)  // 옷갈아입기등의 캐릭터 변경
         {
-            // prevRectTransform = chara.GetComponent<RectTransform>();
-            // if (prevRectTransform != null)
-            // {
-            //     //TODO : Change Effect Here
-            //     previousPosition = prevRectTransform.anchoredPosition3D;
-            //     previousRotation = chara.transform.rotation; // 기존 회전 값 저장(프리팹초기값 사용도 고려)
-            // }
+            prevRectTransform = chara.GetComponent<RectTransform>();
+            if (prevRectTransform != null)
+            {
+                //TODO : Change Effect Here
+                previousPosition = prevRectTransform.anchoredPosition3D;
+                previousRotation = chara.transform.rotation; // 기존 회전 값 저장(프리팹초기값 사용도 고려)
+            }
             Destroy(chara);
-        }
+            character = Instantiate(obj, previousPosition, previousRotation, canvas.transform);
+            character.transform.SetParent(subCharsContainer.transform, false);  // parent 정리
+        } 
+        else 
+        {
+            // 새로운 캐릭터 생성, Canvas의 자식으로 설정
+            // StatusManager.Instance.IsDragging = false;
 
-        // 새로운 캐릭터 생성, Canvas의 자식으로 설정
-        // StatusManager.Instance.IsDragging = false;
-        float canvasWidth = canvas.GetComponent<RectTransform>().rect.width;
-        float randomX = Random.Range(-canvasWidth / 2 + 100, canvasWidth / 2 - 100);
-        GameObject character = Instantiate(obj, new Vector3(randomX, 0, -70), obj.transform.rotation, canvas.transform);
-        character.transform.SetParent(subCharsContainer.transform, false);  // parent 정리
+            character = Instantiate(obj, new Vector3(0, 0, -70), obj.transform.rotation, canvas.transform);
+            character.transform.SetParent(subCharsContainer.transform, false);  // parent 정리
+        }
 
         // 소환후 변경하는 방법일 경우시 아래와 같이 사용         rectTransform.anchoredPosition3D = ;
         RectTransform rectTransform = character.GetComponent<RectTransform>();
@@ -217,7 +221,11 @@ public class SubCharManager : MonoBehaviour
             if (chara != null) {
                 rectTransform.anchoredPosition3D = previousPosition;
             } else {
-                rectTransform.anchoredPosition3D = new Vector3(randomX, 0, -70);
+                float canvasWidth = canvas.GetComponent<RectTransform>().rect.width;
+                float randomX = Random.Range(-canvasWidth / 2 + 100, canvasWidth / 2 - 100);
+                float canvasHeight = canvas.GetComponent<RectTransform>().rect.height;
+                float heightY = canvasHeight/4;  // 상위 25% 지점
+                rectTransform.anchoredPosition3D = new Vector3(randomX, heightY, -70);
             }
         }        
 
@@ -336,7 +344,7 @@ public class SubCharManager : MonoBehaviour
     // #endif
 
         CharAttributes charAttributes = character.GetComponent<CharAttributes>();
-        Dialogue greeting = DialogueCacheManager.instance.GetRandomGreeting(charAttributes.nickname);
+        Dialogue greeting = DialogueCacheManager.instance.GetRandomGreeting(charAttributes.charcode);
         SubVoiceManager.Instance.PlayAudioFromPath(greeting.filePath);
 
         // FX
