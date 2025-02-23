@@ -14,11 +14,13 @@ public class SettingManager : MonoBehaviour
     [SerializeField] private Dropdown uiLangDropdown;
     [SerializeField] private Dropdown aiLangDropdown;
     [SerializeField] private Toggle isAlwaysOnTopToggle;
+    [SerializeField] private Toggle isShowChatBoxOnClickToggle;
 
     [SerializeField] private Slider charSizeSlider;
     [SerializeField] private Slider charSpeedSlider;
     [SerializeField] private Slider charMobilitySlider;
     [SerializeField] private Toggle isGravityToggle;
+    [SerializeField] private Toggle isWindowsCollisionToggle;
 
     [SerializeField] private Dropdown soundLanguageDropdown;
     [SerializeField] private Slider soundVolumeMasterSlider;  // 현재는 마스터 볼륨만 있으면
@@ -30,6 +32,7 @@ public class SettingManager : MonoBehaviour
 
     // 표시용 UI
     public Text soundSpeedMasterText;
+    public Text serverInfoText;
 
 
     // 설정 데이터 클래스
@@ -45,12 +48,14 @@ public class SettingManager : MonoBehaviour
         public string ai_language_in;
         public string ai_language_out;
         public bool isAlwaysOnTop;
+        public bool isShowChatBoxOnClick;
 
         public string char_lastUsed;
         public float char_size;
         public float char_mobility;
         public float char_speed;
         public bool isGravity;
+        public bool isWindowsCollision;
 
         public int sound_language_idx;  // 0 : ko, 1 : jp, 2: en
         public string sound_language;  
@@ -94,12 +99,14 @@ public class SettingManager : MonoBehaviour
         # endif
         SaveSettings(); 
     }
+    public void SetIsShowChatBoxOnClick(bool value) {settings.isShowChatBoxOnClick = value; SaveSettings(); }
 
     public void SetCharLastUsed(string value) { settings.char_lastUsed = value; SaveSettings(); }
     public void SetCharSize(float value) { settings.char_size = value; CharManager.Instance.setCharSize(); SaveSettings(); }
     public void SetCharSpeed(float value) { settings.char_speed = value; SaveSettings(); }
     public void SetCharMobility(float value) { settings.char_mobility = value; SaveSettings(); }
     public void SetIsGravity(bool value) { settings.isGravity = value; SaveSettings(); }
+    public void SetIsWindowsCollision(bool value) { settings.isWindowsCollision = value; WindowCollisionManager.Instance.SetWindowsRectChecking(value); SaveSettings(); }
 
     public void SetSoundLanguageType() { int value=soundLanguageDropdown.value; settings.sound_language_idx = value; settings.sound_language=getLangFromIdx(value); SaveSettings(); }
     public void SetSoundVolumeMaster(float value) { settings.sound_volumeMaster = value; SaveSettings(); }
@@ -108,6 +115,9 @@ public class SettingManager : MonoBehaviour
     public void SetServerType() { int value=serverTypeDropdown.value; settings.server_type_idx = value; settings.server_type=getServerTypeFromIdx(value); SaveSettings(); }
     public void SetIsAskedTurnOnServer(bool value) { settings.isAskedTurnOnServer = value; SaveSettings(); }
     public void SetIsAPITest(bool value) { settings.isAPITest = value; SaveSettings(); }
+
+    // 표시용
+    public void SetServerInfoText(string text) {serverInfoText.text=text;}
 
 
     private string configFilePath;
@@ -204,11 +214,13 @@ public class SettingManager : MonoBehaviour
         uiLangDropdown.value = settings.ui_language_idx;
         aiLangDropdown.value = settings.ai_language_idx;
         isAlwaysOnTopToggle.isOn = settings.isAlwaysOnTop;
+        isShowChatBoxOnClickToggle.isOn = settings.isShowChatBoxOnClick;
 
         charSizeSlider.value = settings.char_size;
         charSpeedSlider.value = settings.char_speed;
         charMobilitySlider.value = settings.char_mobility;
         isGravityToggle.isOn = settings.isGravity;
+        isWindowsCollisionToggle.isOn = settings.isWindowsCollision;
 
         soundLanguageDropdown.value = settings.sound_language_idx;
         soundVolumeMasterSlider.value = settings.sound_volumeMaster;
@@ -262,12 +274,14 @@ public class SettingManager : MonoBehaviour
         settings.ai_language_in = "ko";
         settings.ai_language_out = "ko";
         settings.isAlwaysOnTop = false;
+        settings.isShowChatBoxOnClick = false;
 
         settings.char_size = 100;
         settings.char_lastUsed = "mari";
         settings.char_mobility = 5;
         settings.char_speed = 100;
         settings.isGravity = true;
+        settings.isWindowsCollision = false;
 
         settings.sound_language_idx = 1;  // jp
         settings.sound_language = "jp";
