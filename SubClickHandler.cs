@@ -65,7 +65,7 @@ public class SubClickHandler : MonoBehaviour, IPointerClickHandler
             else if (isAnimatorTriggerExists(_animator, "doSelect"))
             {
                 // Dialogue select = DialogueManager.Instance.GetRandomSelect();
-                Dialogue select = DialogueCacheManager.instance.GetRandomSelect(charAttributes.nickname);
+                Dialogue select = DialogueCacheManager.instance.GetRandomSelect(charAttributes.charcode);
                 DoDialogueBehaviour(select);
             }
             else
@@ -106,7 +106,7 @@ public class SubClickHandler : MonoBehaviour, IPointerClickHandler
                 else if (isAnimatorTriggerExists(_animator, "doSelect"))
                 {
                     // Dialogue select = DialogueManager.Instance.GetRandomSelect();
-                    Dialogue select = DialogueCacheManager.instance.GetRandomSelect(charAttributes.nickname);
+                    Dialogue select = DialogueCacheManager.instance.GetRandomSelect(charAttributes.charcode);
                     DoDialogueBehaviour(select);
                 }
                 else
@@ -120,7 +120,7 @@ public class SubClickHandler : MonoBehaviour, IPointerClickHandler
     private void HandleMiddleClick()
     {
         // Dialogue idle = DialogueManager.Instance.GetRandomIdle();
-        Dialogue idle = DialogueCacheManager.instance.GetRandomIdle(charAttributes.nickname);
+        Dialogue idle = DialogueCacheManager.instance.GetRandomIdle(charAttributes.charcode);
         DoDialogueBehaviour(idle);
     }
 
