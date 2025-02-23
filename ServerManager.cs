@@ -11,6 +11,7 @@ public class ServerManager : MonoBehaviour
     public string baseUrl = "";
     private string ngrokUrl;
     private string ngrokStatus;
+    private bool isConnected = false;  // 일단 1회라도 연결된적이 있는지(불가역)
 
     public Text serverStatusText;
 
@@ -33,6 +34,49 @@ public class ServerManager : MonoBehaviour
         StartCoroutine(SetBaseUrl());
     }
 
+    public string GetBaseUrl()
+    {
+        if (isConnected) {
+            return baseUrl;  // 재세팅하는건 다른 곳에서
+        }
+        
+        
+        // SetBaseUrl()을 직접 실행하고 완료될 때까지 대기
+        int maxAttempts = 500; // 최대 500프레임 (약 5초)
+
+        IEnumerator setBaseUrlCoroutine = SetBaseUrl();
+        while (setBaseUrlCoroutine.MoveNext() && maxAttempts > 0)
+        {
+            maxAttempts--;
+        }
+        if (maxAttempts == 0)
+        {
+            Debug.LogError("SetBaseUrl timeout!");
+            return ""; // 실패 시 빈 문자열 반환
+        }
+
+        return baseUrl;
+    }
+
+    public string SetBaseUrlToDevServer()
+    {
+        // SetBaseUrl()을 직접 실행하고 완료될 때까지 대기
+        int maxAttempts = 500; // 최대 500프레임 (약 5초)
+
+        IEnumerator setBaseUrlCoroutine = SetDevServer();
+        while (setBaseUrlCoroutine.MoveNext() && maxAttempts > 0)
+        {
+            maxAttempts--;
+        }
+        if (maxAttempts == 0)
+        {
+            Debug.LogError("SetBaseUrlToDevServer timeout!");
+            return ""; // 실패 시 빈 문자열 반환
+        }
+
+        return baseUrl;
+    }
+
     // Base URL 설정 (FetchNgrokJsonData 이후)
     private IEnumerator SetBaseUrl()
     {
@@ -44,6 +88,7 @@ public class ServerManager : MonoBehaviour
 
         if (!string.IsNullOrEmpty(baseUrl))
         {
+            isConnected = true;
             Debug.Log("Final Base URL: " + baseUrl);
         }
         else
@@ -174,8 +219,8 @@ public class ServerManager : MonoBehaviour
         Debug.Log("server_id : " + server_id);
 
         // Supabase 요청 URL 및 API 키
-        string ngrokSupabaseUrl = "<MY Token>";
-        string supabaseApiKey = "<MY KEY>"
+        string ngrokSupabaseUrl = "https://lxmkzckwzasvmypfoapl.supabase.co/storage/v1/object/sign/json_bucket/my_little_jarvis_plus_ngrok_server.json?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJqc29uX2J1Y2tldC9teV9saXR0bGVfamFydmlzX3BsdXNfbmdyb2tfc2VydmVyLmpzb24iLCJpYXQiOjE3MzM4Mzg4MjYsImV4cCI6MjA0OTE5ODgyNn0.ykDVTXYVXNnKJL5lXILSk0iOqt0_7UeKZqOd1Qv_pSY&t=2024-12-10T13%3A53%3A47.907Z";
+        string supabaseApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4bWt6Y2t3emFzdm15cGZvYXBsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM4MzUxNzQsImV4cCI6MjA0OTQxMTE3NH0.zmEKHhIcQa4ODekS2skgknlXi8Hbd8JjpjBlFZpPsJ8";
 
         using (UnityWebRequest request = UnityWebRequest.Get(ngrokSupabaseUrl))
         {
@@ -219,6 +264,72 @@ public class ServerManager : MonoBehaviour
                     ngrokUrl = null;
                     ngrokStatus = null;
                     Debug.LogError($"Server ID '{server_id}' not found in JSON data.");
+                }
+            }
+        }
+    }
+
+    // m9dev 서버로 강제 설정
+    private IEnumerator SetDevServer()
+    {
+        // 최대 3초 동안 server_id 대기
+        string server_id = "m9dev";
+
+        // Supabase 요청 URL 및 API 키
+        string ngrokSupabaseUrl = "https://lxmkzckwzasvmypfoapl.supabase.co/storage/v1/object/sign/json_bucket/my_little_jarvis_plus_ngrok_server.json?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJqc29uX2J1Y2tldC9teV9saXR0bGVfamFydmlzX3BsdXNfbmdyb2tfc2VydmVyLmpzb24iLCJpYXQiOjE3MzM4Mzg4MjYsImV4cCI6MjA0OTE5ODgyNn0.ykDVTXYVXNnKJL5lXILSk0iOqt0_7UeKZqOd1Qv_pSY&t=2024-12-10T13%3A53%3A47.907Z";
+        string supabaseApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4bWt6Y2t3emFzdm15cGZvYXBsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM4MzUxNzQsImV4cCI6MjA0OTQxMTE3NH0.zmEKHhIcQa4ODekS2skgknlXi8Hbd8JjpjBlFZpPsJ8";
+
+        using (UnityWebRequest request = UnityWebRequest.Get(ngrokSupabaseUrl))
+        {
+            // 인증 헤더 추가
+            request.SetRequestHeader("Authorization", $"Bearer {supabaseApiKey}");
+
+            // 서버 요청
+            yield return request.SendWebRequest();
+
+            // 에러 처리
+            if (request.result == UnityWebRequest.Result.ConnectionError || request.result == UnityWebRequest.Result.ProtocolError)
+            {
+                Debug.LogError($"Error fetching JSON data: {request.error}");
+            }
+            else
+            {
+                // JSON 데이터를 문자열로 가져옴
+                string jsonResponse = request.downloadHandler.text;
+
+                // JSON 데이터 파싱
+                var fullData = JsonConvert.DeserializeObject<Dictionary<string, NgrokJsonResponse>>(jsonResponse);
+                if (fullData != null && fullData.ContainsKey(server_id))
+                {
+                    NgrokJsonResponse data = fullData[server_id];
+                    Debug.Log($"Fetched URL: {data.url}");
+
+                    ngrokUrl = data.url;
+                    ngrokStatus = data.status;
+
+                    if (ngrokStatus == "closed")
+                    {
+                        NoticeBalloonManager.Instance.ModifyNoticeBalloonText("Supabase Server Closed");
+                        yield break;
+                    }
+                    else if (ngrokStatus != "open")
+                    {
+                        NoticeBalloonManager.Instance.ModifyNoticeBalloonText("Supabase Server Not Opened");
+                        yield break;
+                    }
+
+                    // 이대로 호출
+                    bool isReachable = false;
+                    yield return StartCoroutine(IsUrlReachable(ngrokUrl + "/health", result => isReachable = result));
+                    if (isReachable)
+                    {
+                        baseUrl = ngrokUrl;
+                        yield break;
+                    }
+
+                    serverStatusText.text = "m9dev";
+                    Debug.Log("서버 상태: Loca.lt");
+
                 }
             }
         }
