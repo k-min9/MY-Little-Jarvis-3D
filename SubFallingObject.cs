@@ -51,9 +51,9 @@ public class SubFallingObject : MonoBehaviour
             if (subStatusManager.isFalling) { 
                 // 낙하 중지 + 이동거리 재계산
                 StopFalling();
-                newPosition.y = Mathf.Max(bottomBoundary, top-0.8f);  // window 좌표는 정수라 약간의 보정이 필요함
-                rectTransform.anchoredPosition = newPosition;
             }
+            newPosition.y = Mathf.Max(bottomBoundary, top-0.8f);  // window 좌표는 정수라 약간의 보정이 필요함
+            rectTransform.anchoredPosition = newPosition;
             
         }
     }
