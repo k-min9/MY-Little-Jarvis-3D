@@ -47,10 +47,10 @@ public class SubDragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IE
         // VoiceManager.Instance.ResetAudio();
 
         // 닉네임
-        string nickname = charAttributes.nickname;
+        string charcode = charAttributes.charcode;
 
         // Pick 상태 전환시의 음성 재생
-        Dialogue pick = DialogueCacheManager.instance.GetRandomPick(nickname);
+        Dialogue pick = DialogueCacheManager.instance.GetRandomPick(charcode);
         SubVoiceManager.Instance.PlayAudioFromPath(pick.filePath);  // 음성 재생
         subStatusManager.isDragging = true;
         // StatusManager.Instance.IsDragging = true;
