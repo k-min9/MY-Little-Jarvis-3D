@@ -120,9 +120,9 @@ public class SubMenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHand
             subStatusManager.isOptioning = false;
             subPysicsManager.SetWalkRightState();
         });
-        m_ContextMenu.AddMenuItem("Change Char", delegate { 
-            UIManager.Instance.ShowCharChange();
-        });
+        // m_ContextMenu.AddMenuItem("Change Char", delegate { 
+        //     UIManager.Instance.ShowCharChange();
+        // });
 
         if (_charAttributes.toggleClothes != null || _charAttributes.changeClothes!=null) {
             m_ContextMenu.AddMenuItem("Change Clothes", delegate { 
