@@ -62,7 +62,7 @@ public class BackgroundService : MonoBehaviour
             return;
         }
 
-        string baseUrl = ServerManager.Instance.baseUrl;
+        string baseUrl = ServerManager.Instance.GetBaseUrl();
 
 #if UNITY_ANDROID && !UNITY_EDITOR  // 안드로이드
         pluginClass.CallStatic("ReceiveBaseUrl", baseUrl);
