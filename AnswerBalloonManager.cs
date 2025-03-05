@@ -17,6 +17,7 @@ public class AnswerBalloonManager : MonoBehaviour
     [SerializeField] private Image answerBalloonImage;
     [SerializeField] private Sprite lightSprite;
     [SerializeField] private Sprite normalSprite;
+    public bool isAnswered = false;  // 타 시스템이 해당 balloon 지워도 되는지 체크에 활용
 
     private float hideTimer = 0f; // 타이머 변수 추가
 
@@ -27,6 +28,11 @@ public class AnswerBalloonManager : MonoBehaviour
 
     // 싱글톤 인스턴스
     private static AnswerBalloonManager instance;
+
+    void Start()
+    {
+        _canvas = FindObjectOfType<Canvas>();  // 최상위 Canvas
+    }
 
     private void Awake()
     {
@@ -98,12 +104,14 @@ public class AnswerBalloonManager : MonoBehaviour
     public void ChangeAnswerBalloonSpriteLight()
     {
         answerBalloonImage.sprite = lightSprite;
+        isAnswered = false;
     }
 
     // 대답 완료 sprite
     public void ChangeAnswerBalloonSpriteNormal()
     {
         answerBalloonImage.sprite = normalSprite;
+        isAnswered = true;
     }
 
     // AnswerBalloon을 보이고 텍스트를 초기화하는 함수
@@ -180,6 +188,12 @@ public class AnswerBalloonManager : MonoBehaviour
         Vector2 charPosition = characterTransform.anchoredPosition;
         
         // 캐릭터의 X 위치와 동일하게 설정
-        answerBalloonTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 270 * SettingManager.Instance.settings.char_size / 100f); // Y축 창크기 270만큼
+        RectTransform canvasRect = _canvas.GetComponent<RectTransform>();
+        float leftBound = -canvasRect.rect.width/2; // 캔버스 왼쪽 끝
+        float rightBound = canvasRect.rect.width/2; // 캔버스 오른쪽 끝
+        float charPositionX = Mathf.Clamp(charPosition.x, leftBound+250, rightBound-250);
+
+        // answerBalloonTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 270 * SettingManager.Instance.settings.char_size / 100f); // Y축 창크기 270만큼
+        answerBalloonTransform.anchoredPosition = new Vector2(charPositionX, charPosition.y + 200 * SettingManager.Instance.settings.char_size / 100f + 100);
     }
 }

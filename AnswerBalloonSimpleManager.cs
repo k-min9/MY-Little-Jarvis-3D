@@ -80,6 +80,10 @@ public class AnswerBalloonSimpleManager : MonoBehaviour
     // AnswerBalloonSimple을 타이머 무제한으로 보이기
     public void ShowAnswerBalloonSimpleInf()
     {
+        // 기존의 balloon이 있을경우 Hide
+        if (AnswerBalloonManager.Instance.isAnswered) AnswerBalloonManager.Instance.HideAnswerBalloon();
+        ChatBalloonManager.Instance.HideChatBalloon();
+
         hideTimer = 99999f;
         answerBalloonSimple.SetActive(true);
         answerText.text = string.Empty; // 텍스트 초기화
@@ -90,6 +94,10 @@ public class AnswerBalloonSimpleManager : MonoBehaviour
     // AnswerBalloonSimple을 보이고 텍스트를 초기화하는 함수
     public void ShowAnswerBalloonSimple()
     {
+        // 기존의 balloon이 있을경우 Hide
+        if (AnswerBalloonManager.Instance.isAnswered) AnswerBalloonManager.Instance.HideAnswerBalloon();
+        ChatBalloonManager.Instance.HideChatBalloon();
+
         answerBalloonSimple.SetActive(true);
         answerText.text = string.Empty; // 텍스트 초기화
         StatusManager.Instance.IsAnsweringSimple = true; // StatusManager 상태 업데이트
@@ -141,6 +149,6 @@ public class AnswerBalloonSimpleManager : MonoBehaviour
         Vector2 charPosition = characterTransform.anchoredPosition;
         
         // 캐릭터의 X 위치와 동일하게 설정
-        answerBalloonSimpleTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 270 * SettingManager.Instance.settings.char_size / 100f); // Y축 창크기 270만큼
+        answerBalloonSimpleTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 200 * SettingManager.Instance.settings.char_size / 100f + 100);
     }
 }
