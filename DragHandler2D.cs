@@ -8,16 +8,10 @@ using UnityEngine.EventSystems;
 using UnityWeld.Binding;
 
 [Binding] 
-public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHandler 
+public class DragHandler2D : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHandler 
 {
     public Canvas _canvas;
-    [SerializeField] public Animator _animator; 
-    private CharAttributes charAttributes;
-
-    private void Start()
-    {
-        charAttributes = FindObjectOfType<CharAttributes>();
-    }
+    // [SerializeField] public Animator _animator; 
 
     public void OnDrag(PointerEventData eventData)
     {
@@ -37,7 +31,7 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
         AnswerBalloonSimpleManager.Instance.HideAnswerBalloonSimple();
 
         // 기존 애니메이션 정지
-        PhysicsManager.Instance.animator.Play("idle", 0, 0);  // 현재 애니메이션 강제 중지;
+        // PhysicsManager.Instance.animator.Play("idle", 0, 0);  // 현재 애니메이션 강제 중지;
 
         // 기존 음성 초기화
         VoiceManager.Instance.ResetAudio();
@@ -46,10 +40,7 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
         Dialogue pick = DialogueManager.Instance.GetRandomPick();
         VoiceManager.Instance.PlayAudioFromPath(pick.filePath);  // 음성 재생
         StatusManager.Instance.IsDragging = true;
-        _animator.SetBool("isPick", true);
-        if (charAttributes.type=="2D") {
-            CharManager.Instance.setCharSize(70);
-        }
+        // _animator.SetBool("isPick", true);
         StatusManager.Instance.IsPicking = true;
     }
 
@@ -57,10 +48,7 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
     {
         VoiceManager.Instance.StopAudio();  // 음성 종료
         StatusManager.Instance.IsDragging = false;
-        _animator.SetBool("isPick", false);
-        if (charAttributes.type=="2D") {
-            CharManager.Instance.setCharSize(100);
-        }
+        // _animator.SetBool("isPick", false);
         StatusManager.Instance.IsPicking = false;
     }
 }
