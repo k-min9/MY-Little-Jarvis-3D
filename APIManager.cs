@@ -18,6 +18,8 @@ public class APIManager : MonoBehaviour
     private List<string> replyListEn = new List<string>();
 
     private string query_trans = "";
+    private string ai_language_out = "en";  // 메모리에 저장할 언어
+
     private bool isCompleted = false; // 반환이 완료되었는지 여부를 체크하는 플래그
     private bool isResponsedStarted = false; // 첫 반환이 돌아왔는지 여부
     private string logFilePath; // 로그 파일 경로
@@ -86,23 +88,25 @@ public class APIManager : MonoBehaviour
     private void ProcessReply(JObject jsonObject)
     {
 
-    LogToFile("ProcessReply started."); // ProcessReply 시작 로그
+        LogToFile("ProcessReply started."); // ProcessReply 시작 로그
 
-    // 초기화
-    replyListKo = new List<string>();
-    replyListJp = new List<string>();
-    replyListEn = new List<string>();
+        // 초기화
+        replyListKo = new List<string>();
+        replyListJp = new List<string>();
+        replyListEn = new List<string>();
 
         // 반환된 JSON 객체에서 "reply_list"를 가져오기
         JToken replyToken = jsonObject["reply_list"];
         string chatIdx = jsonObject["chat_idx"].ToString();
+        ai_language_out = jsonObject["ai_language_out"].ToString();
         // Debug.Log("ProcessReply chatIdx chk");
         // Debug.Log(chatIdx + "/" + GameManager.Instance.chatIdxSuccess.ToString());
 
-        // 이중 체크 중...
-        // if (chatIdx != GameManager.Instance.chatIdxSuccess.ToString()) {
-        //     return;  // 현재 대화가 아님
-        // }
+        // 이중 체크 중... 음성체크와 별개로 대화는 뒤에서 저장 되어야하는데 그게 저지 됨?
+        if (chatIdx != GameManager.Instance.chatIdxSuccess.ToString()) {
+            Debug.Log("chatIdx Too Old : " + chatIdx + "/"+ GameManager.Instance.chatIdxSuccess.ToString());
+            return;  // 현재 대화가 아님
+        }
 
         if (replyToken != null && replyToken.Type == JTokenType.Array)
         {
@@ -174,10 +178,15 @@ public class APIManager : MonoBehaviour
         // {
         //     Debug.Log(reply); // 각 reply를 출력
         // }
-        string replyEn = string.Join(" ", replyListEn);
-        Debug.Log("Answer Finished : " + replyEn);
+        string reply = string.Join(" ", replyListEn);
+        if (ai_language_out == "ja")
+        {
+            reply = string.Join(" ", replyListJp);
+        }
+
+        Debug.Log("Answer Finished : " + reply);
         MemoryManager.Instance.SaveConversationMemory("player", query_trans);
-        MemoryManager.Instance.SaveConversationMemory("character", replyEn);
+        MemoryManager.Instance.SaveConversationMemory("character", reply);
     }
 
     // 스트리밍 데이터를 가져오는 메서드
@@ -267,30 +276,21 @@ public class APIManager : MonoBehaviour
     }
 
     // chatHandler에서 호출
-    public async void CallConversationStream(string query, string chatIdx="-1")
+    public async void CallConversationStream(string query, string chatIdx="-1", string ai_lang_in = "")
     {
         // 공용변수 최신화
         if(chatIdx!="-1") {
             GameManager.Instance.chatIdxSuccess = chatIdx;
-        }
+        }     
 
         // API 호출을 위한 URL 구성
-        string baseUrl = "";
-#if UNITY_ANDROID && !UNITY_EDITOR
-        if (APIManager.Instance.ngrokUrl == null) {
-            baseUrl = "https://minmin496969.loca.lt";
-        } else {
-            baseUrl = APIManager.Instance.ngrokUrl;  // ex) https://8e5c-1-237-90-223.ngrok-free.app
-        }
-#else
-        baseUrl = "http://127.0.0.1:5000";
-#endif
+        string baseUrl = ServerManager.Instance.GetBaseUrl();
         string streamUrl = baseUrl+"/conversation_stream";
         // 닉네임 가져오기
         string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
         string player_name = SettingManager.Instance.settings.player_name;
         string ai_language = SettingManager.Instance.settings.ai_language ?? "";
-        string ai_language_in = SettingManager.Instance.settings.ai_language_in ?? "";
+        string ai_language_in = ai_lang_in;  // stt 에서 가져온 언어 있으면 사용(en, ja, ko 안에 포함되는지는 서버쪽에서 확인)
         string ai_language_out = SettingManager.Instance.settings.ai_language_out ?? "";
 
         var memory = MemoryManager.Instance.GetAllConversationMemory();
@@ -315,16 +315,7 @@ public class APIManager : MonoBehaviour
     public async void GetKoWavFromAPI(string text, string chatIdx)
     {
         // API 호출을 위한 URL 구성
-        string baseUrl = "";
-#if UNITY_ANDROID && !UNITY_EDITOR
-        if (APIManager.Instance.ngrokUrl == null) {
-            baseUrl = "https://minmin496969.loca.lt";
-        } else {
-            baseUrl = APIManager.Instance.ngrokUrl;  // ex) https://8e5c-1-237-90-223.ngrok-free.app
-        }
-#else
-        baseUrl = "http://127.0.0.1:5000";
-#endif
+        string baseUrl = ServerManager.Instance.GetBaseUrl();
         string url = baseUrl+"/getSound/ko"; // GET + Uri.EscapeDataString(text);
 
         // 닉네임 가져오기
@@ -400,16 +391,7 @@ public class APIManager : MonoBehaviour
     public async void GetJpWavFromAPI(string text, string chatIdx)
     {
         // API 호출을 위한 URL 구성
-        string baseUrl = "";
-#if UNITY_ANDROID && !UNITY_EDITOR
-        if (APIManager.Instance.ngrokUrl == null) {
-            baseUrl = "https://minmin496969.loca.lt";
-        } else {
-            baseUrl = APIManager.Instance.ngrokUrl;  // ex) https://8e5c-1-237-90-223.ngrok-free.app
-        }
-#else
-        baseUrl = "http://127.0.0.1:5000";
-#endif
+        string baseUrl = ServerManager.Instance.GetBaseUrl();
         string url = baseUrl+"/getSound/jp"; // GET + Uri.EscapeDataString(text);
 
         // 닉네임 가져오기
@@ -577,7 +559,7 @@ public class APIManager : MonoBehaviour
     }
 
     [System.Serializable]
-    public class NgorokJsonResponse
+    public class NgrokJsonResponse
     {
         public string url;
         public string status;  // open, closed
@@ -588,9 +570,15 @@ public class APIManager : MonoBehaviour
     {
         // string ngrokSupabaseUrl = "https://lxmkzckwzasvmypfoapl.supabase.co/storage/v1/object/private/json_bucket/my_little_jarvis_plus_ngrok_server.json";
 
-        string server_id = SettingManager.Instance.settings.server_id;
+        string server_id = "temp";
+        try {
+            server_id = SettingManager.Instance.settings.server_id;
+        } catch (Exception ex) {
+            Debug.Log("Setting server_id failed. use init value");
+        }
+
         Debug.Log("server_id : " + server_id);
-        string ngrokSupabaseUrl = "https://lxmkzckwzasvmypfoapl.supabase.co/storage/v1/object/sign/json_bucket/my_little_jarvis_plus_ngrok_server_"+server_id+".json?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJqc29uX2J1Y2tldC9teV9saXR0bGVfamFydmlzX3BsdXNfbmdyb2tfc2VydmVyLmpzb24iLCJpYXQiOjE3MzM4Mzg4MjYsImV4cCI6MjA0OTE5ODgyNn0.ykDVTXYVXNnKJL5lXILSk0iOqt0_7UeKZqOd1Qv_pSY&t=2024-12-10T13%3A53%3A47.907Z";
+        string ngrokSupabaseUrl = "https://lxmkzckwzasvmypfoapl.supabase.co/storage/v1/object/sign/json_bucket/my_little_jarvis_plus_ngrok_server.json?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJqc29uX2J1Y2tldC9teV9saXR0bGVfamFydmlzX3BsdXNfbmdyb2tfc2VydmVyLmpzb24iLCJpYXQiOjE3MzM4Mzg4MjYsImV4cCI6MjA0OTE5ODgyNn0.ykDVTXYVXNnKJL5lXILSk0iOqt0_7UeKZqOd1Qv_pSY&t=2024-12-10T13%3A53%3A47.907Z";
         string supabaseApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4bWt6Y2t3emFzdm15cGZvYXBsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM4MzUxNzQsImV4cCI6MjA0OTQxMTE3NH0.zmEKHhIcQa4ODekS2skgknlXi8Hbd8JjpjBlFZpPsJ8"; 
         
         using (UnityWebRequest request = UnityWebRequest.Get(ngrokSupabaseUrl))
@@ -612,25 +600,29 @@ public class APIManager : MonoBehaviour
                 string jsonResponse = request.downloadHandler.text;
 
                 // JSON 데이터 파싱
-                NgorokJsonResponse data = JsonUtility.FromJson<NgorokJsonResponse>(jsonResponse);
-
-                // url 값 반환 및 출력
-                if (data != null && !string.IsNullOrEmpty(data.url))
+                var fullData = JsonConvert.DeserializeObject<Dictionary<string, NgrokJsonResponse>>(jsonResponse);
+                if (fullData != null && fullData.ContainsKey(server_id))
                 {
+                    NgrokJsonResponse data = fullData[server_id];
                     Debug.Log($"Fetched URL: {data.url}");
+
                     ngrokUrl = data.url;
-                    // BackgroundService.Instance.baseUrl = data.url;  // backgroundService에 중요
                     ngrokStatus = data.status;
 
-                    if (ngrokStatus == "closed") {
+                    if (ngrokStatus == "closed")
+                    {
                         NoticeBalloonManager.Instance.ModifyNoticeBalloonText("Supabase Server Closed");
-                    } else if (ngrokStatus != "open") {
+                    }
+                    else if (ngrokStatus != "open")
+                    {
                         NoticeBalloonManager.Instance.ModifyNoticeBalloonText("Supabase Server Not Opened");
                     }
                 }
                 else
                 {
-                    Debug.LogError("Invalid JSON data or 'url' field is missing.");
+                    ngrokUrl = null;
+                    ngrokStatus = null;
+                    Debug.LogError($"Server ID '{server_id}' not found in JSON data.");
                 }
             }
         }
