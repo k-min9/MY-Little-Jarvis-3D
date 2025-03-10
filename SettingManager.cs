@@ -27,6 +27,8 @@ public class SettingManager : MonoBehaviour
     [SerializeField] private Slider soundSpeedMasterSlider;  // 현재는 마스터 볼륨만 있으면
 
     [SerializeField] private Dropdown serverTypeDropdown;
+    [SerializeField] private Dropdown aiWebSearchDropdown;
+    [SerializeField] private Dropdown aiAskIntentDropdown;
     [SerializeField] private Toggle isAskedTurnOnServerToggle;
     [SerializeField] private Toggle isAPITest;
 
@@ -64,6 +66,10 @@ public class SettingManager : MonoBehaviour
 
         public int server_type_idx;  // 0 : GPU, 1 : CPU
         public string server_type;
+        public int ai_web_search_idx;  // 0 : off, 1 : on, 2: force
+        public string ai_web_search;
+        public int ai_ask_intent_idx;  // 0 : off, 1 : on
+        public string ai_ask_intent;
         public bool isAskedTurnOnServer;
         public bool isAPITest;
     }
@@ -88,7 +94,7 @@ public class SettingManager : MonoBehaviour
     // setter
     public void SetPlayerName(string value) { settings.player_name = value; SaveSettings(); }
     public void SetServerID(string value) { settings.server_id = value; SaveSettings(); }
-    public void SetUiLanguage() { int value=uiLangDropdown.value; settings.ui_language_idx = value; settings.ui_language=getLangFromIdx(value); SaveSettings(); }
+    public void SetUiLanguage() { int value=uiLangDropdown.value; settings.ui_language_idx = value; settings.ui_language=getLangFromIdx(value); LanguageManager.Instance.SetUILanguage(); SaveSettings(); }
     public void SetAiLanguage() { int value=aiLangDropdown.value; settings.ai_language_idx = value; settings.ai_language=getLangFromIdx(value); SaveSettings(); }
     public void SetAiLanguageIn(string value) { settings.ai_language_in = value; SaveSettings(); }
     public void SetAiLanguageOut(string value) { settings.ai_language_out = value; SaveSettings(); }
@@ -113,6 +119,8 @@ public class SettingManager : MonoBehaviour
     public void SetSoundSpeedMaster(float value) { settings.sound_speedMaster = value; SaveSettings(); soundSpeedMasterText.text="Speed (" + (int)settings.sound_speedMaster + "%)";}
 
     public void SetServerType() { int value=serverTypeDropdown.value; settings.server_type_idx = value; settings.server_type=getServerTypeFromIdx(value); SaveSettings(); }
+    public void SetAIWebSearch() { int value=aiWebSearchDropdown.value; settings.ai_web_search_idx = value; settings.ai_web_search=getONOFFTypeFromIdx(value); SaveSettings(); }
+    public void SetAIAskIntent() { int value=aiAskIntentDropdown.value; settings.ai_ask_intent_idx = value; settings.server_type=getONOFFTypeFromIdx(value); SaveSettings(); }
     public void SetIsAskedTurnOnServer(bool value) { settings.isAskedTurnOnServer = value; SaveSettings(); }
     public void SetIsAPITest(bool value) { settings.isAPITest = value; SaveSettings(); }
 
@@ -181,6 +189,18 @@ public class SettingManager : MonoBehaviour
         return lang;
     }
 
+    // idx를 OnOFF로 변환; // 0 : off, 1 : on, 2: force
+    private string getONOFFTypeFromIdx(int idx) {
+        string lang = "off";
+        if (idx ==  1) {
+            lang = "on";
+        }
+        if (idx ==  2) {
+            lang = "force";
+        }
+        return lang;
+    }
+
 
     // 설정 데이터를 JSON 파일에서 불러오기
     private void LoadSettings()
@@ -227,8 +247,13 @@ public class SettingManager : MonoBehaviour
         soundSpeedMasterSlider.value = settings.sound_speedMaster;
 
         serverTypeDropdown.value = settings.server_type_idx;
+        aiWebSearchDropdown.value = settings.ai_web_search_idx;
+        aiAskIntentDropdown.value = settings.ai_ask_intent_idx;
         isAskedTurnOnServerToggle.isOn = settings.isAskedTurnOnServer;
         isAPITest.isOn = settings.isAPITest;
+
+        // 초기값일 경우 UI가 반영되지 않으므로 한번 더 호출
+        LanguageManager.Instance.SetUILanguage();
     }
 
     // 설정 데이터를 JSON 파일에 저장하는 함수
@@ -290,6 +315,10 @@ public class SettingManager : MonoBehaviour
 
         settings.server_type_idx = 0;  // 0 : GPU, 1 : CPU
         settings.server_type = "GPU";
+        settings.ai_web_search_idx = 0;  // 0 : off, 1 : on, 2: force
+        settings.ai_web_search = "OFF";
+        settings.ai_ask_intent_idx = 0;  // 0 : off, 1 : on
+        settings.ai_ask_intent = "OFF";
         settings.isAskedTurnOnServer = true;
         settings.isAPITest = false;
     }
