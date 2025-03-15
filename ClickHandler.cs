@@ -34,6 +34,29 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
 #endif
     }
 
+    void Update()
+    {
+#if UNITY_EDITOR
+        // Test 용 : 키보드 숫자 1, 2, 3 입력을 감지하여 SetMouth 호출, 0은 입 없애기
+        if (Input.GetKeyDown(KeyCode.Alpha0))
+        {
+            float randomIndex = Random.Range(0, 5);  // 0~4
+            _animator.SetFloat("Blend", randomIndex);
+            _animator.SetTrigger("doBlend");
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha1))
+        {
+            _animator.SetFloat("Blend", 1.0f);
+            _animator.SetTrigger("doBlend");
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha2))
+        {
+            _animator.SetFloat("Blend", 2);
+            _animator.SetTrigger("doBlend");
+        }
+#endif
+    }
+
     private void HandleClickMobile()
     {
         if (SettingManager.Instance.settings.isShowChatBoxOnClick)
