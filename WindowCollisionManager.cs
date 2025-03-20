@@ -288,7 +288,8 @@ public class WindowCollisionManager : MonoBehaviour
             Vector2 end = ConvertWinposToUnityPos(new Vector2(rect.x + rect.width, rect.y + rect.height)); // 우하단
             if (start.x <= position.x && start.y <= position.y
                 && end.x >= position.x && end.y >= position.y)
-            {
+            { 
+                // Debug.Log("posY : " + position.y);
                 // Debug.Log("x : " + start.x + "/" + position.x + "/" + end.x);
                 // Debug.Log("y : " + start.y + "/" + position.y + "/" + end.y);
                 return end.y;
@@ -303,9 +304,10 @@ public class WindowCollisionManager : MonoBehaviour
             if (taskbar.width > 0 && taskbar.height > 0) {
                 Vector2 start = ConvertWinposToUnityPos(new Vector2(taskbar.x, taskbar.y)); // 좌상단
                 Vector2 end = ConvertWinposToUnityPos(new Vector2(taskbar.x + taskbar.width, taskbar.y + taskbar.height)); // 우하단
-                if (start.x <= position.x && start.y <= position.y
+                if (start.x <= position.x  // && start.y <= position.y  taskbar 최소높이 체크는 당연히 하지 않는다.
                     && end.x >= position.x && end.y >= position.y)
                 {
+                    Debug.Log("Hit!!");
                     // Debug.Log("x : " + start.x + "/" + position.x + "/" + end.x);
                     // Debug.Log("y : " + start.y + "/" + position.y + "/" + end.y);
                     return end.y;
@@ -313,6 +315,15 @@ public class WindowCollisionManager : MonoBehaviour
             }
         }
         
+        // Debug.Log(testRects.Count);
+        // foreach (var rect in testRects)
+        // {
+        //     // Windows 좌표를 Canvas 좌표로 변환 : Windows 좌표의 좌상단과 우하단을 구함
+        //     Vector2 start = ConvertWinposToUnityPos(new Vector2(rect.x, rect.y)); // 좌상단
+        //     Vector2 end = ConvertWinposToUnityPos(new Vector2(rect.x + rect.width, rect.y + rect.height)); // 우하단
+        //     Debug.Log("x : " + start.x + "/" + position.x + "/" + end.x);
+        //     Debug.Log("y : " + start.y + "/" + position.y + "/" + end.y);           
+        // }
         return -99999f;
     }
 
