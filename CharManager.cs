@@ -79,6 +79,7 @@ public class CharManager : MonoBehaviour
         setChatBalloonVar(currentCharacter);
         setAskBalloonVar(currentCharacter);
         setTalkMenuVar(currentCharacter);
+        setStatusManagerVar(currentCharacter);
 
         // RectTransform을 찾아서 위치를 (0, 0, -70)으로 설정
         RectTransform rectTransform = currentCharacter.GetComponent<RectTransform>();
@@ -115,12 +116,12 @@ public class CharManager : MonoBehaviour
     }
 
     // 캐릭터 크기 설정 함수 (퍼센트 기반)
-    public void setCharSize()
+    public void setCharSize(int percent = 100)
     {   
         float char_size = SettingManager.Instance.settings.char_size;
         if (currentCharacter != null)
         {
-            float scaleFactor = currentCharacterInitLocalScale * char_size / 100f; // 퍼센트를 소수점 비율로 변환
+            float scaleFactor = currentCharacterInitLocalScale * char_size * percent / 10000f; // 퍼센트를 소수점 비율로 변환
             currentCharacter.transform.localScale = new Vector3(scaleFactor, scaleFactor, scaleFactor); // X, Y, Z 동일한 비율로 크기 조정
             // Debug.Log("Character size set to: " + char_size + "%");
         }
@@ -143,6 +144,11 @@ public class CharManager : MonoBehaviour
             Debug.LogError("Invalid index for character change.");
             return;
         }
+
+        // 기존 캐릭터 제거 전 정보제거
+        // 기존의 answerballoon이 있을경우 Hide
+        if (AnswerBalloonManager.Instance.isAnswered) AnswerBalloonManager.Instance.HideAnswerBalloon();
+        AnswerBalloonSimpleManager.Instance.HideAnswerBalloonSimple();
 
         // 기존 캐릭터 제거 전 RectTransform 위치 저장
         Vector3 previousPosition = new Vector3(0, 0, -70); // 기본 위치는 (0, 0, -70)
@@ -272,7 +278,6 @@ public class CharManager : MonoBehaviour
         //  toggleClothes와 changeClothes가 둘 다 None일 경우, 안내와 return
         if (charAttributes.toggleClothes == null && charAttributes.changeClothes==null) 
         {
-            // TODO : 옷이 없다는 안내문
             return;
         // toggleClothes가 있음
         } 
@@ -286,9 +291,6 @@ public class CharManager : MonoBehaviour
                 if (charAttributes.changeClothes!=null)
                 {
                     ChangeCharacterFromGameObject(charAttributes.changeClothes);
-                    // 왜 재생 음성 여기서도..?
-                    // Dialogue greeting = DialogueManager.Instance.GetRandomGreeting();
-                    // VoiceManager.Instance.PlayAudioFromPath(greeting.filePath);
                 } else {
                     charAttributes.toggleClothes.SetActive(true);
                 }
@@ -387,6 +389,7 @@ public class CharManager : MonoBehaviour
         PhysicsManager physicsManager = FindObjectOfType<PhysicsManager>();
         physicsManager.animator = charObj.GetComponent<Animator>();
         physicsManager.rectTransform = charObj.GetComponent<RectTransform>();
+        physicsManager.charAttributes = charObj.GetComponent<CharAttributes>();
     }
     public void setAnswerBalloonVar(GameObject charObj)
     {
@@ -417,5 +420,9 @@ public class CharManager : MonoBehaviour
         // 캐릭터의 하위에 있는 ClickHandler를 찾아 설정
         TalkMenuManager talkMenuManager = FindObjectOfType<TalkMenuManager>();
         talkMenuManager.characterTransform = charObj.GetComponent<RectTransform>();
+    }
+    public void setStatusManagerVar(GameObject charObj)
+    {
+        StatusManager.Instance.characterTransform = charObj.GetComponent<RectTransform>();
     }
 }

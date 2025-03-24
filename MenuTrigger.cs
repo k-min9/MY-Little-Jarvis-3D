@@ -17,12 +17,15 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     private bool isLeftClickHeld = false; // 좌클릭 상태
     private float leftClickHoldTime = 0f; // 좌클릭 누른 시간
 
+    private RadialMenu m_RadialMenuAction;
+
     // Start is called before the first frame update
     private void Start()
     {
         this.m_ContextMenu = WidgetUtility.Find<ContextMenu>("ContextMenu");
         this._transparentWindow = FindObjectOfType<TransparentWindow>();  // GameObject에 있음
         this._charAttributes = FindObjectOfType<CharAttributes>();
+        this.m_RadialMenuAction = WidgetUtility.Find<RadialMenu>("RadialMenuAction");
 
     }
 
@@ -88,26 +91,15 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         m_ContextMenu.AddMenuItem("Settings", delegate { 
             UIManager.Instance.showSettings();
         });
-        m_ContextMenu.AddMenuItem("Idle", delegate { 
-            StatusManager.Instance.IsFalling = false;
-            StatusManager.Instance.IsPicking = false;
-            StatusManager.Instance.IsOptioning = false;
-            PhysicsManager.Instance.SetIdleState();
+        m_ContextMenu.AddMenuItem("Action", delegate { 
+            OnPointerDownRadialMenuAction();
         });
-        m_ContextMenu.AddMenuItem("Go Left", delegate { 
-            StatusManager.Instance.IsFalling = false;
-            StatusManager.Instance.IsPicking = false;
-            StatusManager.Instance.IsOptioning = false;
-            PhysicsManager.Instance.SetWalkLeftState();
-        });
-        m_ContextMenu.AddMenuItem("Go Right", delegate { 
-            StatusManager.Instance.IsFalling = false;
-            StatusManager.Instance.IsPicking = false;
-            StatusManager.Instance.IsOptioning = false;
-            PhysicsManager.Instance.SetWalkRightState();
-        });
+        
         m_ContextMenu.AddMenuItem("Change Char", delegate { 
             UIManager.Instance.ShowCharChange();
+        });
+        m_ContextMenu.AddMenuItem("Summon Char", delegate { 
+            UIManager.Instance.ShowCharAdd();
         });
 
         if (_charAttributes.toggleClothes != null || _charAttributes.changeClothes!=null) {
@@ -143,15 +135,15 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         m_ContextMenu.AddMenuItem("Change Monitor", delegate { 
             _transparentWindow.NextMonitor(); 
         });
+        m_ContextMenu.AddMenuItem("Set Screenshot Area", delegate {  
+            ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();  // 최상위 ScreenshotManager
+            sm.SetScreenshotArea();
+        });
+        m_ContextMenu.AddMenuItem("Get Screenshot", delegate { 
+            ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();  // 최상위 ScreenshotManager
+            sm.SaveScreenshot(); 
+        });
         #endif
-        // m_ContextMenu.AddMenuItem("Set Screenshot Area", delegate {  
-        //     ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();  // 최상위 ScreenshotManager
-        //     sm.SetScreenshotArea();
-        // });
-        // m_ContextMenu.AddMenuItem("Get Screenshot", delegate { 
-        //     ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();  // 최상위 ScreenshotManager
-        //     sm.SaveScreenshot(); 
-        // });
         // m_ContextMenu.AddMenuItem("Local AI Server", delegate { 
         //     ServerManager.AskStartServer();
         // });
@@ -168,5 +160,14 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 
         chkTimer = 1f;
         itemChkFlag = true;
+    }
+
+    // Sub - RadialMenu를 위한 전용 함수들
+
+    // Action
+    private void OnPointerDownRadialMenuAction() {
+        Vector2 characterTransformPos = StatusManager.Instance.characterTransform.anchoredPosition;
+        m_RadialMenuAction.characterTransformPos = new Vector2(characterTransformPos.x, characterTransformPos.y + 200 * SettingManager.Instance.settings.char_size / 100f + 100);
+        m_RadialMenuAction.Show();
     }
 }
