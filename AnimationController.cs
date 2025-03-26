@@ -8,7 +8,7 @@ public class AnimationController : MonoBehaviour
     // idleCount를 프로퍼티로 변경
     public int IdleCount { get; set; }
 
-    private int animationTotalCount = 4;  // 5 - 1
+    private int animationTotalCount = 6;  // 0~5.99
 
     void Start()
     {
@@ -26,13 +26,13 @@ public class AnimationController : MonoBehaviour
             if (currentTime < prevNormalizedTime) // 1.0 -> 0.0으로 넘어가는 순간
             {
                 IdleCount++; // IdleCount 증가
-                Debug.Log("IdleCount: " + IdleCount);
+                // Debug.Log("IdleCount: " + IdleCount);
 
                 if (IdleCount >= 10) // IdleCount가 10 이상일 때 실행
                 {
-                    float randomIndex = Random.Range(0, animationTotalCount);  // 0~4
+                    float randomIndex = Random.Range(0, animationTotalCount);  // 0~5.99
                     _animator.SetFloat("BlendIdle", randomIndex);
-                    Debug.Log("다음 Idle 애니메이션 : " + randomIndex);
+                    // Debug.Log("다음 Idle 애니메이션 : " + randomIndex);
                     
                     IdleCount = 0; // IdleCount 초기화
                 }
