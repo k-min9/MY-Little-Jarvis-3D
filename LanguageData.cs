@@ -13,7 +13,11 @@ public static class LanguageData
 
         new Dictionary<string, string> { { "ko", "이미지 보내기" }, { "jp", "画像情報を送る" }, { "en", "Send Image Info" } },
 
-
+        new Dictionary<string, string> { { "ko", "왼쪽으로" }, { "jp", "左に" }, { "en", "Go Left" } },
+        new Dictionary<string, string> { { "ko", "오른쪽으로" }, { "jp", "右に" }, { "en", "Go Right" } },
+        new Dictionary<string, string> { { "ko", "춤추기" }, { "jp", "踊る" }, { "en", "Dance" } },
+        new Dictionary<string, string> { { "ko", "대기" }, { "jp", "待機" }, { "en", "Idle" } },
+        new Dictionary<string, string> { { "ko", "숨기" }, { "jp", "隠す" }, { "en", "Hide" } },
 
         
         new Dictionary<string, string> { { "ko", "언어" }, { "jp", "言語" }, { "en", "Language" } },
