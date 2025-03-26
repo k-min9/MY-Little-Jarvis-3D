@@ -41,6 +41,7 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
                 return;
             }
 
+            // 메뉴가 보이는 중
             if (!m_ContextMenu.IsVisible)  // 자체제공함수
             {
                 StatusManager.Instance.IsOptioning = false;
@@ -58,6 +59,12 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
                 leftClickHoldTime = 0f;
                 TriggerMenu();
             }
+        }
+
+        // Radial Menu Action이 보이는 중
+        if (m_RadialMenuAction.IsVisible)  // 자체제공함수
+        {
+            UpdateRadialMenuActionPosition();
         }
     }
 
@@ -88,13 +95,18 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         this.m_ContextMenu.Clear();
 
         // 메뉴 추가
-        m_ContextMenu.AddMenuItem("Settings", delegate { 
+        string menuName = "";
+        string targetLang = SettingManager.Instance.settings.ui_language; // 0 : ko, 1 : jp, 2: en 
+
+        // setting
+        // menuName = LanguageData.Translate("Settings", targetLang);
+        m_ContextMenu.AddMenuItem("Settings", delegate {   // Language로 향하는 과정은 전부 영어로만
             UIManager.Instance.showSettings();
         });
+        menuName = LanguageData.Translate("Settings", targetLang);
         m_ContextMenu.AddMenuItem("Action", delegate { 
             OnPointerDownRadialMenuAction();
         });
-        
         m_ContextMenu.AddMenuItem("Change Char", delegate { 
             UIManager.Instance.ShowCharChange();
         });
@@ -169,5 +181,12 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         Vector2 characterTransformPos = StatusManager.Instance.characterTransform.anchoredPosition;
         m_RadialMenuAction.characterTransformPos = new Vector2(characterTransformPos.x, characterTransformPos.y + 200 * SettingManager.Instance.settings.char_size / 100f + 100);
         m_RadialMenuAction.Show();
+    }
+
+    // AnswerBalloon의 위치를 캐릭터 바로 위로 조정하는 함수
+    private void UpdateRadialMenuActionPosition()
+    {
+        Vector2 characterTransformPos = StatusManager.Instance.characterTransform.anchoredPosition;
+        m_RadialMenuAction.GetComponent<RectTransform>().anchoredPosition = new Vector2(characterTransformPos.x, characterTransformPos.y + 200 * SettingManager.Instance.settings.char_size / 100f + 100);
     }
 }
