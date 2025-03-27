@@ -46,8 +46,8 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
         }
         else if (Input.GetKeyDown(KeyCode.Alpha1))
         {
-            _animator.SetFloat("Blend", 1.0f);
-            _animator.SetTrigger("doBlend");
+            _animator.SetFloat("BlendStand", 1.0f);
+            _animator.SetTrigger("doBlendStand");
         }
         else if (Input.GetKeyDown(KeyCode.Alpha2))
         {
