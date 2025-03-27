@@ -32,4 +32,15 @@ public class AnimationManager : MonoBehaviour
         _animator.SetBool("isDance", true);
     }
 
+    public void Hide() {
+        Animator _animator = CharManager.Instance.GetCurrentCharacter().GetComponent<Animator>();
+
+        _animator.SetBool("isWalk", false);
+        _animator.SetBool("isRun", false);
+        _animator.SetBool("isPick", false);
+        _animator.SetBool("isDance", false
+        );   
+        _animator.SetTrigger("doHide");
+    }
+
 }
