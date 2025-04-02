@@ -196,6 +196,9 @@ public class APIManager : MonoBehaviour
         string curChatIdx = data["chatIdx"];
         int curChatIdxNum = int.Parse(curChatIdx);
 
+        string boundary = "----WebKitFormBoundary" + DateTime.Now.Ticks.ToString("x");
+        string contentType = "multipart/form-data; boundary=" + boundary;
+
         try
         {
             // 요청전 초기화
@@ -205,13 +208,53 @@ public class APIManager : MonoBehaviour
             // HttpWebRequest 객체를 사용하여 요청 생성
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
             request.Method = "POST";
-            request.ContentType = "application/json";
-            byte[] byteArray = Encoding.UTF8.GetBytes(jsonData);
-
-            // 요청 본문에 데이터 쓰기
-            using (Stream dataStream = await request.GetRequestStreamAsync())
+            request.ContentType = contentType;
+            
+            using (MemoryStream memStream = new MemoryStream())
+            using (StreamWriter writer = new StreamWriter(memStream, Encoding.UTF8, 1024, true))
             {
-                dataStream.Write(byteArray, 0, byteArray.Length);
+                // JSON 데이터 추가
+                foreach (var entry in data)
+                {
+                    writer.WriteLine($"--{boundary}");
+                    writer.WriteLine($"Content-Disposition: form-data; name=\"{entry.Key}\"");
+                    writer.WriteLine();
+                    writer.WriteLine(entry.Value);
+                }
+
+                // 이미지 파일 추가 (파일이 존재할 경우)
+                string directory = Path.Combine(Application.persistentDataPath, "Screenshots");
+                if (!Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+                string filePath = Path.Combine(directory, "panel_capture.png");
+                if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+                {
+                    byte[] fileBytes = File.ReadAllBytes(filePath);
+                    string fileName = Path.GetFileName(filePath);
+
+                    writer.WriteLine($"--{boundary}");
+                    writer.WriteLine($"Content-Disposition: form-data; name=\"image\"; filename=\"{fileName}\"");
+                    writer.WriteLine("Content-Type: image/png");
+                    writer.WriteLine();
+                    writer.Flush(); // 헤더 부분을 먼저 메모리에 씀
+
+                    memStream.Write(fileBytes, 0, fileBytes.Length);
+                    writer.WriteLine();
+                }
+
+                // 마지막 boundary 추가
+                writer.WriteLine($"--{boundary}--");
+                writer.Flush();
+
+                // 요청 본문에 데이터 쓰기
+                request.ContentLength = memStream.Length;
+                using (Stream requestStream = await request.GetRequestStreamAsync())
+                {
+                    memStream.Seek(0, SeekOrigin.Begin);
+                    await memStream.CopyToAsync(requestStream);
+                }
             }
 
             // 응답을 비동기로 읽기
@@ -292,6 +335,7 @@ public class APIManager : MonoBehaviour
         string ai_language = SettingManager.Instance.settings.ai_language ?? "";
         string ai_language_in = ai_lang_in;  // stt 에서 가져온 언어 있으면 사용(en, ja, ko 안에 포함되는지는 서버쪽에서 확인)
         string ai_language_out = SettingManager.Instance.settings.ai_language_out ?? "";
+        string ai_web_search = SettingManager.Instance.settings.ai_web_search ?? "off";  // 0 : off, 1 : on, 2: force
 
         var memory = MemoryManager.Instance.GetAllConversationMemory();
         string memoryJson = JsonConvert.SerializeObject(memory);
@@ -306,7 +350,11 @@ public class APIManager : MonoBehaviour
             { "ai_language_in", ai_language_in }, // 추론언어로 한입, 영입영출 등 조절(ko, en, jp)
             { "ai_language_out", ai_language_out }, // 추론언어로 한출, 영입영출 등 조절(ko, en, jp)
             { "memory", memoryJson },
-            { "chatIdx", chatIdx}
+            { "chatIdx", chatIdx},
+            { "intent_web", ai_web_search},  // off, on, force
+            { "intent_image", "off"},  // on, off, force
+            { "intent_confirm", "off"},  // on, off, force
+            { "intent_confirm_type", "off"}  // web, image, ""
         };
 
         await FetchStreamingData(streamUrl, requestData);
