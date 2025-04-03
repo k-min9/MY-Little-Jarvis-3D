@@ -13,6 +13,7 @@ public class PhysicsManager : MonoBehaviour
     public float idleProbability = 70f;
     public float walkProbability = 30f;
     public RectTransform rectTransform;
+    public CharAttributes charAttributes;
     public Canvas canvas; 
     private float initialRotationY;
 
@@ -55,6 +56,19 @@ public class PhysicsManager : MonoBehaviour
 
     private void Update()
     {
+        // Test코드
+        // 충돌 감지
+        // Vector2 newPosition = rectTransform.anchoredPosition;
+        // if (WindowCollisionManager.Instance.IsCollisionWithWindowsRect(newPosition))
+        // {
+        //     NoticeBalloonManager.Instance.ModifyNoticeBalloonText("충돌중:" + newPosition.x.ToString("0.00") + "/" + newPosition.y.ToString("0.00"));
+        //     // Debug.Log("충돌중!");
+        // }
+        // else
+        // {
+        //      NoticeBalloonManager.Instance.ModifyNoticeBalloonText("충돌XXXX:" + newPosition.x.ToString("0.00") + "/" + newPosition.y.ToString("0.00"));
+        // }
+
         if (StatusManager.Instance.IsPicking 
         || StatusManager.Instance.IsFalling 
         || StatusManager.Instance.IsConversationing 
@@ -81,7 +95,9 @@ public class PhysicsManager : MonoBehaviour
         if (!StatusManager.Instance.IsPicking 
         && !StatusManager.Instance.IsFalling 
         && !StatusManager.Instance.IsConversationing
-        && !StatusManager.Instance.IsOptioning)
+        && !StatusManager.Instance.IsOptioning
+        && !animator.GetBool("isDance")
+        )
         {
             float rand = Random.Range(0f, 100f);
             if (rand < idleProbability)
@@ -101,18 +117,27 @@ public class PhysicsManager : MonoBehaviour
 
     public void SetIdleState()
     {
+        StatusManager.Instance.IsFalling = false;
+        StatusManager.Instance.IsPicking = false;
+        StatusManager.Instance.IsOptioning = false;
         animator.SetBool("isWalk", false);
         ResetRotation();
     }
 
     public void SetWalkLeftState()
     {
+        StatusManager.Instance.IsFalling = false;
+        StatusManager.Instance.IsPicking = false;
+        StatusManager.Instance.IsOptioning = false;
         animator.SetBool("isWalk", true);
         WalkLeftStart();
     }
 
     public void SetWalkRightState()
     {
+        StatusManager.Instance.IsFalling = false;
+        StatusManager.Instance.IsPicking = false;
+        StatusManager.Instance.IsOptioning = false;
         animator.SetBool("isWalk", true);
         WalkRightStart();
     }
@@ -127,7 +152,12 @@ public class PhysicsManager : MonoBehaviour
             StopCoroutine(currentCoroutine);  // 기존 코루틴 중지
             currentCoroutine = null;
         }
-        rectTransform.localEulerAngles = new Vector3(rectTransform.localEulerAngles.x, -90, rectTransform.localEulerAngles.z);
+        if (charAttributes.type == "3D") {
+            rectTransform.localEulerAngles = new Vector3(rectTransform.localEulerAngles.x, -90, rectTransform.localEulerAngles.z);
+        } else {
+            rectTransform.localEulerAngles = new Vector3(rectTransform.localEulerAngles.x, 0, rectTransform.localEulerAngles.z);
+        }
+        
         currentCoroutine = StartCoroutine(MoveLeft());
     }
 
@@ -141,7 +171,11 @@ public class PhysicsManager : MonoBehaviour
             StopCoroutine(currentCoroutine);  // 기존 코루틴 중지
             currentCoroutine = null;
         }
-        rectTransform.localEulerAngles = new Vector3(rectTransform.localEulerAngles.x, -270, rectTransform.localEulerAngles.z);
+        if (charAttributes.type == "3D") {
+            rectTransform.localEulerAngles = new Vector3(rectTransform.localEulerAngles.x, -270, rectTransform.localEulerAngles.z);
+        } else {
+            rectTransform.localEulerAngles = new Vector3(rectTransform.localEulerAngles.x, -180, rectTransform.localEulerAngles.z);
+        }
         currentCoroutine = StartCoroutine(MoveRight());
     }
 
