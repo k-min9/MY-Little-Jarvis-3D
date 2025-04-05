@@ -144,6 +144,11 @@ public class TrayIconManager : MonoBehaviour
     // 창 복원
     private void RestoreWindow(object sender, EventArgs e)
     {
+        // 중앙이동
+        CurrentCharToMiddle(null, null);
+        // 애니메이션 별도 관리
+        AnimationManager.Instance.Show();
+        
         isMinimized = false;
         trayIcon.Visible = true;
         ShowWindowManually();
