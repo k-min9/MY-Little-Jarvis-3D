@@ -325,7 +325,8 @@ public class APIManager : MonoBehaviour
         if(chatIdx!="-1") {
             GameManager.Instance.chatIdxSuccess = chatIdx;
         }     
-
+        // 애니메이션 재생 초기화
+        AnimationManager.Instance.Idle();
         // API 호출을 위한 URL 구성
         string baseUrl = ServerManager.Instance.GetBaseUrl();
         string streamUrl = baseUrl+"/conversation_stream";
