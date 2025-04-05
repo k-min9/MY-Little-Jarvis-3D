@@ -47,11 +47,12 @@ public class EmotionBalloonController : MonoBehaviour
     {
         if (targetCollider == null || balloonRect == null) return;
 
-        
+        Canvas _canvas = FindObjectOfType<Canvas>();
         Vector3 worldHeadPos = GetHeadPosition();  // 머리 끝 부분 좌표
-        Vector2 screenPoint = Camera.main.WorldToScreenPoint(worldHeadPos);  // 월드 좌표 → UI 스크린 좌표
+        Vector2 screenPoint = Camera.main.WorldToScreenPoint(worldHeadPos);
 
-        balloonRect.anchoredPosition = new Vector2(screenPoint.x+40, screenPoint.y+10);
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvas.transform as RectTransform, screenPoint, _canvas.worldCamera, out Vector2 pos);
+        balloonRect.localPosition = new Vector3(pos.x + 40, pos.y + 10, -70);
     }
 
     private Vector3 GetHeadPosition()
