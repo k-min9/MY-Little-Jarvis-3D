@@ -16,8 +16,9 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
 
     private int animationTotalCount = 4;
 
-    private GameObject emotionBalloonInstance = null;
     private bool isPatting = false;
+    private GameObject emotionBalloonInstance = null;
+    private GameObject emotionFxInstance = null;
 
     private void Start()
     {
@@ -124,12 +125,20 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
             Destroy(emotionBalloonInstance);
             emotionBalloonInstance = null;
         }
+        if (emotionFxInstance != null)
+        {
+            Destroy(emotionFxInstance);
+            emotionFxInstance = null;
+        }
         
         // 머리 쓰다듬기 초기화
         if (HasParameter(_animator, "isPat"))
         {
             _animator.SetBool("isPat", false);
             isPatting = false;
+
+            // 얼굴 표정 초기화
+            EmotionManager.Instance.ShowEmotion("idle");
         }
 
         if (charAttributes.type=="2D") {
@@ -147,13 +156,32 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
         _animator.SetBool("isPat", true);
         StatusManager.Instance.IsPicking = true; // 영향도분석필요
 
-        // 기존 감정풍선 삭제
+        // 기존 감정풍선 삭제 후 재생성
         if (emotionBalloonInstance != null)
         {
             Destroy(emotionBalloonInstance);
         }
-        // emotionBalloonInstance = EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter());
         emotionBalloonInstance = EmotionBalloonManager.Instance.ShowEmotionBalloon(this.gameObject);
+
+        // 기존 fx 삭제 후 재생성
+        if (emotionFxInstance != null)
+        {
+            Destroy(emotionFxInstance);
+        }
+        emotionFxInstance = EffectManager.Instance.CreateEffectToGameObject(this.transform.parent.gameObject);
+
+        // 얼굴 표정 정도 변경
+        EmotionManager.Instance.ShowEmotion("><");
+
+        // TODO : 음성재생(임시)
+        List<string> pat = new List<string>
+        {
+            "Sound/arona/Arona_Etc_Fue_Normal.ogg",
+            "Sound/arona/Arona_Work_Sleep_Exit_1.ogg",
+            "Sound/arona/Arona_Work_Sleep_Talk_1.ogg"
+        };
+        int randomIndex = UnityEngine.Random.Range(0, 3);
+        VoiceManager.Instance.PlayAudioFromPath(pat[randomIndex]);  // 음성 재생
     }
 
     // animator의 유틸성 함수

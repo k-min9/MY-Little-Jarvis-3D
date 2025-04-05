@@ -184,6 +184,7 @@ public class CharManager : MonoBehaviour
         setChatBalloonVar(currentCharacter);
         setAskBalloonVar(currentCharacter);
         setTalkMenuVar(currentCharacter);
+        setStatusManagerVar(currentCharacter);
 
         // RectTransform 위치를 (0, 0, -70)으로 설정 (또는 이전 위치로 유지)
         RectTransform newRectTransform = currentCharacter.GetComponent<RectTransform>();
