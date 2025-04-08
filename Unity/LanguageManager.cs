@@ -51,18 +51,33 @@ public class LanguageManager : MonoBehaviour
 
     public TooltipTrigger imageUseToggleTooltipTrigger;
 
+    public TooltipTrigger radialMenuActionDance;
+    public TooltipTrigger radialMenuActionGoLeft;
+    public TooltipTrigger radialMenuActionGoRight;
+    public TooltipTrigger radialMenuActionHide;
+    public TooltipTrigger radialMenuActionIdle;
+
     // Setting 변경시 호출하여 UI에 반영
     public void SetUILanguage()
     {
         string targetLang = SettingManager.Instance.settings.ui_language; // 0 : ko, 1 : jp, 2: en 
 
-        settingsHeaderTitle.text = LanguageData.Translate(settingsHeaderTitle.text, targetLang);;
-        settingsGeneralPlayerNameLabel.text = LanguageData.Translate(settingsGeneralPlayerNameLabel.text, targetLang);;
-        settingsGeneralServerIDLabel.text = LanguageData.Translate(settingsGeneralServerIDLabel.text, targetLang);;
-        settingsGeneralAlwaysOnTopLabel.text = LanguageData.Translate(settingsGeneralAlwaysOnTopLabel.text, targetLang);;
-        settingsGeneralShowChatBoxOnClickLabel.text = LanguageData.Translate(settingsGeneralShowChatBoxOnClickLabel.text, targetLang);;
+        // setting
+        settingsHeaderTitle.text = LanguageData.Translate(settingsHeaderTitle.text, targetLang);
+        settingsGeneralPlayerNameLabel.text = LanguageData.Translate(settingsGeneralPlayerNameLabel.text, targetLang);
+        settingsGeneralServerIDLabel.text = LanguageData.Translate(settingsGeneralServerIDLabel.text, targetLang);
+        settingsGeneralAlwaysOnTopLabel.text = LanguageData.Translate(settingsGeneralAlwaysOnTopLabel.text, targetLang);
+        settingsGeneralShowChatBoxOnClickLabel.text = LanguageData.Translate(settingsGeneralShowChatBoxOnClickLabel.text, targetLang);
 
+        // chatBalloon
         imageUseToggleTooltipTrigger.tooltip = LanguageData.Translate(imageUseToggleTooltipTrigger.tooltip, targetLang);
+
+        // RadialMenuAction
+        radialMenuActionDance.tooltip = LanguageData.Translate(radialMenuActionDance.tooltip, targetLang);
+        radialMenuActionGoLeft.tooltip = LanguageData.Translate(radialMenuActionGoLeft.tooltip, targetLang);
+        radialMenuActionGoRight.tooltip = LanguageData.Translate(radialMenuActionGoRight.tooltip, targetLang);
+        radialMenuActionHide.tooltip = LanguageData.Translate(radialMenuActionHide.tooltip, targetLang);
+        radialMenuActionIdle.tooltip = LanguageData.Translate(radialMenuActionIdle.tooltip, targetLang);
     }
 
 
