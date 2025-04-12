@@ -35,6 +35,7 @@ public class SettingManager : MonoBehaviour
     // 표시용 UI
     public Text soundSpeedMasterText;
     public Text serverInfoText;
+    public Text charSizeText;
 
 
     // 설정 데이터 클래스
@@ -108,7 +109,7 @@ public class SettingManager : MonoBehaviour
     public void SetIsShowChatBoxOnClick(bool value) {settings.isShowChatBoxOnClick = value; SaveSettings(); }
 
     public void SetCharLastUsed(string value) { settings.char_lastUsed = value; SaveSettings(); }
-    public void SetCharSize(float value) { settings.char_size = value; CharManager.Instance.setCharSize(); SaveSettings(); }
+    public void SetCharSize(float value) { settings.char_size = value; CharManager.Instance.setCharSize(); SaveSettings(); charSizeText.text="Size ("+(int)settings.char_size+")";}
     public void SetCharSpeed(float value) { settings.char_speed = value; SaveSettings(); }
     public void SetCharMobility(float value) { settings.char_mobility = value; SaveSettings(); }
     public void SetIsGravity(bool value) { settings.isGravity = value; SaveSettings(); }
@@ -251,6 +252,10 @@ public class SettingManager : MonoBehaviour
         aiAskIntentDropdown.value = settings.ai_ask_intent_idx;
         isAskedTurnOnServerToggle.isOn = settings.isAskedTurnOnServer;
         isAPITest.isOn = settings.isAPITest;
+
+        // Text 계열
+        soundSpeedMasterText.text="Speed (" + (int)settings.sound_speedMaster + "%)";
+        charSizeText.text="Size ("+(int)settings.char_size+"%)";
 
         // 초기값일 경우 UI가 반영되지 않으므로 한번 더 호출
         LanguageManager.Instance.SetUILanguage();
