@@ -26,7 +26,7 @@
   - bone : root_bone부터 각각 리깅된 모델
   - Animator
     - Entry, Idle, Walk, Pick을 boolean으로 Exit Time없이 transition
-    - Any State, Motion, Exit을 Trigger로 transition
+    - Any State, Motion, Exit을 Trigger로 transition  
         ![alt text](Docs/animator.png)
 
 ### Camera
