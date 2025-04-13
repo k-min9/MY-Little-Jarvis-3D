@@ -32,6 +32,9 @@ public class CharManager : MonoBehaviour
     // 캐릭터가 속할 Canvas
     public Canvas canvas; // Canvas를 에디터에서 설정하거나 Find로 찾기
 
+    // 오류시 보낼 기본 값
+    public Sprite sampleSprite;
+
     void Awake()
     {
         // InitCharacter 호출해서 첫 번째 캐릭터를 생성
@@ -313,6 +316,17 @@ public class CharManager : MonoBehaviour
             return nicknameComponent.nickname;
         }
         return null;
+    }
+
+    // 캐릭터 프리팹에서 Nickname 컴포넌트가 있는 경우, 닉네임을 가져오는 함수
+    public Sprite GetCharSprite(GameObject character)
+    {
+        CharAttributes nicknameComponent = character.GetComponent<CharAttributes>();
+        if (nicknameComponent != null)
+        {
+            return nicknameComponent.charSprite;
+        }
+        return sampleSprite;
     }
 
     // 캐릭터 프리팹에서 voicePath Getter

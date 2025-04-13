@@ -9,6 +9,7 @@ public class CharAttributes : MonoBehaviour
     public string type = "3D";  // 3D, 2D 모델 구분
     public bool isMain = true;  // main : 대화 가능, AI 연결 주체
     public float initLocalScale = 0;
+    public Sprite charSprite;
 
     public GameObject toggleClothes = null;  // 안경, 외투 등의 변환
     public GameObject changeClothes = null;  // 옷 자체를 변경
