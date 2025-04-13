@@ -113,6 +113,9 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         m_ContextMenu.AddMenuItem("Summon Char", delegate { 
             UIManager.Instance.ShowCharAdd();
         });
+        m_ContextMenu.AddMenuItem("Chat History", delegate { 
+            UIManager.Instance.ShowChatHistory();
+        });
 
         if (_charAttributes.toggleClothes != null || _charAttributes.changeClothes!=null) {
             m_ContextMenu.AddMenuItem("Change Clothes", delegate { 
@@ -162,6 +165,15 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         m_ContextMenu.AddMenuItem("Version", delegate { 
             UIManager.Instance.ShowVersion();
         });
+        // For Test
+// #if UNITY_EDITOR
+        m_ContextMenu.AddMenuItem("Debug", delegate {  // 테스트용
+            Debug.Log("======Test Start======");
+            // EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), 10.0f);
+            EmotionManager.Instance.NextEmotion();
+            Debug.Log("=======Test End=======");
+        });
+// #endif
         m_ContextMenu.AddMenuItem("Exit", delegate { Application.Quit(); });
 
         // 메뉴 보이기

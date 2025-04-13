@@ -7,11 +7,11 @@ using UnityEngine.UI;
 public class UIManager : MonoBehaviour
 {
     [SerializeField] private GameObject charChange; // CharChange
+    [SerializeField] private GameObject charAdd; // charAdd
     [SerializeField] private GameObject version; // version+thanks
     [SerializeField] private Text versionThanksContent; // version+thanks
     [SerializeField] private GameObject settings; // settings
-
-
+    [SerializeField] private GameObject chatHistory; // chatHistory
 
     // 싱글톤 인스턴스
     private static UIManager instance;
@@ -31,8 +31,10 @@ public class UIManager : MonoBehaviour
 
         // 자체 함수로 비활성화
         charChange.SetActive(false);
+        charAdd.SetActive(false);
         version.SetActive(false);
         settings.SetActive(false);
+        chatHistory.SetActive(false);
 
 //         // 안드로이드 or 테스트용
 // #if UNITY_ANDROID || UNITY_EDITOR
@@ -59,7 +61,13 @@ public class UIManager : MonoBehaviour
     {
         UIWidget uIWidget = charChange.GetComponent<UIWidget>();
         uIWidget.Show();
-        
+    }
+
+    // charChange-UIWidget의 Show 작동
+    public void ShowCharAdd()
+    {
+        UIWidget uIWidget = charAdd.GetComponent<UIWidget>();
+        uIWidget.Show();
     }
 
     // version-UIWidget의 Show 작동
@@ -90,6 +98,16 @@ public class UIManager : MonoBehaviour
     public void showSettings()
     {
         UIWidget uIWidget = settings.GetComponent<UIWidget>();
+        uIWidget.Show();
+    }
+
+    // charChange-UIWidget의 Show 작동
+    public void ShowChatHistory()
+    {
+        UIChatHistoryManager uIChatHistoryManager = chatHistory.GetComponent<UIChatHistoryManager>();
+        uIChatHistoryManager.LoadChatHistory();
+
+        UIWidget uIWidget = chatHistory.GetComponent<UIWidget>();
         uIWidget.Show();
     }
 }
