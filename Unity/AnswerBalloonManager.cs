@@ -162,7 +162,13 @@ public class AnswerBalloonManager : MonoBehaviour
         // 바뀐 언어로 AnswerBalloon 다시 세팅
         ModifyAnswerBalloonText();
     }
-    
+
+    // 채팅로그 창 열기
+    public void ShowChatHistory()
+    {
+        UIManager.Instance.ShowChatHistory();
+    }
+
     // 현재(마지막) 오디오 재생 후 AnswerBalloon을 숨기는 코루틴 호출
     public void HideAnswerBalloonAfterAudio()
     {
