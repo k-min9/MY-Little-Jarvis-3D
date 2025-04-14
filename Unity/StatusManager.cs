@@ -20,6 +20,8 @@ isOptioning = 우클릭, 메뉴등의 대기 상태
 isOnTop - 최상위 여부
 isMinimize - 최소화 여부
 isAiUsing = 서버를 키거나 그렇게 하도록 명령을 내린 대화 가능 상태
+
+characterTransform - 메인캐릭터 transform : 메뉴 등의 위치 설정에 사용
 */
 public class StatusManager : MonoBehaviour
 {
@@ -57,6 +59,9 @@ public class StatusManager : MonoBehaviour
     public bool isOnTop;
     public bool isMinimize;
     public bool isAiUsing;
+
+    // 그 외
+    public RectTransform characterTransform;
 
     // Getter / Setter
     public bool IsDragging
