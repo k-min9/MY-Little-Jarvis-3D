@@ -17,6 +17,7 @@ public class APIManager : MonoBehaviour
     private List<string> replyListJp = new List<string>();
     private List<string> replyListEn = new List<string>();
 
+    public string query_origin = "";
     private string query_trans = "";
     private string ai_language_out = "en";  // 메모리에 저장할 언어
 
@@ -290,6 +291,7 @@ public class APIManager : MonoBehaviour
 
                                         // Debug.Log(jsonObject["query"]);
                                         // Debug.Log(jsonObject["query"]["text"]);
+                                        query_origin = jsonObject["query"]["origin"].ToString();
                                         query_trans = jsonObject["query"]["text"].ToString();
                                     }
 
@@ -355,7 +357,8 @@ public class APIManager : MonoBehaviour
             { "intent_web", ai_web_search},  // off, on, force
             { "intent_image", "off"},  // on, off, force
             { "intent_confirm", "off"},  // on, off, force
-            { "intent_confirm_type", "off"}  // web, image, ""
+            { "intent_confirm_type", "off"},  // web, image, ""
+            { "regenerate_count", "0"}
         };
 
         await FetchStreamingData(streamUrl, requestData);
