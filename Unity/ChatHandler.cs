@@ -16,8 +16,10 @@ public class ChatHandler : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Return)) // 엔터키가 눌렸는지 확인
         {
-            Debug.Log("입력된 텍스트: " + input);
-            APIManager.Instance.CallConversationStream(input);
+            GameManager.Instance.chatIdx += 1;
+            GameManager.Instance.chatIdxRegenerateCount = 0;
+            Debug.Log("입력된 텍스트 ("+GameManager.Instance.chatIdx.ToString()+") : " + input);
+            APIManager.Instance.CallConversationStream(input, GameManager.Instance.chatIdx.ToString());
 
             // 여기서 입력된 텍스트를 처리하는 코드를 작성하세요
             // PerformActionBasedOnInput(input);
@@ -26,12 +28,14 @@ public class ChatHandler : MonoBehaviour
         }
     }
 
-    // 입력 제출 처리 테스트
-    public void HandleInputSubmitTest()
+    // 버튼용 입력 제출 처리 테스트
+    public void HandleInputSubmitButton()
     {
         string input = inputField.text;
-        Debug.Log("입력된 텍스트 (테스트용): " + input);
-        APIManager.Instance.CallConversationStream(input);
+        GameManager.Instance.chatIdx += 1;
+        GameManager.Instance.chatIdxRegenerateCount = 0;
+        Debug.Log("입력된 텍스트 ("+GameManager.Instance.chatIdx.ToString()+") : " + input);
+        APIManager.Instance.CallConversationStream(input, GameManager.Instance.chatIdx.ToString());
     }
 
     // 입력에 따라 수행할 작업을 정의하는 함수
