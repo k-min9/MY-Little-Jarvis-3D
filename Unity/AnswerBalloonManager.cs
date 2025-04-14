@@ -163,6 +163,33 @@ public class AnswerBalloonManager : MonoBehaviour
         ModifyAnswerBalloonText();
     }
 
+    // 최근대화 삭제후 창 종료하기
+    public void DeleteRecentDialogue()
+    {
+        MemoryManager.Instance.DeleteRecentDialogue();
+        MemoryManager.Instance.DeleteRecentDialogue();
+
+        HideAnswerBalloon();
+    }
+
+    // 대화 재생성
+    public void ChatRegenerate()
+    {        
+        string input = APIManager.Instance.query_origin;
+        // GameManager.Instance.chatIdx += 1;
+        GameManager.Instance.chatIdxRegenerateCount += 1;
+        Debug.Log("Regenerate 텍스트 ("+GameManager.Instance.chatIdx.ToString()+") : " + input);
+        APIManager.Instance.CallConversationStream(input, GameManager.Instance.chatIdx.ToString());
+
+        // 이미 대화 저장했을 경우 삭제
+        if (isAnswered) 
+        {
+            DeleteRecentDialogue();
+            GameManager.Instance.chatIdxSuccess = "-1";
+        }
+        HideAnswerBalloon();
+    }
+
     // 채팅로그 창 열기
     public void ShowChatHistory()
     {
