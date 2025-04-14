@@ -307,7 +307,7 @@ public class WindowCollisionManager : MonoBehaviour
                 if (start.x <= position.x  // && start.y <= position.y  taskbar 최소높이 체크는 당연히 하지 않는다.
                     && end.x >= position.x && end.y >= position.y)
                 {
-                    Debug.Log("Hit!!");
+                    // Debug.Log("Hit!!");
                     // Debug.Log("x : " + start.x + "/" + position.x + "/" + end.x);
                     // Debug.Log("y : " + start.y + "/" + position.y + "/" + end.y);
                     return end.y;

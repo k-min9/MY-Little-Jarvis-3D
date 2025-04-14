@@ -32,7 +32,7 @@ public class UIChatHistoryManager : MonoBehaviour
         uiChatSlotSample.SetActive(false);
 
         // LoadChatHistory 초기화(잉여작업)
-        LoadChatHistory();
+        // LoadChatHistory();
 
         // Test 코드
         // TestChatHistory();
