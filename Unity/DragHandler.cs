@@ -19,6 +19,8 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
     private bool isPatting = false;
     private GameObject emotionBalloonInstance = null;
     private GameObject emotionFxInstance = null;
+    public float headPatThreshold = 18f;  // 머리쓰다듬기 반응 비율
+    public float emotionFxMultiRate = 0.0002f;  // 이펙트 비율
 
     private void Start()
     {
@@ -76,7 +78,7 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
                     Debug.Log($"DragHandler 마우스 클릭 위치 : 상위 {percentageFromTop:F2}%");
 
                     // 머리 쓰다듬기 분리
-                    if (percentageFromTop<15){  // 기준 하드코딩. 필요할 경우, charattributes 사용 or collider 분리
+                    if (percentageFromTop<headPatThreshold){  
                         PatHead();
                         return;
                     }
@@ -169,19 +171,20 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
             Destroy(emotionFxInstance);
         }
         emotionFxInstance = EffectManager.Instance.CreateEffectToGameObject(this.transform.parent.gameObject);
+        // 현재 스케일에 0.0002를 곱하여 설정
+        Vector3 currentScale = emotionFxInstance.transform.localScale;
+        emotionFxInstance.transform.localScale = new Vector3(
+            currentScale.x * emotionFxMultiRate,
+            currentScale.y * emotionFxMultiRate,
+            currentScale.z * emotionFxMultiRate
+        );
 
         // 얼굴 표정 정도 변경
         EmotionManager.Instance.ShowEmotion("><");
 
-        // TODO : 음성재생(임시)
-        List<string> pat = new List<string>
-        {
-            "Sound/arona/Arona_Etc_Fue_Normal.ogg",
-            "Sound/arona/Arona_Work_Sleep_Exit_1.ogg",
-            "Sound/arona/Arona_Work_Sleep_Talk_1.ogg"
-        };
-        int randomIndex = UnityEngine.Random.Range(0, 3);
-        VoiceManager.Instance.PlayAudioFromPath(pat[randomIndex]);  // 음성 재생
+        // 음성재생
+        Dialogue pat = DialogueManager.Instance.GetRandomPat();
+        VoiceManager.Instance.PlayAudioFromPath(pat.filePath);
     }
 
     // animator의 유틸성 함수
