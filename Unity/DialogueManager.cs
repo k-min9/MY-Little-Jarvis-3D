@@ -38,6 +38,7 @@ public class DialogueManager : MonoBehaviour
     public List<Dialogue> idle = new List<Dialogue>();
     public List<Dialogue> select = new List<Dialogue>();
     public List<Dialogue> pick = new List<Dialogue>();
+    public List<Dialogue> pat = new List<Dialogue>();
 
     private string jsonFilePath;
 
@@ -130,6 +131,7 @@ public class DialogueManager : MonoBehaviour
         idle = wrapper.idle;
         select = wrapper.select;
         pick = wrapper.pick;
+        pat = wrapper.pat;
     }
 
     // 대사 리스트 초기화
@@ -139,6 +141,7 @@ public class DialogueManager : MonoBehaviour
         idle = new List<Dialogue>();
         select = new List<Dialogue>();
         pick = new List<Dialogue>();
+        pat = new List<Dialogue>();
     }
 
     // JSON 파일 저장
@@ -148,7 +151,9 @@ public class DialogueManager : MonoBehaviour
         {
             greetings = greetings,
             idle = idle,
-            pick = pick
+            select = select,
+            pick = pick,
+            pat = pat
         };
 
         string json = JsonUtility.ToJson(wrapper, true);
@@ -204,6 +209,18 @@ public class DialogueManager : MonoBehaviour
         int randomIndex = UnityEngine.Random.Range(0, pick.Count);
         return pick[randomIndex];
     }
+    // pat 리스트에서 랜덤한 대사를 반환하는 함수
+    public Dialogue GetRandomPat()
+    {
+        if (pat.Count == 0)
+        {
+            Debug.LogWarning("pat 리스트가 비어 있습니다.");
+            return default(Dialogue); // 기본값 반환
+        }
+
+        int randomIndex = UnityEngine.Random.Range(0, pat.Count);
+        return pat[randomIndex];
+    }
 }
 
 // JSON 형식에 맞추기 위해 여러 대사 유형을 감싸는 Wrapper 클래스
@@ -214,4 +231,5 @@ public class DialogueCategoryWrapper
     public List<Dialogue> idle;
     public List<Dialogue> select;
     public List<Dialogue> pick;
+    public List<Dialogue> pat;
 }
