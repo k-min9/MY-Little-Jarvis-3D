@@ -258,19 +258,12 @@ public IEnumerator SendWavFile(string filePath, string sttLang, string sttLevel)
 
     // UnityWebRequest로 서버에 데이터 업로드
     // API 호출을 위한 URL 구성
-    string baseUrl = "";
-#if UNITY_ANDROID && !UNITY_EDITOR
-    if (APIManager.Instance.ngrokUrl == null) {
-        baseUrl = "https://minmin496969.loca.lt";
-    } else {
-        baseUrl = APIManager.Instance.ngrokUrl;  // ex) https://8e5c-1-237-90-223.ngrok-free.app
-    }
-#else
-    baseUrl = "http://127.0.0.1:5000";
-#endif
+    string baseUrl = ServerManager.Instance.GetBaseUrl();
     string url = baseUrl+"/stt"; // http://localhost:5000/stt
-    
+    Debug.Log("url : " + url);
+
     GameManager.Instance.chatIdx += 1;
+    GameManager.Instance.chatIdxRegenerateCount = 0;
 
     WWWForm formData = new WWWForm();
     // formData.AddBinaryData("file", wavData, Path.GetFileName(filePath), "audio/wav");
@@ -299,7 +292,7 @@ public IEnumerator SendWavFile(string filePath, string sttLang, string sttLevel)
 
             var responseJson = JsonUtility.FromJson<SttResponse>(responseText);
             // Debug.Log($"STT Text: {responseJson.text}");
-            // Debug.Log($"Detected Language: {responseJson.lang}");
+            // Debug.Log($"Detected Language: {responseJson.lang}");  // ja, ko, en
             // Debug.Log($"ChatIdx: {responseJson.chatIdx}");
 
             string query = responseJson.text ?? "";
@@ -307,7 +300,10 @@ public IEnumerator SendWavFile(string filePath, string sttLang, string sttLevel)
             NoticeBalloonManager.Instance.ModifyNoticeBalloonText(query);
 
             // 대화 시작
-            APIManager.Instance.CallConversationStream(query, responseJson.chatIdx);
+            APIManager.Instance.CallConversationStream(query, responseJson.chatIdx, responseJson.lang);
+
+            // 기존 음성 중지 및 초기화
+            VoiceManager.Instance.ResetAudio();
         }
         catch (Exception ex)
         {
