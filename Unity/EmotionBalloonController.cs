@@ -52,7 +52,7 @@ public class EmotionBalloonController : MonoBehaviour
         Vector2 screenPoint = Camera.main.WorldToScreenPoint(worldHeadPos);
 
         RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvas.transform as RectTransform, screenPoint, _canvas.worldCamera, out Vector2 pos);
-        balloonRect.localPosition = new Vector3(pos.x + 40, pos.y + 10, -70);
+        balloonRect.localPosition = new Vector3(pos.x + 40, pos.y + 10, -250);
     }
 
     private Vector3 GetHeadPosition()
