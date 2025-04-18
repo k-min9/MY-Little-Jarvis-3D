@@ -42,6 +42,11 @@ public class AnimationPatLoop : StateMachineBehaviour
             return;
         }
 
+        // endTime = 0 끝까지
+        if (endFrame<=0 && totalFrame>=1) {
+            endFrame = totalFrame - 1;
+        } 
+
         float startTime = startFrame / frameRate;
         float endTime = endFrame / frameRate;
         float totalTime = totalFrame / frameRate;
