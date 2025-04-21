@@ -284,7 +284,8 @@ public class APIManager : MonoBehaviour
                                     var jsonObject = JObject.Parse(line);
                                     // Debug.Log(jsonObject.ToString());
 
-                                    if (!isResponsedStarted) {
+                                    if (!isResponsedStarted) 
+                                    {
                                         AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
                                         AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();  // 대답중 sprite
                                         isResponsedStarted = true;
@@ -358,7 +359,7 @@ public class APIManager : MonoBehaviour
             { "intent_image", "off"},  // on, off, force
             { "intent_confirm", "off"},  // on, off, force
             { "intent_confirm_type", "off"},  // web, image, ""
-            { "regenerate_count", "0"}
+            { "regenerate_count", GameManager.Instance.chatIdxRegenerateCount.ToString()}
         };
 
         await FetchStreamingData(streamUrl, requestData);
