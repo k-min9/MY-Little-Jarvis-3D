@@ -96,7 +96,7 @@ public class PhysicsManager : MonoBehaviour
         && !StatusManager.Instance.IsFalling 
         && !StatusManager.Instance.IsConversationing
         && !StatusManager.Instance.IsOptioning
-        && !animator.GetBool("isDance")
+        && (!HasParameter(animator, "isDance") || !animator.GetBool("isDance"))  // isDance가 없거나, 있더라도 false
         )
         {
             float rand = Random.Range(0f, 100f);
@@ -254,5 +254,15 @@ public class PhysicsManager : MonoBehaviour
 
         animator.SetBool("isWalk", false);
         ResetRotation();
+    }
+
+    // animator의 유틸성 함수
+    private bool HasParameter(Animator animator, string paramName)
+    {
+        foreach (AnimatorControllerParameter param in animator.parameters)
+        {
+            if (param.name == paramName) return true;
+        }
+        return false;
     }
 }
