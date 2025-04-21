@@ -7,28 +7,46 @@ using UnityEngine;
 */
 public class EffectManager : MonoBehaviour
 {
-    public ParticleSystem effectMerge;
 
-    public void EffectPlay() {
-        effectMerge.transform.position = transform.position;
-        effectMerge.transform.localScale = transform.localScale;
-        effectMerge.Play();
+    // 싱글톤 인스턴스
+    private static EffectManager instance;
+    public static EffectManager Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = FindObjectOfType<EffectManager>();
+            }
+            return instance;
+        }
     }
 
-    // // Instantiate 예시
-    // // 새 동글 생성
-    // Dongle GetDongle() {
-    //     // 이펙트 생성
-    //     GameObject effectMerge = Instantiate(effectFrepabMerge, effectGroup); // effectGroup 자식으로 프리팹 생성
-    //     ParticleSystem instantEffectMerge = effectMerge.GetComponent<ParticleSystem>();
+    // 게임오브젝트
+    public GameObject fxPrefabLoveAura;
 
-    //     // 동글생성
-    //     GameObject instant = Instantiate(dongleFrepab, dongleGroup); // dongleGroup 자식으로 프리팹 생성
-    //     Dongle instantDongle = instant.GetComponent<Dongle>();
-    //     instantDongle.effectMerge = instantEffectMerge;
+    // GameObject에 이펙트 붙이기(오라류)
+    public GameObject CreateEffectToGameObject(GameObject target, string fxName = "love")
+    {
+        // 이펙트 prefab
+        GameObject fxPrefab = fxPrefabLoveAura;
+        if (fxName == "love") {
+            fxPrefab = fxPrefabLoveAura;
+        }
 
-    //     return instantDongle;
+        // 말풍선 생성
+        GameObject fxInstance = Instantiate(fxPrefab, target.transform);
+
+        return fxInstance;
+    }
+
+
+    // 파티클시스템 예제
+    // public ParticleSystem effectMerge;
+
+    // public void EffectPlay() {
+    //     effectMerge.transform.position = transform.position;
+    //     effectMerge.transform.localScale = transform.localScale;
+    //     effectMerge.Play();
     // }
-
-
 }
