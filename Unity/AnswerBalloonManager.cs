@@ -175,8 +175,11 @@ public class AnswerBalloonManager : MonoBehaviour
     // 대화 재생성
     public void ChatRegenerate()
     {        
+        // 기존 음성 중지 및 초기화
+        VoiceManager.Instance.ResetAudio();
+
         string input = APIManager.Instance.query_origin;
-        // GameManager.Instance.chatIdx += 1;
+        GameManager.Instance.chatIdx += 1;
         GameManager.Instance.chatIdxRegenerateCount += 1;
         Debug.Log("Regenerate 텍스트 ("+GameManager.Instance.chatIdx.ToString()+") : " + input);
         APIManager.Instance.CallConversationStream(input, GameManager.Instance.chatIdx.ToString());
@@ -185,7 +188,6 @@ public class AnswerBalloonManager : MonoBehaviour
         if (isAnswered) 
         {
             DeleteRecentDialogue();
-            GameManager.Instance.chatIdxSuccess = "-1";
         }
         HideAnswerBalloon();
     }
