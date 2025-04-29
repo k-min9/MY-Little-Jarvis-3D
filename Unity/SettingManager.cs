@@ -37,6 +37,13 @@ public class SettingManager : MonoBehaviour
     public Text serverInfoText;
     public Text charSizeText;
 
+    public Text aiInfoServerType;
+    public Text aiInfoModel;
+    public Text aiInfoPrompt;
+    public Text aiInfoLangUsed;
+    public Text aiInfoTranslator;
+    public Text aiInfoTime;
+    public Text aiInfoIntent;
 
     // 설정 데이터 클래스
     [Serializable]
@@ -127,7 +134,15 @@ public class SettingManager : MonoBehaviour
 
     // 표시용
     public void SetServerInfoText(string text) {serverInfoText.text=text;}
-
+    public void RefreshAIInfoText(string ai_info_server_type, string ai_info_model, string ai_info_prompt, string ai_info_lang_used, string ai_info_translator, string ai_info_time, string ai_info_intent) {
+    aiInfoServerType.text = ai_info_server_type;
+    aiInfoModel.text = ai_info_model;
+    aiInfoPrompt.text = ai_info_prompt;
+    aiInfoLangUsed.text = ai_info_lang_used;
+    aiInfoTranslator.text = ai_info_translator;
+    aiInfoTime.text = ai_info_time;
+    aiInfoIntent.text = ai_info_intent;
+    }
 
     private string configFilePath;
 
@@ -256,6 +271,7 @@ public class SettingManager : MonoBehaviour
         // Text 계열
         soundSpeedMasterText.text="Speed (" + (int)settings.sound_speedMaster + "%)";
         charSizeText.text="Size ("+(int)settings.char_size+"%)";
+        RefreshAIInfoText("","","","","","","");
 
         // 초기값일 경우 UI가 반영되지 않으므로 한번 더 호출
         LanguageManager.Instance.SetUILanguage();
