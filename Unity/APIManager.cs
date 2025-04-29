@@ -294,8 +294,26 @@ public class APIManager : MonoBehaviour
                                         // Debug.Log(jsonObject["query"]["text"]);
                                         query_origin = jsonObject["query"]["origin"].ToString();
                                         query_trans = jsonObject["query"]["text"].ToString();
-                                    }
 
+                                        // Setting - AI Info 내용 갱신
+                                        try
+                                        {
+                                            string ai_info_server_type = jsonObject["ai_info"]["server_type"].ToString();
+                                            string ai_info_model = jsonObject["ai_info"]["model"].ToString();
+                                            string ai_info_prompt = jsonObject["ai_info"]["prompt"].ToString();
+                                            string ai_info_lang_used = jsonObject["ai_info"]["lang_used"].ToString();
+                                            string ai_info_translator = jsonObject["ai_info"]["translator"].ToString();
+                                            string ai_info_time = jsonObject["ai_info"]["time"].ToString();
+                                            string ai_info_intent = jsonObject["ai_info"]["time"].ToString();
+                                            SettingManager.Instance.RefreshAIInfoText(ai_info_server_type, ai_info_model, ai_info_prompt, ai_info_lang_used, ai_info_translator, ai_info_time, ai_info_intent);      
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Debug.Log(ex);
+                                            // Debug.LogException(ex);
+
+                                        }
+                                    }
                                     ProcessReply(jsonObject); // 각 JSON 응답을 처리
                                 } else {
                                     Debug.Log("과거대화 : " + curChatIdxNum.ToString() + "/" + GameManager.Instance.chatIdxBalloon.ToString());
