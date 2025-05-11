@@ -354,10 +354,13 @@ public class APIManager : MonoBehaviour
         // 닉네임 가져오기
         string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
         string player_name = SettingManager.Instance.settings.player_name;
+        // string ui_language = SettingManager.Instance.settings.ui_language ?? "";  // 설정 ui에서 쓰는 언어에 따라가는 경향이 있음
         string ai_language = SettingManager.Instance.settings.ai_language ?? "";
         string ai_language_in = ai_lang_in;  // stt 에서 가져온 언어 있으면 사용(en, ja, ko 안에 포함되는지는 서버쪽에서 확인)
         string ai_language_out = SettingManager.Instance.settings.ai_language_out ?? "";
         string ai_web_search = SettingManager.Instance.settings.ai_web_search ?? "off";  // 0 : off, 1 : on, 2: force
+        string intent_confirm = "false";
+        if (SettingManager.Instance.settings.confirmUserIntent) intent_confirm = "true";
 
         var memory = MemoryManager.Instance.GetAllConversationMemory();
         string memoryJson = JsonConvert.SerializeObject(memory);
@@ -365,18 +368,19 @@ public class APIManager : MonoBehaviour
         // 요청 데이터 구성
         var requestData = new Dictionary<string, string>
         {
-            { "query", query },
-            { "player", player_name }, // 설정의 플레이어 이름
-            { "char", nickname }, // 닉네임으로 캐릭터 이름 추가
-            { "ai_language", ai_language }, // 추론언어로 한입, 영입영출 등 조절(ko, en, jp)
+            { "query", query },  // 질문내용
+            { "player", player_name }, // 설정의 플레이어 이름 : 초기값 sensei
+            { "char", nickname }, // 닉네임으로 캐릭터 이름 추가 : 초기값 arona
+            { "ai_language", ai_language }, // 추론언어로 한입, 영입영출 등 조절(normal, prefer, ko, en, jp)
             { "ai_language_in", ai_language_in }, // 추론언어로 한입, 영입영출 등 조절(ko, en, jp)
             { "ai_language_out", ai_language_out }, // 추론언어로 한출, 영입영출 등 조절(ko, en, jp)
             { "memory", memoryJson },
             { "chatIdx", chatIdx},
             { "intent_web", ai_web_search},  // off, on, force
             { "intent_image", "off"},  // on, off, force
-            { "intent_confirm", "off"},  // on, off, force
-            { "intent_confirm_type", "off"},  // web, image, ""
+            { "intent_confirm", intent_confirm},  // on, off : 의도행동확인 받기 여부[web검색하실까요 선생님?]
+            { "intent_confirm_type", ""},  // "", web, light : 의도행동확인 종류
+            { "intent_confirm_answer", ""},  // true, false : 의도행동확인에 대한 답변[재생성시 확인 없이 적용하기 위해]
             { "regenerate_count", GameManager.Instance.chatIdxRegenerateCount.ToString()}
         };
 
