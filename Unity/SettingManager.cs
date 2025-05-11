@@ -8,42 +8,48 @@ using System.Collections;
 public class SettingManager : MonoBehaviour
 {
 
-    // 입력값 정리
+    [Header("General")]
     [SerializeField] private TMP_InputField playerNameInputField;
     [SerializeField] private TMP_InputField serverIdInputField;
     [SerializeField] private Dropdown uiLangDropdown;
-    [SerializeField] private Dropdown aiLangDropdown;
     [SerializeField] private Toggle isAlwaysOnTopToggle;
     [SerializeField] private Toggle isShowChatBoxOnClickToggle;
 
+    //
+    [Header("Character")]
     [SerializeField] private Slider charSizeSlider;
     [SerializeField] private Slider charSpeedSlider;
     [SerializeField] private Slider charMobilitySlider;
     [SerializeField] private Toggle isGravityToggle;
     [SerializeField] private Toggle isWindowsCollisionToggle;
 
+    [Header("Sound")]
     [SerializeField] private Dropdown soundLanguageDropdown;
     [SerializeField] private Slider soundVolumeMasterSlider;  // 현재는 마스터 볼륨만 있으면
     [SerializeField] private Slider soundSpeedMasterSlider;  // 현재는 마스터 볼륨만 있으면
 
+    [Header("AI")]
     [SerializeField] private Dropdown serverTypeDropdown;
     [SerializeField] private Dropdown aiWebSearchDropdown;
     [SerializeField] private Dropdown aiAskIntentDropdown;
+    [SerializeField] private Dropdown aiLangDropdown;
     [SerializeField] private Toggle isAskedTurnOnServerToggle;
-    [SerializeField] private Toggle isAPITest;
+    [SerializeField] private Toggle isAPITestToggle;
+    [SerializeField] private Toggle confirmUserIntentToggle;
 
-    // 표시용 UI
+    [Header("Dialogue Info")]
+    [SerializeField] private Text aiInfoServerType;
+    [SerializeField] private Text aiInfoModel;
+    [SerializeField] private Text aiInfoPrompt;
+    [SerializeField] private Text aiInfoLangUsed;
+    [SerializeField] private Text aiInfoTranslator;
+    [SerializeField] private Text aiInfoTime;
+    [SerializeField] private Text aiInfoIntent;
+
+    // 기타 표시용 UI
     public Text soundSpeedMasterText;
     public Text serverInfoText;
     public Text charSizeText;
-
-    public Text aiInfoServerType;
-    public Text aiInfoModel;
-    public Text aiInfoPrompt;
-    public Text aiInfoLangUsed;
-    public Text aiInfoTranslator;
-    public Text aiInfoTime;
-    public Text aiInfoIntent;
 
     // 설정 데이터 클래스
     [Serializable]
@@ -54,7 +60,6 @@ public class SettingManager : MonoBehaviour
         public int ui_language_idx;  // 0 : ko, 1 : jp, 2: en
         public string ui_language;  
         public int ai_language_idx;  // 0 : ko, 1 : jp, 2: en
-        public string ai_language;  
         public string ai_language_in;
         public string ai_language_out;
         public bool isAlwaysOnTop;
@@ -78,8 +83,10 @@ public class SettingManager : MonoBehaviour
         public string ai_web_search;
         public int ai_ask_intent_idx;  // 0 : off, 1 : on
         public string ai_ask_intent;
+        public string ai_language;  
         public bool isAskedTurnOnServer;
         public bool isAPITest;
+        public bool confirmUserIntent;
     }
 
     // 설정 데이터 인스턴스
@@ -103,7 +110,6 @@ public class SettingManager : MonoBehaviour
     public void SetPlayerName(string value) { settings.player_name = value; SaveSettings(); }
     public void SetServerID(string value) { settings.server_id = value; SaveSettings(); }
     public void SetUiLanguage() { int value=uiLangDropdown.value; settings.ui_language_idx = value; settings.ui_language=getLangFromIdx(value); LanguageManager.Instance.SetUILanguage(); SaveSettings(); }
-    public void SetAiLanguage() { int value=aiLangDropdown.value; settings.ai_language_idx = value; settings.ai_language=getLangFromIdx(value); SaveSettings(); }
     public void SetAiLanguageIn(string value) { settings.ai_language_in = value; SaveSettings(); }
     public void SetAiLanguageOut(string value) { settings.ai_language_out = value; SaveSettings(); }
     public void SetIsAlwaysOnTop(bool value) { 
@@ -131,6 +137,9 @@ public class SettingManager : MonoBehaviour
     public void SetAIAskIntent() { int value=aiAskIntentDropdown.value; settings.ai_ask_intent_idx = value; settings.server_type=getONOFFTypeFromIdx(value); SaveSettings(); }
     public void SetIsAskedTurnOnServer(bool value) { settings.isAskedTurnOnServer = value; SaveSettings(); }
     public void SetIsAPITest(bool value) { settings.isAPITest = value; SaveSettings(); }
+    public void SetConfirmUserIntent(bool value) { settings.confirmUserIntent = value; SaveSettings(); }  // SetAIAskIntent Toggle 버전
+    public void SetAiLanguage() { int value=aiLangDropdown.value; settings.ai_language_idx = value; settings.ai_language=getAiLangFromIdx(value); SaveSettings(); }
+
 
     // 표시용
     public void SetServerInfoText(string text) {serverInfoText.text=text;}
@@ -195,8 +204,26 @@ public class SettingManager : MonoBehaviour
         }
         return lang;
     }
+    
+    // idx를 추론설정이름으로 변환; 0 : normal, 1 : prefer, 2 : ko, 3 : jp, 4 : en
+    private string getAiLangFromIdx(int idx) {
+        string lang = "normal";
+        if (idx ==  1) {
+            lang = "prefer";
+        }
+        if (idx ==  2) {
+            lang = "ko";
+        }
+        if (idx ==  3) {
+            lang = "jp";
+        }
+        if (idx ==  4) {
+            lang = "en";
+        }
+        return lang;
+    }
 
-    // idx를 언어이름으로 변환; 0 : ko, 1 : jp, 2: en
+    // idx를 서버타입으로 변환; 0 : ko, 1 : jp, 2: en
     private string getServerTypeFromIdx(int idx) {
         string lang = "GPU";
         if (idx ==  1) {
@@ -266,7 +293,8 @@ public class SettingManager : MonoBehaviour
         aiWebSearchDropdown.value = settings.ai_web_search_idx;
         aiAskIntentDropdown.value = settings.ai_ask_intent_idx;
         isAskedTurnOnServerToggle.isOn = settings.isAskedTurnOnServer;
-        isAPITest.isOn = settings.isAPITest;
+        isAPITestToggle.isOn = settings.isAPITest;
+        confirmUserIntentToggle.isOn = settings.confirmUserIntent;
 
         // Text 계열
         soundSpeedMasterText.text="Speed (" + (int)settings.sound_speedMaster + "%)";
@@ -342,5 +370,6 @@ public class SettingManager : MonoBehaviour
         settings.ai_ask_intent = "OFF";
         settings.isAskedTurnOnServer = true;
         settings.isAPITest = false;
+        settings.confirmUserIntent = false;
     }
 }
