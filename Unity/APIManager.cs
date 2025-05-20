@@ -356,9 +356,11 @@ public class APIManager : MonoBehaviour
         string player_name = SettingManager.Instance.settings.player_name;
         // string ui_language = SettingManager.Instance.settings.ui_language ?? "";  // 설정 ui에서 쓰는 언어에 따라가는 경향이 있음
         string ai_language = SettingManager.Instance.settings.ai_language ?? "";
-        string ai_language_in = ai_lang_in;  // stt 에서 가져온 언어 있으면 사용(en, ja, ko 안에 포함되는지는 서버쪽에서 확인)
+        string ai_language_in = ai_lang_in;  // stt 에서 가져온 언어 있으면 사용(en, jp, ko 안에 포함되는지는 서버쪽에서 확인)
         string ai_language_out = SettingManager.Instance.settings.ai_language_out ?? "";
         string ai_web_search = SettingManager.Instance.settings.ai_web_search ?? "off";  // 0 : off, 1 : on, 2: force
+        string intent_image = "off";
+        if (ChatBalloonManager.Instance.GetImageUse()) intent_image = "force";
         string intent_confirm = "false";
         if (SettingManager.Instance.settings.confirmUserIntent) intent_confirm = "true";
 
@@ -377,7 +379,7 @@ public class APIManager : MonoBehaviour
             { "memory", memoryJson },
             { "chatIdx", chatIdx},
             { "intent_web", ai_web_search},  // off, on, force
-            { "intent_image", "off"},  // on, off, force
+            { "intent_image", intent_image},  // on, off, force
             { "intent_confirm", intent_confirm},  // on, off : 의도행동확인 받기 여부[web검색하실까요 선생님?]
             { "intent_confirm_type", ""},  // "", web, light : 의도행동확인 종류
             { "intent_confirm_answer", ""},  // true, false : 의도행동확인에 대한 답변[재생성시 확인 없이 적용하기 위해]
