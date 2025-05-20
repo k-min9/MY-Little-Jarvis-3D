@@ -3,6 +3,8 @@ using UnityEngine;
 public class AnimationController : MonoBehaviour
 {
     [SerializeField] public Animator _animator;
+    private RectTransform rectTransform;
+
     float prevNormalizedTime;
     
     // idleCount를 프로퍼티로 변경
@@ -13,6 +15,7 @@ public class AnimationController : MonoBehaviour
     void Start()
     {
         _animator = GetComponent<Animator>();
+        rectTransform = GetComponent<RectTransform>();
         prevNormalizedTime = 0;
         IdleCount = 0; // 초기화
     }
@@ -25,6 +28,13 @@ public class AnimationController : MonoBehaviour
             
             if (currentTime < prevNormalizedTime) // 1.0 -> 0.0으로 넘어가는 순간
             {
+                // Z축 초기화
+                // Debug.Log("Z축 초기화!");
+                Vector3 pos3D = rectTransform.anchoredPosition3D;
+                pos3D.z = 0f;
+                rectTransform.anchoredPosition3D = pos3D;
+
+
                 IdleCount++; // IdleCount 증가
                 // Debug.Log("IdleCount: " + IdleCount);
 
