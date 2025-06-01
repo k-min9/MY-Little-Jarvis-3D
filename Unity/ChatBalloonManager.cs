@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using TMPro;
+using UnityEngine.UI;
 
 public class ChatBalloonManager : MonoBehaviour
 {
@@ -9,6 +10,7 @@ public class ChatBalloonManager : MonoBehaviour
     [SerializeField] public RectTransform characterTransform; // chatBalloon이 표시될 캐릭터의 Transform
     [SerializeField] private RectTransform chatBalloonTransform; // chatBalloon의 Transform
     [SerializeField] public TMP_InputField inputField; 
+    [SerializeField] private Toggle imageUseToggle;
 
     // 싱글톤 인스턴스
     private static ChatBalloonManager instance;
@@ -74,13 +76,18 @@ public class ChatBalloonManager : MonoBehaviour
         inputField.ActivateInputField();
 
         // 기존 애니메이션 중지 및 isChatting 애니메이션 
+        AnimationManager.Instance.Listen();
     }
     
     // chatBalloon을 숨기는 함수
     public void HideChatBalloon()
     {
         chatBalloon.SetActive(false);
-        StatusManager.Instance.IsChatting = false; 
+
+        if (StatusManager.Instance.IsChatting) {
+            StatusManager.Instance.IsChatting = false; 
+            AnimationManager.Instance.ListenDisable();
+        }
 //         // 안드로이드 테스트용
 // #if UNITY_ANDROID && !UNITY_EDITOR
 //         chatBalloon.SetActive(true);
@@ -99,17 +106,29 @@ public class ChatBalloonManager : MonoBehaviour
             ShowChatBalloon();
         }
     }
+    
+    public bool GetImageUse()
+    {
+        if (imageUseToggle.isOn)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
 
     // chatBalloon의 위치를 캐릭터 바로 위로 조정하는 함수
     private void UpdateChatBalloonPosition()
     {
         Vector2 charPosition = characterTransform.anchoredPosition;
-        
+
         // 캐릭터의 X 위치와 동일하게 설정
         RectTransform canvasRect = _canvas.GetComponent<RectTransform>();
-        float leftBound = -canvasRect.rect.width/2; // 캔버스 왼쪽 끝
-        float rightBound = canvasRect.rect.width/2; // 캔버스 오른쪽 끝
-        float charPositionX = Mathf.Clamp(charPosition.x, leftBound+250, rightBound-250);
+        float leftBound = -canvasRect.rect.width / 2; // 캔버스 왼쪽 끝
+        float rightBound = canvasRect.rect.width / 2; // 캔버스 오른쪽 끝
+        float charPositionX = Mathf.Clamp(charPosition.x, leftBound + 250, rightBound - 250);
 
         // chatBalloonTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 270 * SettingManager.Instance.settings.char_size / 100f); // Y축 창크기 270만큼
         chatBalloonTransform.anchoredPosition = new Vector2(charPositionX, charPosition.y + 200 * SettingManager.Instance.settings.char_size / 100f + 100);
