@@ -175,19 +175,28 @@ public class APIManager : MonoBehaviour
         Debug.Log("All replies have been received.");
         LogToFile("ProcessReply completed."); // ProcessReply 완료 로그
         
-        // foreach (string reply in replyListJp)
-        // {
-        //     Debug.Log(reply); // 각 reply를 출력
-        // }
+        
+        // 표시언어로 저장 : SettingManager.Instance.settings.ui_language
         string reply = string.Join(" ", replyListEn);
-        if (ai_language_out == "ja")
-        {
-            reply = string.Join(" ", replyListJp);
-        }
 
         Debug.Log("Answer Finished : " + reply);
-        MemoryManager.Instance.SaveConversationMemory("player", query_trans);
-        MemoryManager.Instance.SaveConversationMemory("character", reply);
+        if (query_trans != "")  // 영어 번역이 필요한 LLM 사용시 번역기 답변
+        {
+            MemoryManager.Instance.SaveConversationMemory("player", query_trans);
+            MemoryManager.Instance.SaveConversationMemory("character", reply);
+        }
+        else
+        {
+            MemoryManager.Instance.SaveConversationMemory("player", query_origin);
+            if (SettingManager.Instance.settings.ui_language == "ja" || SettingManager.Instance.settings.ui_language == "jp")
+            {
+                reply = string.Join(" ", replyListJp);
+            } else if (SettingManager.Instance.settings.ui_language == "ko")
+            { 
+                reply = string.Join(" ", replyListKo);
+            }
+            MemoryManager.Instance.SaveConversationMemory("character", reply);
+        }
     }
 
     // 스트리밍 데이터를 가져오는 메서드
@@ -284,7 +293,7 @@ public class APIManager : MonoBehaviour
                                     var jsonObject = JObject.Parse(line);
                                     // Debug.Log(jsonObject.ToString());
 
-                                    if (!isResponsedStarted) 
+                                    if (!isResponsedStarted)
                                     {
                                         AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
                                         AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();  // 대답중 sprite
@@ -305,14 +314,32 @@ public class APIManager : MonoBehaviour
                                             string ai_info_translator = jsonObject["ai_info"]["translator"].ToString();
                                             string ai_info_time = jsonObject["ai_info"]["time"].ToString();
                                             string ai_info_intent = jsonObject["ai_info"]["time"].ToString();
-                                            SettingManager.Instance.RefreshAIInfoText(ai_info_server_type, ai_info_model, ai_info_prompt, ai_info_lang_used, ai_info_translator, ai_info_time, ai_info_intent);      
+                                            SettingManager.Instance.RefreshAIInfoText(ai_info_server_type, ai_info_model, ai_info_prompt, ai_info_lang_used, ai_info_translator, ai_info_time, ai_info_intent);
                                         }
                                         catch (Exception ex)
                                         {
                                             Debug.Log(ex);
                                             // Debug.LogException(ex);
-
                                         }
+
+                                        // 의도(Intent) 관련 정보 갱신
+                                        // 우선 AnswerBalloon의 web마크 비활성화
+                                        AnswerBalloonManager.Instance.HideWebImage();
+                                        try
+                                        {
+                                            string intent_info_is_intent_web = jsonObject["intent_info"]["is_intent_web"].ToString();  // on, off
+                                            string intent_info_web_info = jsonObject["intent_info"]["web_info"].ToString();
+                                            string intent_info_is_intent_image = jsonObject["intent_info"]["is_intent_image"].ToString();  // on, off
+                                            string intent_info_image_info = jsonObject["intent_info"]["image_info"].ToString();
+
+                                            if (intent_info_is_intent_web == "on") AnswerBalloonManager.Instance.ShowWebImage();
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Debug.Log(ex);
+                                            // Debug.LogException(ex);
+                                        }
+
                                     }
                                     ProcessReply(jsonObject); // 각 JSON 응답을 처리
                                 } else {
@@ -333,7 +360,7 @@ public class APIManager : MonoBehaviour
                 }
             }
         }
-        catch (WebException ex)
+        catch (Exception ex)
         {
             Debug.Log($"Exception: {ex.Message}");
         }
@@ -359,6 +386,11 @@ public class APIManager : MonoBehaviour
         string ai_language_in = ai_lang_in;  // stt 에서 가져온 언어 있으면 사용(en, jp, ko 안에 포함되는지는 서버쪽에서 확인)
         string ai_language_out = SettingManager.Instance.settings.ai_language_out ?? "";
         string ai_web_search = SettingManager.Instance.settings.ai_web_search ?? "off";  // 0 : off, 1 : on, 2: force
+        if (GameManager.Instance.isWebSearchForced)  // 강제 검색 메뉴
+        {
+            GameManager.Instance.isWebSearchForced = false;
+            ai_web_search = "force";
+        }
         string intent_image = "off";
         if (ChatBalloonManager.Instance.GetImageUse()) intent_image = "force";
         string intent_confirm = "false";
