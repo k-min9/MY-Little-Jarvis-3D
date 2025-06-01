@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
+// LanguageManager에서 관리할 Data를 등록후, LanguageManger에서 GameObject 등록
 public static class LanguageData
 {
     public static readonly List<Dictionary<string, string>> Texts = new List<Dictionary<string, string>>
@@ -11,7 +12,11 @@ public static class LanguageData
         new Dictionary<string, string> { { "ko", "항상 위에 표시" }, { "jp", "常に上に表示" }, { "en", "Always on Top" } },
         new Dictionary<string, string> { { "ko", "클릭 시 채팅창 표시" }, { "jp", "クリック時チャット画面表示" }, { "en", "Show Chatbox on Click" } },
 
-        new Dictionary<string, string> { { "ko", "이미지 보내기" }, { "jp", "画像情報を送る" }, { "en", "Send Image Info" } },
+        new Dictionary<string, string> { { "ko", "답변에 이미지 사용" }, { "jp", "回答に画像を使用" }, { "en", "Use Image in Answer" } },
+        new Dictionary<string, string> { { "ko", "Web에서 검색하기" }, { "jp", "Webで検索する" }, { "en", "Search the Web" } },
+
+
+
 
         new Dictionary<string, string> { { "ko", "왼쪽으로" }, { "jp", "左に" }, { "en", "Go Left" } },
         new Dictionary<string, string> { { "ko", "오른쪽으로" }, { "jp", "右に" }, { "en", "Go Right" } },
@@ -19,7 +24,7 @@ public static class LanguageData
         new Dictionary<string, string> { { "ko", "대기" }, { "jp", "待機" }, { "en", "Idle" } },
         new Dictionary<string, string> { { "ko", "숨기" }, { "jp", "隠す" }, { "en", "Hide" } },
 
-        
+
         new Dictionary<string, string> { { "ko", "언어" }, { "jp", "言語" }, { "en", "Language" } },
         new Dictionary<string, string> { { "ko", "음성인식" }, { "jp", "音声認識" }, { "en", "Speech Recognition" } },
         new Dictionary<string, string> { { "ko", "음성인식" }, { "jp", "音声認識" }, { "en", "Speech Recognition" } }, // "Speech R."
