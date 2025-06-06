@@ -20,6 +20,7 @@ isOptioning = 우클릭, 메뉴등의 대기 상태
 isOnTop - 최상위 여부
 isMinimize - 최소화 여부
 isAiUsing = 서버를 키거나 그렇게 하도록 명령을 내린 대화 가능 상태
+isMouthMoving -  입이 현재 움직이는 중인지 여부(Flag로 전환 관리)
 
 characterTransform - 메인캐릭터 transform : 메뉴 등의 위치 설정에 사용
 */
@@ -59,6 +60,7 @@ public class StatusManager : MonoBehaviour
     public bool isOnTop;
     public bool isMinimize;
     public bool isAiUsing;
+    public bool isMouthActive = false; // 입이 현재 움직이는 중인지 여부
 
     // 그 외
     public RectTransform characterTransform;
@@ -171,14 +173,22 @@ public class StatusManager : MonoBehaviour
 
     void Update()
     {
-        // 대화중이면 입 움직이기
         if (VoiceManager.Instance.isQueuePlaying)
-        {   
+        {
+            if (!isMouthActive)
+            {
+                isMouthActive = true;  // EmotionFaceController에서도 사용
+            }
             updateMouthStatus();
-        } else {
-        #if !UNITY_EDITOR
-            initMouthStatus();
-        #endif
+        }
+        else
+        {
+            if (isMouthActive)
+            {
+                isMouthActive = false;
+                initMouthStatus();
+                EmotionManager.Instance.ShowEmotionFromEmotion("default"); // 입 다문 직후에만 호출
+            }
         }
     }
 
@@ -189,9 +199,9 @@ public class StatusManager : MonoBehaviour
         faceTextureChanger = CharManager.Instance.GetCurrentCharacter().GetComponentInChildren<FaceTextureChanger>();
         if (faceTextureChanger==null) return;     
 
-        // 2초에 한번 입모양 변경
+        // 0.5초에 한번 입모양 변경
         faceTextureChanger.mouthIndex += 1;
-        if (faceTextureChanger.mouthIndex < 120) return;
+        if (faceTextureChanger.mouthIndex < 30) return;
         faceTextureChanger.mouthIndex = 0;
 
         if (faceTextureChanger.mouthStatus == 5) {
