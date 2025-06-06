@@ -4,6 +4,8 @@ using UnityEngine;
 public abstract class EmotionFaceController : MonoBehaviour
 {
     public abstract void ShowEmotion(string emotion);
-    
+
+    public abstract void ShowEmotionFromEmotion(string emotion);     // joy, anger, confusion, sadness, surprise, neutral을 각각 표정변환
+        
     public abstract void NextAnimation();
 }

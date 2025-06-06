@@ -41,7 +41,8 @@ public class EmotionManager : MonoBehaviour
             default:
                 controller = gameObject.GetComponent<EmotionFaceController>();
                 if (controller != null) {
-                    controller.ShowEmotion("normal");
+                    controller.ShowEmotion(emotion);
+                    // controller.ShowEmotion("normal");
                     
                     return;
                 }
@@ -51,11 +52,18 @@ public class EmotionManager : MonoBehaviour
         }
     }
 
+    // 표정에 따른 얼굴 변화 Interface 호출
+    public void ShowEmotionFromEmotion(string emotion)
+    {
+        GameObject gameObject = CharManager.Instance.GetCurrentCharacter();
+        EmotionFaceController controller = gameObject.GetComponent<EmotionFaceController>();
+        controller.ShowEmotionFromEmotion(emotion);
+    }
+
     // Test
     public void NextEmotion()
     {
         GameObject gameObject = CharManager.Instance.GetCurrentCharacter();
-        // EmotionFaceAronaController controller = gameObject.GetComponent<EmotionFaceAronaController>();
         EmotionFaceController controller = gameObject.GetComponent<EmotionFaceController>();
         controller.NextAnimation();
     }

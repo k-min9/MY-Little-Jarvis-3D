@@ -69,6 +69,9 @@ public class AnimationManager : MonoBehaviour
             _animator.SetBool("isPick", false);
             _animator.SetBool("isDance", false);
             _animator.SetBool("isListen", true);
+
+            // 얼굴 표정 있을 경우 사용
+            EmotionManager.Instance.ShowEmotion("listen");
         }
         catch
         {
@@ -82,6 +85,10 @@ public class AnimationManager : MonoBehaviour
         {
             Animator _animator = CharManager.Instance.GetCurrentCharacter().GetComponent<Animator>();
             _animator.SetBool("isListen", false);
+
+            // 얼굴 표정 있을 경우 사용
+            // 고도화 고려 : 현재 Listen 재생일 경우 사용하는 추가 기능도 가능(StatusManager에서 관리 추천)
+            EmotionManager.Instance.ShowEmotion("default");   // normal도 고려
         }
         catch
         {

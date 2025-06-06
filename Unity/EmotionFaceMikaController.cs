@@ -39,6 +39,64 @@ public class EmotionFaceMikaController : EmotionFaceController
         // }
     }
 
+    // joy, anger, confusion, sadness, surprise, neutral을 각각 표정변환
+    public override void ShowEmotionFromEmotion(string emotion)
+    {
+        string selectedAnimation = "";
+
+        switch (emotion.ToLower())
+        {
+            case "joy":
+                {
+                    float rand = Random.value;
+                    if (rand < 0.33f)
+                        selectedAnimation = "wink";
+                    else if (rand < 0.66f)
+                        selectedAnimation = "><";
+                    else
+                        selectedAnimation = "happy";
+                }
+                break;
+            case "anger":
+                selectedAnimation = "angry";
+                break;
+            case "confusion":
+                selectedAnimation = "danger";
+                break;
+            case "sadness":
+                selectedAnimation = "cry";
+                break;
+            case "surprise":
+                {
+                    float rand = Random.value;
+                    if (rand < 0.33f)
+                        selectedAnimation = "idle";
+                    else if (rand < 0.66f)
+                        selectedAnimation = "surprise";
+                    else
+                        selectedAnimation = "surprise";
+                }
+                break;
+            case "neutral":
+            default:
+                {
+                    float rand = Random.value;
+                    if (rand < 0.2f)
+                        selectedAnimation = "calm";
+                    else if (rand < 0.7f)
+                        selectedAnimation = "default";
+                    else
+                        selectedAnimation = "normal";
+                }
+                break;
+        }
+
+        ShowEmotion(selectedAnimation);
+        Debug.Log($"Mika : [Emotion Input] {emotion} → [Animation] {selectedAnimation}");
+    }
+
+
+
     // Test용 코드
     private int currentAnimationIndex = 0;
     public override void NextAnimation()

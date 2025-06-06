@@ -322,6 +322,21 @@ public class APIManager : MonoBehaviour
                                             // Debug.LogException(ex);
                                         }
 
+                                        // Setting - AI Info 표정 갱신
+                                        try
+                                        {
+                                            string ai_info_emotion = jsonObject["ai_info"]["emotion"].ToString();
+                                            Debug.Log("### emotion : " + ai_info_emotion);
+
+                                            EmotionManager.Instance.ShowEmotionFromEmotion(ai_info_emotion);
+
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Debug.Log(ex);
+                                            // Debug.LogException(ex);
+                                        }                                 
+
                                         // 의도(Intent) 관련 정보 갱신
                                         // 우선 AnswerBalloon의 web마크 비활성화
                                         AnswerBalloonManager.Instance.HideWebImage();

@@ -7,13 +7,37 @@ public class EmotionFaceAronaController : EmotionFaceController
     public GameObject faceNormal, faceRelax, faceListen, faceWink;
     private SkinnedMeshRenderer skinnedMeshRenderer;
     private Coroutine talkCoroutine;
-    private bool talkStatus = false;
+    private bool lastMouthState = false;  // update에서 변경될때만 처리되게 flag 관리
 
     void Start()
     {
         // 기본 얼굴 설정
         FaceChange("normal");
         skinnedMeshRenderer = faceNormal.GetComponent<SkinnedMeshRenderer>();
+    }
+
+    void Update()
+    {
+        bool current = StatusManager.Instance.isMouthActive;
+
+        if (current != lastMouthState)
+        {
+            lastMouthState = current;
+
+            if (current)
+            {
+                if (talkCoroutine == null)
+                    talkCoroutine = StartCoroutine(TalkAnimation());
+            }
+            else
+            {
+                if (talkCoroutine != null)
+                {
+                    StopCoroutine(talkCoroutine);
+                    talkCoroutine = null;
+                }
+            }
+        }
     }
 
     private List<string> faceEmotion = new List<string> { "normal", "relax", "listen", "><" };
@@ -36,6 +60,58 @@ public class EmotionFaceAronaController : EmotionFaceController
         {
             FaceNormalBlendShape(emotion);
         }
+    }
+
+    // joy, anger, confusion, sadness, surprise, neutral을 각각 표정변환
+    public override void ShowEmotionFromEmotion(string emotion)
+    {
+        string selectedAnimation = "";
+
+        switch (emotion.ToLower())
+        {
+            case "joy":
+                {
+                    float rand = Random.value;
+                    if (rand < 0.5f)
+                        selectedAnimation = "><";
+                    else
+                        selectedAnimation = "star";
+                }
+                break;
+            case "anger":
+                selectedAnimation = "slant";
+                break;
+            case "confusion":
+                selectedAnimation = "confused";
+                break;
+            case "sadness":
+                selectedAnimation = "listen";
+                break;
+            case "surprise":
+                {
+                    float rand = Random.value;
+                    if (rand < 0.8f)
+                        selectedAnimation = "surprise";
+                    else
+                        selectedAnimation = "star";
+                }
+                break;
+            case "neutral":
+            default:
+                {
+                    float rand = Random.value;
+                    if (rand < 0.2f)
+                        selectedAnimation = "relax";
+                    else if (rand < 0.7f)
+                        selectedAnimation = "default";
+                    else
+                        selectedAnimation = "normal";
+                }
+                break;
+        }
+
+        ShowEmotion(selectedAnimation);
+        Debug.Log($"[Emotion Input] {emotion} → [Animation] {selectedAnimation}");
     }
 
     // Test용 코드
@@ -83,20 +159,7 @@ public class EmotionFaceAronaController : EmotionFaceController
             case "star":
                 skinnedMeshRenderer.SetBlendShapeWeight(GetBlendShapeIndex("misc-star-eyes"), 100f);
                 break;
-            case "talk":
-                if (!talkStatus)
-                {
-                    talkStatus = true;
-                    talkCoroutine = StartCoroutine(TalkAnimation());
-                }
-                break;
             default:
-                if (talkCoroutine != null)
-                {
-                    StopCoroutine(talkCoroutine);
-                    talkCoroutine = null;
-                }
-                talkStatus = false;
                 ResetBlendShapes();
                 break;
         }
@@ -107,8 +170,13 @@ public class EmotionFaceAronaController : EmotionFaceController
         int blendShapeIndex = GetBlendShapeIndex("mouth-a");
         if (blendShapeIndex == -1) yield break;
 
-        while (talkStatus)
+        while (true)
         {
+            if (!StatusManager.Instance.isMouthActive)
+            {
+                break;
+            }
+
             float randomValue = Random.Range(10f, 100f);
             skinnedMeshRenderer.SetBlendShapeWeight(blendShapeIndex, randomValue);
             yield return new WaitForSeconds(Random.Range(0.1f, 0.3f));
@@ -120,7 +188,6 @@ public class EmotionFaceAronaController : EmotionFaceController
 
     private void ResetBlendShapes()
     {
-        talkStatus = false;
         for (int i = 0; i < skinnedMeshRenderer.sharedMesh.blendShapeCount; i++)
         {
             skinnedMeshRenderer.SetBlendShapeWeight(i, 0);
