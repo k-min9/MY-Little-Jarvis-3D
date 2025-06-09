@@ -62,6 +62,33 @@ public class EmotionFaceAronaController : EmotionFaceController
         }
     }
 
+    // listen등의 행동시 표정 변환
+    public override void ShowEmotionFromAction(string action)
+    {
+        string selectedAnimation = "";
+
+        switch (action.ToLower())
+        {
+            case "listen":
+                {
+                    float rand = Random.value;
+                    if (rand < 0.8f)
+                        selectedAnimation = "relax";
+                    else
+                        selectedAnimation = "listen";
+                }
+                break;
+            default:
+                {
+                    selectedAnimation = "default";
+                }
+                break;
+        }
+
+        ShowEmotion(selectedAnimation);
+        Debug.Log($"ARONA : [Action Input] {action} → [Animation] {selectedAnimation}");
+    }
+
     // joy, anger, confusion, sadness, surprise, neutral을 각각 표정변환
     public override void ShowEmotionFromEmotion(string emotion)
     {
@@ -99,13 +126,7 @@ public class EmotionFaceAronaController : EmotionFaceController
             case "neutral":
             default:
                 {
-                    float rand = Random.value;
-                    if (rand < 0.2f)
-                        selectedAnimation = "relax";
-                    else if (rand < 0.7f)
-                        selectedAnimation = "default";
-                    else
-                        selectedAnimation = "normal";
+                    selectedAnimation = "default";
                 }
                 break;
         }

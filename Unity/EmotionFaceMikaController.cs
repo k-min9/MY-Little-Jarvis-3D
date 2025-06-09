@@ -39,6 +39,35 @@ public class EmotionFaceMikaController : EmotionFaceController
         // }
     }
 
+     // listen등의 행동시 표정 변환
+    public override void ShowEmotionFromAction(string action)
+    {
+        string selectedAnimation = "";
+
+        switch (action.ToLower())
+        {
+            case "listen":
+                {
+                    float rand = Random.value;
+                    if (rand < 0.3f)
+                        selectedAnimation = "happy";
+                    else if (rand < 0.66f)
+                        selectedAnimation = "calm";
+                    else
+                        selectedAnimation = "default";
+                }
+                break;
+            default:
+                {
+                    selectedAnimation = "default";
+                }
+                break;
+        }
+
+        ShowEmotion(selectedAnimation);
+        Debug.Log($"Mika : [Action Input] {action} → [Animation] {selectedAnimation}");
+    }
+
     // joy, anger, confusion, sadness, surprise, neutral을 각각 표정변환
     public override void ShowEmotionFromEmotion(string emotion)
     {
