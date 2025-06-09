@@ -52,6 +52,14 @@ public class EmotionManager : MonoBehaviour
         }
     }
 
+    // 행동에 따른 얼굴 변화 Interface 호출
+    public void ShowEmotionFromAction(string action)
+    {
+        GameObject gameObject = CharManager.Instance.GetCurrentCharacter();
+        EmotionFaceController controller = gameObject.GetComponent<EmotionFaceController>();
+        controller.ShowEmotionFromAction(action);
+    }
+
     // 표정에 따른 얼굴 변화 Interface 호출
     public void ShowEmotionFromEmotion(string emotion)
     {
