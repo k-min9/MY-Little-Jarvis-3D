@@ -21,9 +21,7 @@ public class ChatHandler : MonoBehaviour
             Debug.Log("입력된 텍스트 ("+GameManager.Instance.chatIdx.ToString()+") : " + input);
             APIManager.Instance.CallConversationStream(input, GameManager.Instance.chatIdx.ToString());
 
-            // 여기서 입력된 텍스트를 처리하는 코드를 작성하세요
-            // PerformActionBasedOnInput(input);
-
+            // 말풍선 없애기
             ChatBalloonManager.Instance.HideChatBalloon();
         }
     }
@@ -34,8 +32,25 @@ public class ChatHandler : MonoBehaviour
         string input = inputField.text;
         GameManager.Instance.chatIdx += 1;
         GameManager.Instance.chatIdxRegenerateCount = 0;
-        Debug.Log("입력된 텍스트 ("+GameManager.Instance.chatIdx.ToString()+") : " + input);
+        Debug.Log("입력된 텍스트 (" + GameManager.Instance.chatIdx.ToString() + ") : " + input);
         APIManager.Instance.CallConversationStream(input, GameManager.Instance.chatIdx.ToString());
+
+        // 말풍선 없애기
+        ChatBalloonManager.Instance.HideChatBalloon();
+    }
+
+    // 버튼용 입력 제출 처리 테스트 - Web 강제(1회)
+    public void HandleInputWebSubmitButton()
+    {
+        string input = inputField.text;
+        GameManager.Instance.chatIdx += 1;
+        GameManager.Instance.chatIdxRegenerateCount = 0;
+        Debug.Log("입력된 텍스트-web (" + GameManager.Instance.chatIdx.ToString() + ") : " + input);
+        GameManager.Instance.isWebSearchForced = true;  // Web강제 1회
+        APIManager.Instance.CallConversationStream(input, GameManager.Instance.chatIdx.ToString());
+        
+        // 말풍선 없애기
+        ChatBalloonManager.Instance.HideChatBalloon();
     }
 
     // 입력에 따라 수행할 작업을 정의하는 함수
