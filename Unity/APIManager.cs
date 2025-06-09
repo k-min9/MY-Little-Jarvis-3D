@@ -23,6 +23,7 @@ public class APIManager : MonoBehaviour
 
     private bool isCompleted = false; // 반환이 완료되었는지 여부를 체크하는 플래그
     private bool isResponsedStarted = false; // 첫 반환이 돌아왔는지 여부
+    private bool isAnswerStarted = false; // 첫 대답이 시작했는지 여부
     private string logFilePath; // 로그 파일 경로
 
     // 서버 관련
@@ -90,6 +91,10 @@ public class APIManager : MonoBehaviour
     {
 
         LogToFile("ProcessReply started."); // ProcessReply 시작 로그
+
+        // type 확인
+        string type = jsonObject["type"]?.ToString() ?? "reply";
+        LogToFile("ProcessReply type : " + type);
 
         // 초기화
         replyListKo = new List<string>();
@@ -214,6 +219,7 @@ public class APIManager : MonoBehaviour
             // 요청전 초기화
             isCompleted = false;
             isResponsedStarted = false;
+            isAnswerStarted = false;
 
             // HttpWebRequest 객체를 사용하여 요청 생성
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
@@ -291,72 +297,93 @@ public class APIManager : MonoBehaviour
                                     }
 
                                     var jsonObject = JObject.Parse(line);
-                                    // Debug.Log(jsonObject.ToString());
+                                    Debug.Log("jsonObject Start");
+                                    Debug.Log(jsonObject.ToString());
+                                    Debug.Log("jsonObject End");
 
-                                    if (!isResponsedStarted)
+                                    // 생각중 등등의 답변타입체크
+                                    string replyType = jsonObject["type"]?.ToString() ?? "reply";
+                                    if (replyType == "thinking") // "생각 중" 상태
                                     {
-                                        AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
-                                        AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();  // 대답중 sprite
-                                        isResponsedStarted = true;
-
-                                        // Debug.Log(jsonObject["query"]);
-                                        // Debug.Log(jsonObject["query"]["text"]);
-                                        query_origin = jsonObject["query"]["origin"].ToString();
-                                        query_trans = jsonObject["query"]["text"].ToString();
-
-                                        // Setting - AI Info 내용 갱신
-                                        try
-                                        {
-                                            string ai_info_server_type = jsonObject["ai_info"]["server_type"].ToString();
-                                            string ai_info_model = jsonObject["ai_info"]["model"].ToString();
-                                            string ai_info_prompt = jsonObject["ai_info"]["prompt"].ToString();
-                                            string ai_info_lang_used = jsonObject["ai_info"]["lang_used"].ToString();
-                                            string ai_info_translator = jsonObject["ai_info"]["translator"].ToString();
-                                            string ai_info_time = jsonObject["ai_info"]["time"].ToString();
-                                            string ai_info_intent = jsonObject["ai_info"]["time"].ToString();
-                                            SettingManager.Instance.RefreshAIInfoText(ai_info_server_type, ai_info_model, ai_info_prompt, ai_info_lang_used, ai_info_translator, ai_info_time, ai_info_intent);
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            Debug.Log(ex);
-                                            // Debug.LogException(ex);
-                                        }
-
-                                        // Setting - AI Info 표정 갱신
-                                        try
-                                        {
-                                            string ai_info_emotion = jsonObject["ai_info"]["emotion"].ToString();
-                                            Debug.Log("### emotion : " + ai_info_emotion);
-
-                                            EmotionManager.Instance.ShowEmotionFromEmotion(ai_info_emotion);
-
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            Debug.Log(ex);
-                                            // Debug.LogException(ex);
-                                        }                                 
-
-                                        // 의도(Intent) 관련 정보 갱신
-                                        // 우선 AnswerBalloon의 web마크 비활성화
-                                        AnswerBalloonManager.Instance.HideWebImage();
-                                        try
-                                        {
-                                            string intent_info_is_intent_web = jsonObject["intent_info"]["is_intent_web"].ToString();  // on, off
-                                            string intent_info_web_info = jsonObject["intent_info"]["web_info"].ToString();
-                                            string intent_info_is_intent_image = jsonObject["intent_info"]["is_intent_image"].ToString();  // on, off
-                                            string intent_info_image_info = jsonObject["intent_info"]["image_info"].ToString();
-
-                                            if (intent_info_is_intent_web == "on") AnswerBalloonManager.Instance.ShowWebImage();
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            Debug.Log(ex);
-                                            // Debug.LogException(ex);
-                                        }
-
+                                        NoticeManager.Instance.Notice("thinking");
                                     }
-                                    ProcessReply(jsonObject); // 각 JSON 응답을 처리
+                                    else if (replyType == "webSearch")
+                                    { 
+                                        NoticeManager.Instance.Notice("webSearch");
+                                    }
+                                    else  // replyType == "reply"
+                                    {
+                                        if (!isResponsedStarted)
+                                        {
+                                            // 생각 중 말풍선 숨기기
+                                            AnswerBalloonSimpleManager.Instance.HideAnswerBalloonSimple();
+
+                                            // 안내 말풍선 숨기기
+                                            NoticeManager.Instance.DeleteNoticeBalloonInstance();
+
+                                            AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
+                                            AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();  // 대답중 sprite
+                                            isResponsedStarted = true;
+
+                                            // Debug.Log(jsonObject["query"]);
+                                            // Debug.Log(jsonObject["query"]["text"]);
+                                            query_origin = jsonObject["query"]["origin"].ToString();
+                                            query_trans = jsonObject["query"]["text"].ToString();
+
+                                            // Setting - AI Info 내용 갱신
+                                            try
+                                            {
+                                                string ai_info_server_type = jsonObject["ai_info"]["server_type"].ToString();
+                                                string ai_info_model = jsonObject["ai_info"]["model"].ToString();
+                                                string ai_info_prompt = jsonObject["ai_info"]["prompt"].ToString();
+                                                string ai_info_lang_used = jsonObject["ai_info"]["lang_used"].ToString();
+                                                string ai_info_translator = jsonObject["ai_info"]["translator"].ToString();
+                                                string ai_info_time = jsonObject["ai_info"]["time"].ToString();
+                                                string ai_info_intent = jsonObject["ai_info"]["time"].ToString();
+                                                SettingManager.Instance.RefreshAIInfoText(ai_info_server_type, ai_info_model, ai_info_prompt, ai_info_lang_used, ai_info_translator, ai_info_time, ai_info_intent);
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                Debug.Log(ex);
+                                                // Debug.LogException(ex);
+                                            }
+
+                                            // Setting - AI Info 표정 갱신
+                                            try
+                                            {
+                                                string ai_info_emotion = jsonObject["ai_info"]["emotion"].ToString();
+                                                Debug.Log("### emotion : " + ai_info_emotion);
+
+                                                EmotionManager.Instance.ShowEmotionFromEmotion(ai_info_emotion);
+
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                Debug.Log(ex);
+                                                // Debug.LogException(ex);
+                                            }
+
+                                            // 의도(Intent) 관련 정보 갱신
+                                            // 우선 AnswerBalloon의 web마크 비활성화
+                                            AnswerBalloonManager.Instance.HideWebImage();
+                                            try
+                                            {
+                                                string intent_info_is_intent_web = jsonObject["intent_info"]["is_intent_web"].ToString();  // on, off
+                                                string intent_info_web_info = jsonObject["intent_info"]["web_info"].ToString();
+                                                string intent_info_is_intent_image = jsonObject["intent_info"]["is_intent_image"].ToString();  // on, off
+                                                string intent_info_image_info = jsonObject["intent_info"]["image_info"].ToString();
+
+                                                if (intent_info_is_intent_web == "on") AnswerBalloonManager.Instance.ShowWebImage();
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                Debug.Log(ex);
+                                                // Debug.LogException(ex);
+                                            }
+
+                                        }
+                                        ProcessReply(jsonObject); // 각 JSON 응답을 처리
+                                    }
                                 } else {
                                     Debug.Log("과거대화 : " + curChatIdxNum.ToString() + "/" + GameManager.Instance.chatIdxBalloon.ToString());
                                 }
