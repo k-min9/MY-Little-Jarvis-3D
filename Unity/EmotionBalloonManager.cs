@@ -20,15 +20,21 @@ public class EmotionBalloonManager : MonoBehaviour
 
     private Canvas _canvas;
     public GameObject emotionBalloonPrefab;
-
-    public Sprite emotionSpriteLove;
+    
+    public Sprite emotionSpriteLove;     // 쓰다듬기
+    public Sprite emotionSpriteRefresh;  // 재답변
+    public Sprite emotionSpriteTime;     // 로딩 중
+    public Sprite emotionSpriteAlarm;    // 알람 설정중
+    public Sprite emotionSpriteBook;     // 설정 변경, 학습중
+    public Sprite emotionSpriteGift;     // 클릭시 반응
+    public Sprite emotionSpriteSearch;   // 웹 검색
 
     public void Start()
     {
         _canvas = FindObjectOfType<Canvas>();
     }
 
-    public GameObject ShowEmotionBalloon(GameObject target, float duration = 60f)
+    public GameObject ShowEmotionBalloon(GameObject target, string spriteName = "Love", float duration = 60f)
     {
         // 말풍선 생성
         GameObject emotionBalloonInstance = Instantiate(emotionBalloonPrefab, _canvas.transform);
@@ -41,7 +47,33 @@ public class EmotionBalloonManager : MonoBehaviour
             Image emotionBubbleImage = imageTransform.Find("Emotion Bubble Image")?.GetComponent<Image>();
             if (emotionBubbleImage != null)
             {
-                emotionBubbleImage.sprite = emotionSpriteLove;
+                switch (spriteName)
+                {
+                    case "Love":
+                        emotionBubbleImage.sprite = emotionSpriteLove;
+                        break;
+                    case "Refresh":
+                        emotionBubbleImage.sprite = emotionSpriteRefresh;
+                        break;
+                    case "Time":
+                        emotionBubbleImage.sprite = emotionSpriteTime;
+                        break;
+                    case "Alarm":
+                        emotionBubbleImage.sprite = emotionSpriteAlarm;
+                        break;
+                    case "Book":
+                        emotionBubbleImage.sprite = emotionSpriteBook;
+                        break;
+                    case "Gift":
+                        emotionBubbleImage.sprite = emotionSpriteGift;
+                        break;
+                    case "Search":
+                        emotionBubbleImage.sprite = emotionSpriteSearch;
+                        break;
+                    default:
+                        Debug.LogWarning($"정의되지 않은 spriteName: {spriteName}");
+                        break;
+                }
             }
             else
             {
