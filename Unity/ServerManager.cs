@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 using Newtonsoft.Json;
 using UnityEngine.UI;
+using System.IO;
 
 public class ServerManager : MonoBehaviour
 {
@@ -12,6 +13,7 @@ public class ServerManager : MonoBehaviour
     private string ngrokUrl;
     private string ngrokStatus;
     private bool isConnected = false;  // 일단 1회라도 연결된적이 있는지(불가역)
+    private float connectTimer = 0f;  // 타이머 변수
 
     public Text serverStatusText;
 
@@ -34,13 +36,32 @@ public class ServerManager : MonoBehaviour
         StartCoroutine(SetBaseUrl());
     }
 
+    void Update()
+    {
+        if (!isConnected)
+        {
+            // 타이머가 10초마다 1회씩 동작하도록 설정
+            connectTimer += Time.deltaTime;
+
+            if (connectTimer >= 10f)
+            {
+                // 10초마다 isConnected가 false일 경우 SetBaseUrl을 호출
+                StartCoroutine(SetBaseUrl());
+
+                // 타이머 리셋
+                connectTimer = 0f;
+            }
+        }
+    }
+
     public string GetBaseUrl()
     {
-        if (isConnected) {
+        if (isConnected)
+        {
             return baseUrl;  // 재세팅하는건 다른 곳에서
         }
-        
-        
+
+
         // SetBaseUrl()을 직접 실행하고 완료될 때까지 대기
         int maxAttempts = 500; // 최대 500프레임 (약 5초)
 
@@ -93,7 +114,7 @@ public class ServerManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError("Base URL 설정 실패");
+            // Debug.LogError("Base URL 설정 실패");
         }
     }
 
@@ -131,7 +152,7 @@ public class ServerManager : MonoBehaviour
         }
 
         // 4. If all checks fail
-        Debug.LogError("URL 조합 실패");
+        // Debug.LogError("URL 조합 실패");
         baseUrl = "";
     }
 
@@ -167,7 +188,7 @@ public class ServerManager : MonoBehaviour
 
         // Base URL 설정
         yield return StartCoroutine(SetBaseUrl());
-        
+
         // Base URL 상태 확인 및 Text 선택
         if (string.IsNullOrEmpty(baseUrl))
         {
@@ -334,6 +355,195 @@ public class ServerManager : MonoBehaviour
             }
         }
     }
+
+    //////////////////////// APIKeyValidator : 주어진 API 키가 유효한지 검사.
+    public Text keyTestResultText;
+    public Text keyChoiceInputTestResultText;
+    
+    // Test 버튼으로 호출
+    public void CallValidateAPIKey()
+    {
+        // UI초기화
+        keyTestResultText.text = "Testing...";
+        keyChoiceInputTestResultText.text = "Testing...";
+
+        string serviceType = "gemini";
+        string apiKey = SettingManager.Instance.settings.api_key_gemini;
+
+        // 서버타입: 0: Auto, 1: Server, 2: Free(Gemini), 3: Free(OpenRouter), 4: Paid(Gemini)
+        if (SettingManager.Instance.settings.server_type_idx == 2 || SettingManager.Instance.settings.server_type_idx == 4)
+        {
+            serviceType = "gemini";
+        }
+        if (SettingManager.Instance.settings.server_type_idx == 3)
+        {
+            serviceType = "openrouter";
+            apiKey = SettingManager.Instance.settings.api_key_openRouter;
+        }
+
+        StartCoroutine(ValidateAPIKey(serviceType, apiKey));
+    }
+
+    public IEnumerator ValidateAPIKey(string serviceType, string apiKey)
+    {
+        if (string.IsNullOrEmpty(serviceType)) serviceType = "gemini";
+        serviceType = serviceType.ToLower();
+
+        switch (serviceType)
+        {
+            case "openrouter":
+                yield return ValidateOpenRouter(apiKey);
+                break;
+            case "chatgpt":
+                yield return ValidateDefaultGET("https://api.openai.com/v1/models", "Bearer " + apiKey);
+                break;
+            case "gemini":
+            default:
+                yield return ValidateDefaultGET($"https://generativelanguage.googleapis.com/v1beta/models?key={apiKey}", null);
+                break;
+        }
+    }
+
+    private IEnumerator ValidateOpenRouter(string apiKey)
+    {
+        string model = LoadModelFromLocal();
+
+        if (string.IsNullOrEmpty(model))
+        {
+            bool done = false;
+            string result = null;
+
+            yield return GetLatestFreeOpenRouterModel((fetchedModel) =>
+            {
+                result = string.IsNullOrEmpty(fetchedModel) ? "google/gemma-3-27b-it:free" : fetchedModel;
+                done = true;
+            });
+
+            while (!done)
+                yield return null;
+
+            model = result;
+        }
+
+        string url = "https://openrouter.ai/api/v1/chat/completions";
+        string json = $"{{\"model\": \"{model}\", \"messages\": [{{\"role\": \"user\", \"content\": \"hello\"}}]}}";
+
+        UnityWebRequest request = new UnityWebRequest(url, "POST");
+        byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(json);
+        request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+        request.downloadHandler = new DownloadHandlerBuffer();
+        request.SetRequestHeader("Content-Type", "application/json");
+        request.SetRequestHeader("Authorization", "Bearer " + apiKey);
+        request.SetRequestHeader("HTTP-Referer", "https://yourapp.example.com");
+        request.SetRequestHeader("X-Title", "MyLittleJarvis");
+
+        yield return request.SendWebRequest();
+
+        if (request.responseCode == 200)
+        {
+            keyTestResultText.text = "Success";
+            keyChoiceInputTestResultText.text = "Success";
+            Debug.Log($"[OpenRouter] Model used for test: {model}");
+        }
+        else
+        {
+            keyTestResultText.text = "Fail";
+            keyChoiceInputTestResultText.text = "Fail";
+        }
+    }
+
+    private string LoadModelFromLocal()
+    {
+        try
+        {
+            string path = Path.Combine(Application.dataPath, "../config/free_models.txt");
+            if (File.Exists(path))
+            {
+                string line = File.ReadAllLines(path)[0];
+                return line.Trim();
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    private IEnumerator GetLatestFreeOpenRouterModel(Action<string> onResult)
+    {
+        string url = "https://openrouter.ai/api/v1/models";
+        UnityWebRequest request = UnityWebRequest.Get(url);
+
+        yield return request.SendWebRequest();
+
+        if (request.responseCode != 200)
+        {
+            onResult(null);
+            yield break;
+        }
+
+        try
+        {
+            var json = request.downloadHandler.text;
+            var wrapped = "{\"data\":" + json + "}"; // JsonUtility가 배열 파싱 못함 대비
+            var parsed = JsonUtility.FromJson<OpenRouterModelList>(wrapped);
+            string result = null;
+
+            foreach (var model in parsed.data)
+            {
+                if (model.pricing.prompt == "0" &&
+                    model.pricing.completion == "0" &&
+                    (model.id.Contains("qwen/") || model.id.Contains("meta-llama/") || model.id.Contains("google/")) &&
+                    !model.id.Contains("think") &&
+                    !model.id.Contains("deepseek"))
+                {
+                    result = model.id;
+                    break;
+                }
+            }
+
+            onResult(result);
+        }
+        catch
+        {
+            onResult(null);
+        }
+    }
+
+    private IEnumerator ValidateDefaultGET(string url, string authHeader)
+    {
+        UnityWebRequest request = UnityWebRequest.Get(url);
+        if (!string.IsNullOrEmpty(authHeader))
+            request.SetRequestHeader("Authorization", authHeader);
+
+        yield return request.SendWebRequest();
+
+        keyTestResultText.text = request.responseCode == 200 ? "Success" : "Fail";
+        keyChoiceInputTestResultText.text = request.responseCode == 200 ? "Success" : "Fail";
+    }
+
+    [Serializable]
+    public class OpenRouterModelList
+    {
+        public List<OpenRouterModel> data;
+    }
+
+    [Serializable]
+    public class OpenRouterModel
+    {
+        public string id;
+        public string name;
+        public string created;
+        public Pricing pricing;
+
+        [Serializable]
+        public class Pricing
+        {
+            public string prompt;
+            public string completion;
+        }
+    }
+    //////////////////////// APIKeyValidator End
+
+
 }
 
 // Ngrok JSON 응답 클래스
