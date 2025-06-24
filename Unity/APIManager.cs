@@ -70,13 +70,14 @@ public class APIManager : MonoBehaviour
 
     private void Start()
     {
-// #if !UNITY_EDITOR
+        // #if !UNITY_EDITOR
         // supabase에서 ngrok url 가져오기 (에디터에서는 제외)
         CallFetchNgrokJsonData();
-// #endif    
+        // #endif    
     }
 
-    public void CallFetchNgrokJsonData() {
+    public void CallFetchNgrokJsonData()
+    {
         StartCoroutine(FetchNgrokJsonData());
     }
 
@@ -109,8 +110,9 @@ public class APIManager : MonoBehaviour
         // Debug.Log(chatIdx + "/" + GameManager.Instance.chatIdxSuccess.ToString());
 
         // 이중 체크 중... 음성체크와 별개로 대화는 뒤에서 저장 되어야하는데 그게 저지 됨?
-        if (chatIdx != GameManager.Instance.chatIdxSuccess.ToString()) {
-            Debug.Log("chatIdx Too Old : " + chatIdx + "/"+ GameManager.Instance.chatIdxSuccess.ToString());
+        if (chatIdx != GameManager.Instance.chatIdxSuccess.ToString())
+        {
+            Debug.Log("chatIdx Too Old : " + chatIdx + "/" + GameManager.Instance.chatIdxSuccess.ToString());
             return;  // 현재 대화가 아님
         }
 
@@ -127,7 +129,8 @@ public class APIManager : MonoBehaviour
                 if (!string.IsNullOrEmpty(answerJp))
                 {
                     replyListJp.Add(answerJp);
-                    if (SettingManager.Instance.settings.sound_language == "jp") {
+                    if (SettingManager.Instance.settings.sound_language == "jp")
+                    {
                         answerVoice = answerJp;
                     }
                 }
@@ -135,20 +138,22 @@ public class APIManager : MonoBehaviour
                 if (!string.IsNullOrEmpty(answerKo))
                 {
                     replyListKo.Add(answerKo);
-                    if (SettingManager.Instance.settings.sound_language == "ko") {
+                    if (SettingManager.Instance.settings.sound_language == "ko")
+                    {
                         answerVoice = answerKo;
                     }
                 }
                 if (!string.IsNullOrEmpty(answerEn))
                 {
                     replyListEn.Add(answerEn);
-                    if (SettingManager.Instance.settings.sound_language == "en") {
+                    if (SettingManager.Instance.settings.sound_language == "en")
+                    {
                         answerVoice = answerEn;
                     }
                 }
             }
             // answerballoon 갱신
-            
+
             string replyKo = string.Join(" ", replyListKo);
             string replyJp = string.Join(" ", replyListJp);
             string replyEn = string.Join(" ", replyListEn);
@@ -160,11 +165,14 @@ public class APIManager : MonoBehaviour
             AnswerBalloonManager.Instance.ModifyAnswerBalloonText();  // 정보토대 답변
 
             // 음성 API 호출
-            if (answerVoice != null) {
-                if (SettingManager.Instance.settings.sound_language == "ko" || SettingManager.Instance.settings.sound_language == "en") {
+            if (answerVoice != null)
+            {
+                if (SettingManager.Instance.settings.sound_language == "ko" || SettingManager.Instance.settings.sound_language == "en")
+                {
                     GetKoWavFromAPI(answerVoice, chatIdx);
                 }
-                if (SettingManager.Instance.settings.sound_language == "jp") {
+                if (SettingManager.Instance.settings.sound_language == "jp")
+                {
                     GetJpWavFromAPI(answerVoice, chatIdx);
                 }
             }
@@ -179,8 +187,8 @@ public class APIManager : MonoBehaviour
 
         Debug.Log("All replies have been received.");
         LogToFile("ProcessReply completed."); // ProcessReply 완료 로그
-        
-        
+
+
         // 표시언어로 저장 : SettingManager.Instance.settings.ui_language
         string reply = string.Join(" ", replyListEn);
 
@@ -196,8 +204,9 @@ public class APIManager : MonoBehaviour
             if (SettingManager.Instance.settings.ui_language == "ja" || SettingManager.Instance.settings.ui_language == "jp")
             {
                 reply = string.Join(" ", replyListJp);
-            } else if (SettingManager.Instance.settings.ui_language == "ko")
-            { 
+            }
+            else if (SettingManager.Instance.settings.ui_language == "ko")
+            {
                 reply = string.Join(" ", replyListKo);
             }
             MemoryManager.Instance.SaveConversationMemory("character", reply);
@@ -207,6 +216,7 @@ public class APIManager : MonoBehaviour
     // 스트리밍 데이터를 가져오는 메서드
     public async Task FetchStreamingData(string url, Dictionary<string, string> data)
     {
+        Debug.Log("FetchStreamingData START");
         string jsonData = JsonConvert.SerializeObject(data);
         string curChatIdx = data["chatIdx"];
         int curChatIdxNum = int.Parse(curChatIdx);
@@ -225,7 +235,7 @@ public class APIManager : MonoBehaviour
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
             request.Method = "POST";
             request.ContentType = contentType;
-            
+
             using (MemoryStream memStream = new MemoryStream())
             using (StreamWriter writer = new StreamWriter(memStream, Encoding.UTF8, 1024, true))
             {
@@ -289,9 +299,11 @@ public class APIManager : MonoBehaviour
                             try
                             {
                                 // 풍선기준 최신대화여야 함
-                                if (curChatIdxNum >= GameManager.Instance.chatIdxBalloon) {
+                                if (curChatIdxNum >= GameManager.Instance.chatIdxBalloon)
+                                {
                                     // 최신화 하면서 기존 음성 queue 내용 지워버리기
-                                    if (GameManager.Instance.chatIdxBalloon != curChatIdxNum) {
+                                    if (GameManager.Instance.chatIdxBalloon != curChatIdxNum)
+                                    {
                                         GameManager.Instance.chatIdxBalloon = curChatIdxNum;
                                         VoiceManager.Instance.ResetAudio();
                                     }
@@ -308,7 +320,7 @@ public class APIManager : MonoBehaviour
                                         NoticeManager.Instance.Notice("thinking");
                                     }
                                     else if (replyType == "webSearch")
-                                    { 
+                                    {
                                         NoticeManager.Instance.Notice("webSearch");
                                     }
                                     else  // replyType == "reply"
@@ -384,7 +396,9 @@ public class APIManager : MonoBehaviour
                                         }
                                         ProcessReply(jsonObject); // 각 JSON 응답을 처리
                                     }
-                                } else {
+                                }
+                                else
+                                {
                                     Debug.Log("과거대화 : " + curChatIdxNum.ToString() + "/" + GameManager.Instance.chatIdxBalloon.ToString());
                                 }
                             }
@@ -395,10 +409,11 @@ public class APIManager : MonoBehaviour
                         }
                     }
 
-                    if (curChatIdx == GameManager.Instance.chatIdxSuccess) {
+                    if (curChatIdx == GameManager.Instance.chatIdxSuccess)
+                    {
                         OnFinalResponseReceived(); // 최종 반환 완료 시 함수 호출
                     }
-                    
+
                 }
             }
         }
@@ -409,17 +424,20 @@ public class APIManager : MonoBehaviour
     }
 
     // chatHandler에서 호출
-    public async void CallConversationStream(string query, string chatIdx="-1", string ai_lang_in = "")
+    public async void CallConversationStream(string query, string chatIdx = "-1", string ai_lang_in = "")
     {
         // 공용변수 최신화
-        if(chatIdx!="-1") {
+        if (chatIdx != "-1")
+        {
             GameManager.Instance.chatIdxSuccess = chatIdx;
-        }     
+        }
         // 애니메이션 재생 초기화
         AnimationManager.Instance.Idle();
         // API 호출을 위한 URL 구성
         string baseUrl = ServerManager.Instance.GetBaseUrl();
-        string streamUrl = baseUrl+"/conversation_stream";
+        string streamUrl = baseUrl + "/conversation_stream";
+        Debug.Log("streamUrl : " + streamUrl);
+
         // 닉네임 가져오기
         string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
         string player_name = SettingManager.Instance.settings.player_name;
@@ -440,6 +458,7 @@ public class APIManager : MonoBehaviour
 
         var memory = MemoryManager.Instance.GetAllConversationMemory();
         string memoryJson = JsonConvert.SerializeObject(memory);
+        string server_type = SettingManager.Instance.settings.server_type ?? "Auto";  // 0: Auto, 1: Server, 2: Free(Gemini), 3: Free(OpenRouter), 4: Paid(Gemini)
 
         // 요청 데이터 구성
         var requestData = new Dictionary<string, string>
@@ -450,6 +469,10 @@ public class APIManager : MonoBehaviour
             { "ai_language", ai_language }, // 추론언어로 한입, 영입영출 등 조절(normal, prefer, ko, en, jp)
             { "ai_language_in", ai_language_in }, // 추론언어로 한입, 영입영출 등 조절(ko, en, jp)
             { "ai_language_out", ai_language_out }, // 추론언어로 한출, 영입영출 등 조절(ko, en, jp)
+            { "ai_emotion", "off"},
+            { "api_key_Gemini", ""},
+            { "api_key_OpenRouter", ""},
+            { "api_key_ChatGPT", ""},
             { "memory", memoryJson },
             { "chatIdx", chatIdx},
             { "intent_web", ai_web_search},  // off, on, force
@@ -457,7 +480,8 @@ public class APIManager : MonoBehaviour
             { "intent_confirm", intent_confirm},  // on, off : 의도행동확인 받기 여부[web검색하실까요 선생님?]
             { "intent_confirm_type", ""},  // "", web, light : 의도행동확인 종류
             { "intent_confirm_answer", ""},  // true, false : 의도행동확인에 대한 답변[재생성시 확인 없이 적용하기 위해]
-            { "regenerate_count", GameManager.Instance.chatIdxRegenerateCount.ToString()}
+            { "regenerate_count", GameManager.Instance.chatIdxRegenerateCount.ToString()},
+            { "server_type", server_type},
         };
 
         await FetchStreamingData(streamUrl, requestData);
@@ -467,11 +491,11 @@ public class APIManager : MonoBehaviour
     {
         // API 호출을 위한 URL 구성
         string baseUrl = ServerManager.Instance.GetBaseUrl();
-        string url = baseUrl+"/getSound/ko"; // GET + Uri.EscapeDataString(text);
+        string url = baseUrl + "/getSound/ko"; // GET + Uri.EscapeDataString(text);
 
         // 닉네임 가져오기
         string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
-        
+
         // HttpWebRequest 객체 생성
         HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
         request.Method = "POST";
@@ -506,7 +530,8 @@ public class APIManager : MonoBehaviour
                     // 헤더에서 Chat-Idx 값을 가져와, 현재 대화보다 과거일 경우에는 queue에 넣지 않음
                     string chatIdxHeader = response.Headers["Chat-Idx"];
                     int chatIdxHeaderNum = int.Parse(chatIdxHeader);
-                    if (GameManager.Instance.chatIdxBalloon > chatIdxHeaderNum) {
+                    if (GameManager.Instance.chatIdxBalloon > chatIdxHeaderNum)
+                    {
                         Debug.Log("과거대화 : " + GameManager.Instance.chatIdxBalloon.ToString() + "/" + chatIdxHeaderNum.ToString());
                         return;
                     }
@@ -543,7 +568,7 @@ public class APIManager : MonoBehaviour
     {
         // API 호출을 위한 URL 구성
         string baseUrl = ServerManager.Instance.GetBaseUrl();
-        string url = baseUrl+"/getSound/jp"; // GET + Uri.EscapeDataString(text);
+        string url = baseUrl + "/getSound/jp"; // GET + Uri.EscapeDataString(text);
 
         // 닉네임 가져오기
         string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
@@ -586,7 +611,8 @@ public class APIManager : MonoBehaviour
                         // 헤더에서 Chat-Idx 값을 가져와, 현재 대화보다 과거일 경우에는 queue에 넣지 않음
                         string chatIdxHeader = response.Headers["Chat-Idx"];
                         int chatIdxHeaderNum = int.Parse(chatIdxHeader);
-                        if (GameManager.Instance.chatIdxBalloon > chatIdxHeaderNum) {
+                        if (GameManager.Instance.chatIdxBalloon > chatIdxHeaderNum)
+                        {
                             Debug.Log("과거대화 : " + GameManager.Instance.chatIdxBalloon.ToString() + "/" + chatIdxHeaderNum.ToString());
                             return;
                         }
@@ -641,7 +667,7 @@ public class APIManager : MonoBehaviour
             return;
         }
 
-        string filePath = Path.Combine(Application.persistentDataPath, "response.wav");       
+        string filePath = Path.Combine(Application.persistentDataPath, "response.wav");
         try
         {
             File.WriteAllBytes(filePath, wavData);
@@ -722,16 +748,19 @@ public class APIManager : MonoBehaviour
         // string ngrokSupabaseUrl = "https://lxmkzckwzasvmypfoapl.supabase.co/storage/v1/object/private/json_bucket/my_little_jarvis_plus_ngrok_server.json";
 
         string server_id = "temp";
-        try {
+        try
+        {
             server_id = SettingManager.Instance.settings.server_id;
-        } catch (Exception ex) {
+        }
+        catch (Exception ex)
+        {
             Debug.Log("Setting server_id failed. use init value");
         }
 
         Debug.Log("server_id : " + server_id);
         string ngrokSupabaseUrl = "https://lxmkzckwzasvmypfoapl.supabase.co/storage/v1/object/sign/json_bucket/my_little_jarvis_plus_ngrok_server.json?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJqc29uX2J1Y2tldC9teV9saXR0bGVfamFydmlzX3BsdXNfbmdyb2tfc2VydmVyLmpzb24iLCJpYXQiOjE3MzM4Mzg4MjYsImV4cCI6MjA0OTE5ODgyNn0.ykDVTXYVXNnKJL5lXILSk0iOqt0_7UeKZqOd1Qv_pSY&t=2024-12-10T13%3A53%3A47.907Z";
-        string supabaseApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4bWt6Y2t3emFzdm15cGZvYXBsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM4MzUxNzQsImV4cCI6MjA0OTQxMTE3NH0.zmEKHhIcQa4ODekS2skgknlXi8Hbd8JjpjBlFZpPsJ8"; 
-        
+        string supabaseApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4bWt6Y2t3emFzdm15cGZvYXBsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM4MzUxNzQsImV4cCI6MjA0OTQxMTE3NH0.zmEKHhIcQa4ODekS2skgknlXi8Hbd8JjpjBlFZpPsJ8";
+
         using (UnityWebRequest request = UnityWebRequest.Get(ngrokSupabaseUrl))
         {
             // 인증 헤더 추가
@@ -778,5 +807,6 @@ public class APIManager : MonoBehaviour
             }
         }
     }
-    
+
+
 }
