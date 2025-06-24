@@ -5,10 +5,11 @@ public static class ServerModelData
     // 모델 이름과 고유 ID (표시용 텍스트, 내부값)
     public static readonly List<ModelOption> ModelOptions = new List<ModelOption>
     {
-        new ModelOption("qwen-8b", "Qwen 8B"),
-        new ModelOption("qwen-14b", "Qwen 14B"),
-        new ModelOption("qwen-23b", "Qwen 23B"),
-        // 추후 확장 가능
+        new ModelOption("qwen-8b",  "Qwen3(8B)",  "Qwen3-8B-Q4_K_M.gguf", "https://huggingface.co/Qwen/Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q4_K_M.gguf", "4.68GB"),
+        new ModelOption("qwen-14b", "Qwen3(14B)", "Qwen3-14B-Q4_K_M.gguf", "https://huggingface.co/Qwen/Qwen3-14B-GGUF/resolve/main/Qwen3-14B-Q4_K_M.gguf", "8.38GB"),
+        new ModelOption("qwen-32b", "Qwen3(32B)", "Qwen3-32B-Q4_K_M.gguf", "https://huggingface.co/Qwen/Qwen3-32B-GGUF/resolve/main/Qwen3-32B-Q4_K_M.gguf", "18.40GB"),
+        
+        // 추후 ModelOption 추가
     };
 
     public static string GetDisplayNameById(string id)
@@ -23,15 +24,27 @@ public static class ServerModelData
         return found != null ? found.Id : displayName;
     }
 
+    public static string GetFileNameByDisplayName(string displayName)
+    {
+        var found = ModelOptions.Find(m => m.DisplayName == displayName);
+        return found != null ? found.FileName : displayName;
+    }
+
     public class ModelOption
     {
         public string Id;
         public string DisplayName;
+        public string FileName;
+        public string DownloadUrl;
+        public string FileSizeText;
 
-        public ModelOption(string id, string displayName)
+        public ModelOption(string id, string displayName, string fileName, string downloadUrl, string fileSizeText)
         {
             Id = id;
             DisplayName = displayName;
+            FileName = fileName;
+            DownloadUrl = downloadUrl;
+            FileSizeText = fileSizeText;
         }
     }
 }
