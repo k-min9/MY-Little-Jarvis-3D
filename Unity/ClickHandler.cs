@@ -86,6 +86,17 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
 
     private void HandleLeftClick()
     {
+        // 튜토리얼 시작 조건 확인 : baseUrl 값이 ""고, isShowTutorialOnChat가 true
+        if (string.IsNullOrEmpty(ServerManager.Instance.baseUrl) &&
+            SettingManager.Instance.settings.isShowTutorialOnChat)
+        {
+            if (!StatusManager.Instance.isScenario)
+            { 
+                ScenarioTutorialManager.Instance.StartTutorial();
+            }
+            return;  // 튜토리얼 실행 후 나머지 클릭 로직은 중단
+        }
+
         // 기존 좌클릭 처리 로직
         if (SettingManager.Instance.settings.isShowChatBoxOnClick)
         {
@@ -98,11 +109,11 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
             if (false && SettingManager.Instance.settings.isAskedTurnOnServer)  // TODO : SettingManager쪽은 완전히 없애버리자.
             {
                 // 과거의 유산
-// #if UNITY_EDITOR
+                // #if UNITY_EDITOR
                 ChatBalloonManager.Instance.ToggleChatBalloon();
-// #else
-//                 ServerManager.AskStartServer();
-// #endif
+                // #else
+                //                 ServerManager.AskStartServer();
+                // #endif
             }
             else
             {
