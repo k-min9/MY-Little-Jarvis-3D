@@ -15,7 +15,103 @@ public static class LanguageData
         new Dictionary<string, string> { { "ko", "답변에 이미지 사용" }, { "jp", "回答に画像を使用" }, { "en", "Use Image in Answer" } },
         new Dictionary<string, string> { { "ko", "Web에서 검색하기" }, { "jp", "Webで検索する" }, { "en", "Search the Web" } },
 
+        new Dictionary<string, string> { { "ko", "안내" }, { "jp", "案内" }, { "en", "Inform" } },
+        new Dictionary<string, string> { { "ko", "메뉴" }, { "jp", "メニュー" }, { "en", "Menu" } },
 
+        /// Scenario - Turoial
+        // A00 - 시작 진입 조건
+        new Dictionary<string, string> { { "ko", "선생님, 안녕하세요!" }, { "jp", "先生、こんにちは！" }, { "en", "Hello, Sensei!" } },
+
+        // A01 - 무료 서버 재시도
+        new Dictionary<string, string> { { "ko", "전에 무료 서버를 사용하려고 하셨던 것 같아요." }, { "jp", "前に無料サーバーを使おうとされていたようですね。" }, { "en", "It seems like you were trying to use a free server before." } },
+        new Dictionary<string, string> { { "ko", "다시 연결해볼까요?" }, { "jp", "もう一度接続してみますか？" }, { "en", "Shall we try connecting again?" } },
+
+        // A01-1-1 - 연결 성공
+        new Dictionary<string, string> { { "ko", "성공적으로 연결되었어요, 선생님." }, { "jp", "正常に接続されました、先生。" }, { "en", "Successfully connected, Sensei." } },
+        new Dictionary<string, string> { { "ko", "다만, 무료 서버는 응답 속도가 느리거나 다시 요청해야 될 수도 있어요." }, { "jp", "ただし、無료サーバーは応答速度が遅かったり、再度リクエストが必要になることがあります。" }, { "en", "However, free servers may have slow response times or require retrying requests." } },
+        new Dictionary<string, string> { { "ko", "대화가 자연스럽지 않거나, 힘드시면 다른 방법을 시도해주세요." }, { "jp", "会話が自然でなかったり、困難でしたら他の方法を試してみてください。" }, { "en", "If the conversation feels unnatural or difficult, please try other methods." } },
+
+        // A01-1-2 - 연결 실패
+        new Dictionary<string, string> { { "ko", "연결에 실패했어요, 선생님." }, { "jp", "接続に失敗しました、先生。" }, { "en", "Connection failed, Sensei." } },
+        new Dictionary<string, string> { { "ko", "무료 서버는 가끔 연결이 불안정할 수 있어요. 계속 시도해볼까요?" }, { "jp", "無料サーバーは時々接続が不安定になることがあります。続けて試してみますか？" }, { "en", "Free servers can sometimes have unstable connections. Shall we keep trying?" } },
+
+        // A01-1-2-1 - 재시도
+        new Dictionary<string, string> { { "ko", "다시 연결을 시도해볼게요." }, { "jp", "もう一度接続を試してみますね。" }, { "en", "I'll try connecting again." } },
+
+        // A01-1-2-2 - 나중에
+        new Dictionary<string, string> { { "ko", "네. 원하실 때 언제든지 다시 시도하실 수 있어요." }, { "jp", "はい。お望みの時にいつでも再度お試しいただけます。" }, { "en", "Yes. You can try again anytime you want." } },
+
+        // A01-1-2-3 / A01-2-1 - 거부
+        new Dictionary<string, string> { { "ko", "네. 그러면..." }, { "jp", "はい。それでは..." }, { "en", "Yes. Then..." } },
+
+        // A02 - 플랫폼 확인
+        new Dictionary<string, string> { { "ko", "저와 대화하시려면 먼저 환경 설정이 필요해요." }, { "jp", "私と会話するには、まず環境設定が必要です。" }, { "en", "To chat with me, you need to set up the environment first." } },
+        new Dictionary<string, string> { { "ko", "제가 대화 전 세팅을 도와드릴게요." }, { "jp", "私が会話前のセットアップをお手伝いします。" }, { "en", "I'll help you set up before we chat." } },
+        new Dictionary<string, string> { { "ko", "지금 접속하신 기기가 PC는 아닌 것 같은데, 맞으실까요?" }, { "jp", "今アクセスされている機器はPCではないようですが、正しいでしょうか？" }, { "en", "It seems like the device you're accessing from isn't a PC, is that correct?" } },
+
+        // A02-1 - 서버 상태 확인
+        new Dictionary<string, string> { { "ko", "확인해주셔서 고마워요, 선생님." }, { "jp", "確認していただいてありがとうございます、先生。" }, { "en", "Thank you for confirming, Sensei." } },
+        new Dictionary<string, string> { { "ko", "일단 지금 AI 서버가 실행된 PC 정보가 있으실까요?" }, { "jp", "とりあえず、今AIサーバーが実行されているPCの情報はお持ちでしょうか？" }, { "en", "Do you have information about the PC where the AI server is currently running?" } },
+
+        // A02-1-1 - PC ID 입력
+        new Dictionary<string, string> { { "ko", "좋아요! 그럼 연결할 ID를 입력해주시면 바로 설정할게요." }, { "jp", "いいですね！それでは接続するIDを入力していただければすぐに設定します。" }, { "en", "Great! Then please enter the ID to connect and I'll set it up right away." } },
+
+        // A02-1-2 - 도움말 설명
+        new Dictionary<string, string> { { "ko", "저를 다운로드 받은 곳에서 PC 버전을 다운로드 받으실 수 있어요." }, { "jp", "私をダウンロードした場所でPC版をダウンロードできます。" }, { "en", "You can download the PC version from where you downloaded me." } },
+        new Dictionary<string, string> { { "ko", "서버프로그램(`server.exe`) 실행 시 입력한 ID를 제게도 입력해주시면 연결돼요." }, { "jp", "サーバープログラム（`server.exe`）実行時に入力したIDを私にも入力していただければ接続されます。" }, { "en", "If you enter the same ID you used when running the server program (`server.exe`), we'll be connected." } },
+        new Dictionary<string, string> { { "ko", "자세한 내용은 M9Dev 유튜브 채널에서도 확인하실 수 있어요." }, { "jp", "詳細はM9DevのYouTubeチャンネルでもご確認いただけます。" }, { "en", "You can also check the details on the M9Dev YouTube channel." } },
+
+        // A02-2-1 - PC 확인
+        new Dictionary<string, string> { { "ko", "확인 감사합니다, 선생님." }, { "jp", "確認ありがとうございます、先生。" }, { "en", "Thank you for confirming, Sensei." } },
+
+        // A02-3-1 - 플랫폼 확인 거부
+        new Dictionary<string, string> { { "ko", "언제든 저와 이야기하고 싶으실 때 불러주세요, 선생님!" }, { "jp", "いつでも私とお話ししたくなったら呼んでください、先生！" }, { "en", "Please call me whenever you want to talk with me, Sensei!" } },
+
+        // A03 - 연산 방식 선택
+        new Dictionary<string, string> { { "ko", "AI가 작동하려면 먼저 서버 설정이 필요해요." }, { "jp", "AIが動作するには、まずサーバー設定が必要です。" }, { "en", "For AI to work, server setup is needed first." } },
+        new Dictionary<string, string> { { "ko", "지금 사용 중인 이 PC로 연산하는 것도 가능해요." }, { "jp", "今使用中のこのPCで演算することも可能です。" }, { "en", "It's also possible to compute with this PC you're currently using." } },
+
+        // A03-1 - 로컬 연산
+        new Dictionary<string, string> { { "ko", "확인해볼게요... CUDA 환경 지원 여부를 검사 중이에요." }, { "jp", "確認してみますね...CUDA環境のサポート状況を検査中です。" }, { "en", "Let me check... I'm examining CUDA environment support." } },
+
+        // A03-1-1 - CUDA 지원
+        new Dictionary<string, string> { { "ko", "CUDA 환경이 감지되었어요." }, { "jp", "CUDA環境が検出されました。" }, { "en", "CUDA environment detected." } },
+        new Dictionary<string, string> { { "ko", "선생님의 PC에서 GPU를 사용할 수 있어요. 더 빠른 응답을 원하신다면 좋은 선택이에요. 어떻게 하실래요?" }, { "jp", "先生のPCでGPUを使用できます。より速い応答をお望みでしたら良い選択です。どうされますか？" }, { "en", "You can use GPU on your PC, Sensei. It's a good choice if you want faster responses. What would you like to do?" } },
+
+        // A03-1-2 - CUDA 미지원
+        new Dictionary<string, string> { { "ko", "CUDA 환경을 찾지 못했어요." }, { "jp", "CUDA環境が見つかりませんでした。" }, { "en", "CUDA environment not found." } },
+        new Dictionary<string, string> { { "ko", "아쉽게도 GPU는 지원되지 않지만, CPU로 작동하는 건 가능해요. 이어서 진행하실까요?" }, { "jp", "残念ながらGPUはサポートされませんが、CPUで動作することは可能です。続けて進めますか？" }, { "en", "Unfortunately GPU isn't supported, but it can work with CPU. Shall we continue?" } },
+
+        // A04 - 외부 서버 선택
+        new Dictionary<string, string> { { "ko", "그러면 외부 서버와 연결해볼게요." }, { "jp", "それでは外部サーバーと接続してみますね。" }, { "en", "Then let's try connecting to an external server." } },
+        new Dictionary<string, string> { { "ko", "무료 서버를 이용하시거나, API 키를 입력해서 외부 플랫폼(Gemini, ChatGPT...)과 연결하실 수 있어요." }, { "jp", "無料サーバーをご利用いただくか、APIキーを入力して外部プラットフォーム（Gemini、ChatGPT...）と接続できます。" }, { "en", "You can use a free server or enter an API key to connect with external platforms (Gemini, ChatGPT...)." } },
+
+        // A04-1-1 - 외부 무료 서버 연결 실패
+        new Dictionary<string, string> { { "ko", "연결이 잘 되지 않았어요. 다시 시도해볼까요?" }, { "jp", "接続がうまくいきませんでした。もう一度試してみますか？" }, { "en", "The connection didn't work well. Shall we try again?" } },
+
+        // A04-2 - API 키 입력
+        new Dictionary<string, string> { { "ko", "API KEY 관련 모델을 골라주세요" }, { "jp", "API KEY関連のモデルを選んでください" }, { "en", "Please choose an API KEY related model" } },
+
+        // A97 - 연결 테스트
+        new Dictionary<string, string> { { "ko", "서버에 연결을 시도하고 있어요..." }, { "jp", "接続を試みています..." }, { "en", "Attempting to connect..." } },
+        new Dictionary<string, string> { { "ko", "ChatGPT에 연결을 시도하고 있어요..." }, { "jp", "ChatGPTへの接続を試みています..." }, { "en", "Attempting to connect to ChatGPT..." } },
+        new Dictionary<string, string> { { "ko", "Gemini에 연결을 시도하고 있어요..." }, { "jp", "Geminiへの接続を試みています..." }, { "en", "Attempting to connect to Gemini..." } },
+        new Dictionary<string, string> { { "ko", "OpenRouter에 연결을 시도하고 있어요..." }, { "jp", "OpenRouterへの接続を試みています..." }, { "en", "Attempting to connect to OpenRouter..." } },
+        new Dictionary<string, string> { { "ko", "성공했어요 선생님" }, { "jp", "成功しました、先生" }, { "en", "Success, Sensei" } },
+        new Dictionary<string, string> { { "ko", "실패했어요 선생님. 다시 시도해볼까요?" }, { "jp", "失敗しました、先生。もう一度試してみますか？" }, { "en", "Failed, Sensei. Shall we try again?" } },
+
+        // A98 - 설정 취소
+        new Dictionary<string, string> { { "ko", "알겠어요 선생님." }, { "jp", "わかりました、先生。" }, { "en", "I understand, Sensei." } },
+        new Dictionary<string, string> { { "ko", "필요하실 땐 언제든지 다시 설정하실 수 있어요." }, { "jp", "必要な時はいつでも再設定できます。" }, { "en", "You can set it up again anytime you need." } },
+
+        // A99 - 설정 완료
+        new Dictionary<string, string> { { "ko", "설정이 완료되었어요, 선생님!" }, { "jp", "設定が完了しました、先生！" }, { "en", "Setup is complete, Sensei!" } },
+        new Dictionary<string, string> { { "ko", "필요하실 땐 언제든지 다시 설정하실 수 있어요." }, { "jp", "必要な時はいつでも再設정できます。" }, { "en", "You can set it up again anytime you need." } },
+        new Dictionary<string, string> { { "ko", "이제 준비가 끝났어요, 선생님. 앞으로 나눌 이야기들이 정말 기대돼요!" }, { "jp", "準備が整いました、先生。これからお話しする内容が本当に楽しみです！" }, { "en", "Now we're all set, Sensei. I'm really looking forward to the conversations we'll have!" } },
+
+
+        new Dictionary<string, string> { { "ko", "다운로드" }, { "jp", "ダウンロード" }, { "en", "Download" } },
+        new Dictionary<string, string> { { "ko", "보유중" }, { "jp", "所持済" }, { "en", "Owned" } },
 
 
         new Dictionary<string, string> { { "ko", "왼쪽으로" }, { "jp", "左に" }, { "en", "Go Left" } },
