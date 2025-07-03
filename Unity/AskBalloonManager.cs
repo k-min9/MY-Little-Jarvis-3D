@@ -44,6 +44,12 @@ public class AskBalloonManager : MonoBehaviour
             questionJp = "AIサーバーを終了しますか？",
             questionEn = "Do you want to shut down the AI server?"
         });
+        questionDict.Add("start_dev_server", new QuestionInfo
+        {
+            questionKo = "선생님? 현재 연결할 수 없는 서버가 없어요. 개발자 서버를 한 번 연결해볼까요?",
+            questionJp = "先生、現在接続できるサーバーがありません。 開発者サーバーを試してみましょうか？",
+            questionEn = "Sensei? There are currently no servers available to connect to, shall I try the developer server?"
+        });
     }
 
     // 싱글톤 인스턴스
@@ -144,20 +150,21 @@ public class AskBalloonManager : MonoBehaviour
         Vector2 charPosition = characterTransform.anchoredPosition;
         
         // 캐릭터의 X 위치와 동일하게 설정
-        askBalloonTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 270 * SettingManager.Instance.settings.char_size / 100f); // Y축 창크기 270만큼
+        // askBalloonTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 270 * SettingManager.Instance.settings.char_size / 100f); // Y축 창크기 270만큼
+        askBalloonTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 200 * SettingManager.Instance.settings.char_size / 100f + 100);
     }
 
-    // Yes 버튼 사용
+    // Yes 버튼 사용 > 과거의 서버 인스톨 후 시작 흔적
     public void AnswerYes()
     {
         if (currentQuestion == "install_ai_server") {
-            ServerManager.RunInstallExe();
+            // ServerManager.RunInstallExe();
 
             HideAskBalloon();  // 답변했으니 기존 풍선 숨기기
             return;
         }
         if (currentQuestion == "start_ai_server") {
-            ServerManager.StartServer();
+            // ServerManager.StartServer();
 
             // 안내
             AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
