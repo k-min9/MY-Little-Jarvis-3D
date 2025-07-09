@@ -107,6 +107,9 @@ public class AnswerBalloonSimpleManager : MonoBehaviour
     // AnswerBalloonSimple의 텍스트를 수정하고 오디오를 재생하는 함수
     public void ModifyAnswerBalloonSimpleText(string text)
     {
+        // 자동번역 시도
+        text = LanguageManager.Instance.Translate(text);
+
         answerText.text = text; // 텍스트 변경
 
         // 높이 조정
