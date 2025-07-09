@@ -23,10 +23,60 @@ public class JarvisServerManager : MonoBehaviour
     private const int ServerPort = 5000;
     private Process jarvisProcess;  // 실행된 서버 프로세스를 저장할 변수
 
+    private void Awake()
+    {
+        UnityEngine.Debug.Log("[Jarvis] Awake() called");
+        if (SettingManager.Instance.settings.isStartServerOnInit)
+        {
+            RunJarvisServerWithCheck();
+        }
+    }
+
+    public void RunJarvisServerWithCheck()
+    {
+        RunJarvisServer();
+        StartCoroutine(CheckHealthAndNotify());
+    }
+
+    private IEnumerator CheckHealthAndNotify()
+    {
+        string url = $"http://127.0.0.1:{ServerPort}/health";
+        float timeout = 5f;
+        float timer = 0f;
+        bool isAlive = false;
+
+        while (timer < timeout)
+        {
+            using (UnityWebRequest www = UnityWebRequest.Get(url))
+            {
+                yield return www.SendWebRequest();
+
+                if (www.result == UnityWebRequest.Result.Success)
+                {
+                    isAlive = true;
+                    break;
+                }
+            }
+
+            yield return new WaitForSeconds(0.5f);
+            timer += 0.5f;
+        }
+
+        if (isAlive)
+        {
+            StartCoroutine(ScenarioCommonManager.Instance.Run_C01_ServerStarted());
+        }
+        else
+        {
+            UnityEngine.Debug.LogWarning("[Jarvis] 서버 응답 없음 - C01 호출 안됨");
+        }
+    }
+
+
     public bool IsJarvisServerRunning()
     {
         UnityEngine.Debug.Log("[Jarvis] IsJarvisServerRunning() called");
-        bool result = Process.GetProcessesByName("jarvis_serverXXX").Length > 0;
+        bool result = Process.GetProcessesByName("server").Length > 0;
         UnityEngine.Debug.Log("[Jarvis] IsJarvisServerRunning() result: " + result);
         return result;
     }
@@ -38,8 +88,8 @@ public class JarvisServerManager : MonoBehaviour
         // 기존에 켜져있는거 있는지 확인
         if (IsJarvisServerRunning())
         {
-            AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
-            AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Already Served");
+            // AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+            // AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Already Served");
             UnityEngine.Debug.Log("[Jarvis] Launch aborted: already running");
             return;
         }
@@ -47,13 +97,13 @@ public class JarvisServerManager : MonoBehaviour
         // 파일 확인
         string streamingAssetsPath = Application.streamingAssetsPath;
         string executablePath = Application.dataPath;
-        string jarvisServerPath = Path.Combine(Path.GetDirectoryName(executablePath), "jarvis_server.exe");
+        string jarvisServerPath = Path.Combine(Path.GetDirectoryName(executablePath), "server.exe");
 
         if (File.Exists(jarvisServerPath))
         {
             jarvisProcess = RunJarvisServerProcess(jarvisServerPath);
-            AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
-            AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Init server...");
+            // AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+            // AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Init server...");
         }
         else
         {
