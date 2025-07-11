@@ -86,53 +86,67 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
 
     private void HandleLeftClick()
     {
-        // 튜토리얼 시작 조건 확인 : baseUrl 값이 ""고, isShowTutorialOnChat가 true
-        if (string.IsNullOrEmpty(ServerManager.Instance.baseUrl) &&
-            SettingManager.Instance.settings.isShowTutorialOnChat)
+        // 환경세팅/튜토리얼 시작 조건 확인 : 우선 baseUrl 값이 ""
+        if (string.IsNullOrEmpty(ServerManager.Instance.baseUrl))
         {
-            if (!StatusManager.Instance.isScenario)
-            { 
-                ScenarioTutorialManager.Instance.StartTutorial();
-            }
-            return;  // 튜토리얼 실행 후 나머지 클릭 로직은 중단
-        }
+            // 기존 시나리오 실행중일 경우 return 
+            if (StatusManager.Instance.isScenario) return;
 
-        // 기존 좌클릭 처리 로직
-        if (SettingManager.Instance.settings.isShowChatBoxOnClick)
+            // 서버 설치 여부 확인 + PC
+            RuntimePlatform platform = Application.platform;
+            if ((platform == RuntimePlatform.WindowsPlayer || platform == RuntimePlatform.WindowsEditor)
+                && !InstallerManager.Instance.IsJarvisServerInstalled())
+            {
+                ScenarioInstallerManager.Instance.StartInstaller();  //  시나리오 - 설치
+                return;
+            }
+            else if (SettingManager.Instance.settings.isShowTutorialOnChat
+                && !SettingManager.Instance.settings.isTutorialCompleted)  // 시나리오 튜토리얼 실행명령 + 튜토리얼 종료되지 않음
+            {
+                ScenarioTutorialManager.Instance.StartTutorial();  // 시나리오 - 튜토리얼
+                return;
+            }
+            else if (!JarvisServerManager.Instance.IsJarvisServerRunning())  // 설치+환경+튜토리얼종료되어있는상태에서 서버가 켜져있지 않다면 기동
+            {
+                JarvisServerManager.Instance.RunJarvisServerWithCheck();
+            }
+        }
+        else // 정상대화
         {
             StatusManager.Instance.isAnswering = false;
             VoiceManager.Instance.ResetAudio();
             ChatBalloonManager.Instance.ToggleChatBalloon();
+            return;
+        }
+        
+        // 세팅/대화 관련 로직에서 return되지 않았을 경우, 일반 동작
+        if (false && SettingManager.Instance.settings.isAskedTurnOnServer)  // TODO : SettingManager쪽은 완전히 없애버리자/ 서버를 켤까요 선생님이 아니라, 그냥 기동시 켜버리기
+        {
+            // 과거의 유산
+            // #if UNITY_EDITOR
+            ChatBalloonManager.Instance.ToggleChatBalloon();
+            // #else
+            //                 ServerManager.AskStartServer();
+            // #endif
         }
         else
         {
-            if (false && SettingManager.Instance.settings.isAskedTurnOnServer)  // TODO : SettingManager쪽은 완전히 없애버리자.
+            if (isAnimatorTriggerExists(_animator, "doSpecial"))
             {
-                // 과거의 유산
-                // #if UNITY_EDITOR
-                ChatBalloonManager.Instance.ToggleChatBalloon();
-                // #else
-                //                 ServerManager.AskStartServer();
-                // #endif
+                _animator.SetTrigger("doSpecial");
+                StatusManager.Instance.SetStatusTrueForSecond(value => StatusManager.Instance.IsOptioning = value, 7.5f);
+            }
+            else if (isAnimatorTriggerExists(_animator, "doSelect"))
+            {
+                Dialogue select = DialogueManager.Instance.GetRandomSelect();
+                DoDialogueBehaviour(select);
             }
             else
             {
-                if (isAnimatorTriggerExists(_animator, "doSpecial"))
-                {
-                    _animator.SetTrigger("doSpecial");
-                    StatusManager.Instance.SetStatusTrueForSecond(value => StatusManager.Instance.IsOptioning = value, 7.5f);
-                }
-                else if (isAnimatorTriggerExists(_animator, "doSelect"))
-                {
-                    Dialogue select = DialogueManager.Instance.GetRandomSelect();
-                    DoDialogueBehaviour(select);
-                }
-                else
-                {
-                    PlayRandomAnimation();
-                }
+                PlayRandomAnimation();
             }
         }
+
     }
 
     private void HandleMiddleClick()
