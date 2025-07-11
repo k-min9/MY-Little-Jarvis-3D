@@ -46,8 +46,8 @@ public static class ChoiceData
         {
             "A03_inference_select", new List<Dictionary<string, string>>
             {
-                new Dictionary<string, string> { { "ko", "이 PC에서 연산할래" }, { "jp", "このPCで計算する" }, { "en", "I’ll compute on this PC" } },
-                new Dictionary<string, string> { { "ko", "외부 서버를 사용할래" }, { "jp", "外部サーバーを使う" }, { "en", "I’ll use an external server" } },
+                new Dictionary<string, string> { { "ko", "이 PC에서 연산할래" }, { "jp", "このPCで計算する" }, { "en", "I'll compute on this PC" } },
+                new Dictionary<string, string> { { "ko", "외부 서버를 사용할래" }, { "jp", "外部サーバーを使う" }, { "en", "I'll use an external server" } },
                 new Dictionary<string, string> { { "ko", "그만둘래" }, { "jp", "やめておく" }, { "en", "Cancel it" } }
             }
         },
@@ -85,10 +85,11 @@ public static class ChoiceData
         {
             "A04_2_api_key_input", new List<Dictionary<string, string>>
             {
-                new Dictionary<string, string> { { "ko", "ChatGPT" }, { "jp", "ChatGPT" }, { "en", "ChatGPT" } },
                 new Dictionary<string, string> { { "ko", "Gemini" }, { "jp", "Gemini" }, { "en", "Gemini" } },
                 new Dictionary<string, string> { { "ko", "OpenRouter" }, { "jp", "OpenRouter" }, { "en", "OpenRouter" } },
-                new Dictionary<string, string> { { "ko", "전 선택지로" }, { "jp", "前の選択肢に戻る" }, { "en", "Back to previous choices" } }
+                new Dictionary<string, string> { { "ko", "전 선택지로" }, { "jp", "前の選択肢に戻る" }, { "en", "Back to previous choices" } },
+
+                new Dictionary<string, string> { { "ko", "ChatGPT" }, { "jp", "ChatGPT" }, { "en", "ChatGPT" } },  // TODO : ChatGPT
             }
         },
         {
@@ -96,6 +97,13 @@ public static class ChoiceData
             {
                 new Dictionary<string, string> { { "ko", "다시 시도" }, { "jp", "再試行する" }, { "en", "Try again" } },
                 new Dictionary<string, string> { { "ko", "다음에 해볼게" }, { "jp", "また今度にする" }, { "en", "Maybe next time" } }
+            }
+        },
+        {
+            "I01_installer_check", new List<Dictionary<string, string>>
+            {
+                new Dictionary<string, string> { { "ko", "응" }, { "jp", "はい" }, { "en", "Yes" } },
+                new Dictionary<string, string> { { "ko", "아니" }, { "jp", "いいえ" }, { "en", "No" } }
             }
         }
     };
