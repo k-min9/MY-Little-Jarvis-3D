@@ -98,7 +98,18 @@ public class ChoiceManager : MonoBehaviour
 
         Debug.Log($"Choice selected: {index}");
 
-        // 시나리오 매니저에 선택 결과 전달 필요
-        ScenarioTutorialManager.Instance.OnChoiceSelected(curChoiceScenario, index);
+        // 시나리오 ID 기반으로 분기
+        switch (curChoiceScenario)
+        {
+            case string s when s.StartsWith("A"): // Tutorial 시나리오
+                ScenarioTutorialManager.Instance.OnChoiceSelected(curChoiceScenario, index);
+                break;
+            case string s when s.StartsWith("I"): // Installer 시나리오
+                ScenarioInstallerManager.Instance.OnChoiceSelected(curChoiceScenario, index);
+                break;
+            default:
+                Debug.LogWarning($"Unknown scenario type: {curChoiceScenario}");
+                break;
+        }
     }
 }
