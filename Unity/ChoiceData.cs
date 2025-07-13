@@ -105,6 +105,22 @@ public static class ChoiceData
                 new Dictionary<string, string> { { "ko", "응" }, { "jp", "はい" }, { "en", "Yes" } },
                 new Dictionary<string, string> { { "ko", "아니" }, { "jp", "いいえ" }, { "en", "No" } }
             }
+        },
+        {
+            "C02_ask_start_server", new List<Dictionary<string, string>>
+            {
+                new Dictionary<string, string> { { "ko", "네" }, { "jp", "はい" }, { "en", "Yes" } },
+                new Dictionary<string, string> { { "ko", "아니오" }, { "jp", "いいえ" }, { "en", "No" } }
+            }
+        },
+        {
+            "I01_installer_server_type_check", new List<Dictionary<string, string>>
+            {
+                new Dictionary<string, string> { { "ko", "Lite (약 2GB)" }, { "jp", "ライト（約2GB）" }, { "en", "Lite (about 2GB)" } },
+                new Dictionary<string, string> { { "ko", "Full (약 16GB)" }, { "jp", "フル（約16GB）" }, { "en", "Full (about 16GB)" } },
+                new Dictionary<string, string> { { "ko", "각 버전에 대해 설명해줘" }, { "jp", "それぞれについて説明して" }, {"en", "Tell me about each version"} } ,
+                new Dictionary<string, string> { { "ko", "나중에 설치할게" }, { "jp", "あとでインストールする" }, { "en", "I'll install it later" } }
+            }
         }
     };
 }
