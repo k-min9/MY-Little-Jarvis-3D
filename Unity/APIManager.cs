@@ -361,6 +361,7 @@ public class APIManager : MonoBehaviour
                                             }
 
                                             // Setting - AI Info 표정 갱신
+                                            // Joy/Anger/Confusion/Sadness/Surprise/Neutral
                                             try
                                             {
                                                 string ai_info_emotion = jsonObject["ai_info"]["emotion"].ToString();
@@ -568,6 +569,21 @@ public class APIManager : MonoBehaviour
     {
         // API 호출을 위한 URL 구성
         string baseUrl = ServerManager.Instance.GetBaseUrl();
+        Debug.Log("SettingManager.Instance.GetInstallStatus() : " + SettingManager.Instance.GetInstallStatus());
+#if !UNITY_EDITOR
+        if (SettingManager.Instance.GetInstallStatus() < 2) // no install, lite
+        {
+            ServerManager.Instance.GetServerUrlFromServerId("sound_dev", (url) =>
+            {
+                if (!string.IsNullOrEmpty(url))
+                {
+                    Debug.Log("sound_dev 서버 URL: " + url);
+                    baseUrl = url;
+                }
+            });
+        }
+#endif
+
         string url = baseUrl + "/getSound/jp"; // GET + Uri.EscapeDataString(text);
 
         // 닉네임 가져오기
@@ -642,6 +658,75 @@ public class APIManager : MonoBehaviour
             Debug.LogError($"Exception: {ex.Message}");
         }
     }
+
+    
+    public async void GetHowlingFromAPI(string text)
+    {
+        // API 호출을 위한 URL 구성
+        // string baseUrl = ServerManager.Instance.GetBaseUrl();
+        string baseUrl = "http://127.0.0.1:5050";  // dev->5050포트용
+        string url = baseUrl + "/howling"; 
+        Debug.Log("url : " + url);
+
+        // HttpWebRequest 객체 생성
+        HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+        request.Method = "POST";
+        request.ContentType = "application/json";
+
+        var requestData = new Dictionary<string, string>
+        {
+            { "text", text},
+            { "lang", ""},
+            { "is_play", "true"},
+        };
+        string jsonData = JsonConvert.SerializeObject(requestData);
+        byte[] byteArray = Encoding.UTF8.GetBytes(jsonData);
+
+
+        try
+        {
+            // 요청 본문에 데이터 쓰기
+            using (Stream dataStream = await request.GetRequestStreamAsync())
+            {
+                dataStream.Write(byteArray, 0, byteArray.Length);
+            }
+
+            // 비동기 방식으로 요청 보내기
+            using (HttpWebResponse response = (HttpWebResponse)await request.GetResponseAsync())
+            {
+                // 요청이 성공했는지 확인
+                if (response.StatusCode == HttpStatusCode.OK)
+                {
+                    Debug.LogError($"Howling : " + text);
+                    // 저장 지금은 필요없음
+                    // // 응답 스트림을 읽어서 파일에 저장
+                    // using (Stream responseStream = response.GetResponseStream())
+                    // {
+                    //     if (responseStream != null)
+                    //     {
+                    //         byte[] wavData = ReadFully(responseStream);
+
+                    //         // StreamingAssets 경로에 WAV 파일 저장
+                    //         SaveWavToFile(wavData);
+                    //     }
+                    // }
+                }
+                else
+                {
+                    Debug.LogError($"Error fetching WAV file: {response.StatusCode}");
+                }
+            }
+        }
+        catch (WebException ex)
+        {
+            Debug.LogError($"WebException: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Exception: {ex.Message}");
+        }
+    }
+
 
     // 스트림을 바이트 배열로 변환하는 함수
     private byte[] ReadFully(Stream input)
