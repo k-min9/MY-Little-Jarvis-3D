@@ -11,12 +11,18 @@ public static class LanguageData
         new Dictionary<string, string> { { "ko", "서버 ID" }, { "jp", "サーバーID" }, { "en", "Server ID" } },
         new Dictionary<string, string> { { "ko", "항상 위에 표시" }, { "jp", "常に上に表示" }, { "en", "Always on Top" } },
         new Dictionary<string, string> { { "ko", "클릭 시 채팅창 표시" }, { "jp", "クリック時チャット画面表示" }, { "en", "Show Chatbox on Click" } },
+        new Dictionary<string, string> { { "ko", "채팅 시 튜토리얼 표시" }, { "jp", "チャット時にチュートリアル表示" }, { "en", "Show Tutorial On Chat" } },
+        new Dictionary<string, string> { { "ko", "기동 시 서버 실행" }, { "jp", "起動時にサーバー実行" }, { "en", "Start Server On Init" } },
 
-        new Dictionary<string, string> { { "ko", "답변에 이미지 사용" }, { "jp", "回答に画像を使用" }, { "en", "Use Image in Answer" } },
-        new Dictionary<string, string> { { "ko", "Web에서 검색하기" }, { "jp", "Webで検索する" }, { "en", "Search the Web" } },
 
         new Dictionary<string, string> { { "ko", "안내" }, { "jp", "案内" }, { "en", "Inform" } },
         new Dictionary<string, string> { { "ko", "메뉴" }, { "jp", "メニュー" }, { "en", "Menu" } },
+
+        // ToolTip Trigger
+        new Dictionary<string, string> { { "ko", "답변에 이미지 사용" }, { "jp", "回答に画像を使用" }, { "en", "Use Image in Answer" } },
+        new Dictionary<string, string> { { "ko", "Web에서 검색하기" }, { "jp", "Webで検索する" }, { "en", "Search the Web" } },
+        new Dictionary<string, string> { { "ko", "서버 튜토리얼 시작" }, { "jp", "サーバーチュートリアルを開始" }, { "en", "Start Tutorial For Server" } },
+
 
         /// Scenario - Turoial
         // A00 - 시작 진입 조건
@@ -109,17 +115,54 @@ public static class LanguageData
         new Dictionary<string, string> { { "ko", "필요하실 땐 언제든지 다시 설정하실 수 있어요." }, { "jp", "必要な時はいつでも再設정できます。" }, { "en", "You can set it up again anytime you need." } },
         new Dictionary<string, string> { { "ko", "이제 준비가 끝났어요, 선생님. 앞으로 나눌 이야기들이 정말 기대돼요!" }, { "jp", "準備が整いました、先生。これからお話しする内容が本当に楽しみです！" }, { "en", "Now we're all set, Sensei. I'm really looking forward to the conversations we'll have!" } },
 
+        /// Scenario - Installer
+        // I01 - 인스톨러 진입 조건
+        new Dictionary<string, string> { { "ko", "선생님. 대화를 위한 기본적인 파일이 설치되어 있지 않아요." }, { "jp", "先生。会話のための基本的なファイルがインストールされていません。" }, { "en", "Sensei. The basic files for conversation are not installed." } },
+        new Dictionary<string, string> { { "ko", "설치를 위한 프로그램을 구동해도 될까요?" }, { "jp", "インストール用のプログラムを起動してもよろしいですか？" }, { "en", "May I run the installation program?" } },
+
+        // I01_0 - 버전 설명
+        new Dictionary<string, string> { { "ko", "Lite 버전과 Full 버전 어느쪽으로 설치할까요?" }, { "jp", "LiteバージョンとFullバージョン、どちらをインストールしますか？" }, { "en", "Which version would you like to install: Lite or Full?" } },
+        new Dictionary<string, string> { { "ko", "Lite는 음성 인식 같은 기본 기능만 설치돼요. 연산은 외부 플랫폼에 맡기기 때문에 설치도 빠르고 용량도 가벼워요." }, { "jp", "Liteは音声認識などの基本機能のみをインストールします。演算は外部プラットフォームに任せるので、インストールが速く容量も軽いです。" }, { "en", "Lite only installs basic features like speech recognition. Since computation is handled by an external platform, it's quick to install and lightweight." } },
+        new Dictionary<string, string> { { "ko", "Full은 Lite의 기능이 제공되고, AI 연산도 선생님의 컴퓨터에서 직접 처리해요. 외부 서버 상태에 영향을 받지 않고 안정적인 품질을 기대하실 수 있어요." }, { "jp", "FullはLiteの機能を含み、AIの演算も先生のPCで直接行います。外部サーバーの状態に左右されず、安定した品質が期待できます。" }, { "en", "Full includes all the features of Lite and performs AI computation directly on your PC. You can expect stable quality without relying on external servers." } },
+        new Dictionary<string, string> { { "ko", "그만큼 용량도 크고, 컴퓨터 성능에 따라 답변 속도가 달라질 수 있어요." }, { "jp", "その分、容量が大きくなり、PCの性能によって応答速度が変わることがあります。" }, { "en", "It takes up more space, and response speed may vary depending on your PC's performance." } },
+        new Dictionary<string, string> { { "ko", "두 버전은 나중에 언제든지 바꾸실 수 있으니까, 편하게 골라주세요." }, { "jp", "どちらのバージョンも後からいつでも変更できますので、気軽に選んでくださいね。" }, { "en", "You can switch between versions anytime later, so feel free to choose the one you like." } },
+
+        // I01-1 - 설치 진행
+        new Dictionary<string, string> { { "ko", "설치 프로그램을 실행할게요." }, { "jp", "インストールプログラムを実行します。" }, { "en", "I'll run the installation program." } },
+
+        // I01-2 - 나중에 설치
+        new Dictionary<string, string> { { "ko", "언제든 필요하실 때 다시 말씀해주세요." }, { "jp", "いつでも必要でしたら、またお声かけください。" }, { "en", "Please let me know anytime you need it." } },
+
+        // I01-3 - 이미 설치됨
+        new Dictionary<string, string> { { "ko", "아, 이미 설치되어 있네요!" }, { "jp", "あ、もうインストールされていますね！" }, { "en", "Oh, it's already installed!" } },
+        new Dictionary<string, string> { { "ko", "이제 서버를 시작하면 저와 대화할 수 있어요." }, { "jp", "これでサーバーを起動すれば、私と会話できます。" }, { "en", "Now you can start the server and chat with me." } },
+
+        // I01-4 - 이미 실행 중
+        new Dictionary<string, string> { { "ko", "설치 프로그램이 이미 실행 중이에요." }, { "jp", "インストールプログラムが既に実行中です。" }, { "en", "The installation program is already running." } },
+        new Dictionary<string, string> { { "ko", "잠시만 기다려주세요." }, { "jp", "しばらくお待ちください。" }, { "en", "Please wait a moment." } },
+
+        // I02 - 설치 완료 및 서버 실행
+        new Dictionary<string, string> { { "ko", "설치가 완료되었어요!" }, { "jp", "インストールが完了しました！" }, { "en", "The installation is complete!" } },
+        new Dictionary<string, string> { { "ko", "바로 서버를 시작해볼게요, 선생님!" }, { "jp", "すぐにサーバーを起動しますね、先生！" }, { "en", "I'll start the server right away, sir!" } },
+
+        // C01 - 서버 준비 완료 알림
+        new Dictionary<string, string> { { "ko", "선생님, 서버가 준비되었어요!" }, { "jp", "先生、サーバーの準備ができましたよ！" }, { "en", "Sensei, the server is now ready!" }},
+
+        // C02 - 서버 기동 여부 확인
+        new Dictionary<string, string> { { "ko", "선생님, 안녕하세요!" }, { "jp", "先生、こんにちは！" }, { "en", "Hello, Sensei!" } },
+        new Dictionary<string, string> { { "ko", "현재 서버를 기동하지 않으셨는데 기동하셔도 괜찮으실까요?" }, { "jp", "現在、サーバーが起動されていませんが、起動してもよろしいですか？" }, { "en", "The server is not currently running. Would you like to start it, Sensei?" } },
+        new Dictionary<string, string> { { "ko", "네! 서버를 기동할게요." }, { "jp", "はい！サーバーを起動しますね。" }, { "en", "Okay! I'll start the server now, Sensei!" } },
+        new Dictionary<string, string> { { "ko", "마음이 바뀌시면 언제든지 다시 말 걸어주세요, 선생님!" }, { "jp", "気が変わったら、いつでもまた話しかけてくださいね、先生！" }, { "en", "If you change your mind, feel free to talk to me anytime, Sensei!" } },
+
 
         new Dictionary<string, string> { { "ko", "다운로드" }, { "jp", "ダウンロード" }, { "en", "Download" } },
         new Dictionary<string, string> { { "ko", "보유중" }, { "jp", "所持済" }, { "en", "Owned" } },
-
 
         new Dictionary<string, string> { { "ko", "왼쪽으로" }, { "jp", "左に" }, { "en", "Go Left" } },
         new Dictionary<string, string> { { "ko", "오른쪽으로" }, { "jp", "右に" }, { "en", "Go Right" } },
         new Dictionary<string, string> { { "ko", "춤추기" }, { "jp", "踊る" }, { "en", "Dance" } },
         new Dictionary<string, string> { { "ko", "대기" }, { "jp", "待機" }, { "en", "Idle" } },
         new Dictionary<string, string> { { "ko", "숨기" }, { "jp", "隠す" }, { "en", "Hide" } },
-
 
         new Dictionary<string, string> { { "ko", "언어" }, { "jp", "言語" }, { "en", "Language" } },
         new Dictionary<string, string> { { "ko", "음성인식" }, { "jp", "音声認識" }, { "en", "Speech Recognition" } },

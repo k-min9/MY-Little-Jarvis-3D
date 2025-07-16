@@ -49,6 +49,8 @@ public class LanguageManager : MonoBehaviour
     public Text settingsGeneralServerIDLabel;
     public Text settingsGeneralAlwaysOnTopLabel;
     public Text settingsGeneralShowChatBoxOnClickLabel;
+    public Text settingsGeneralShowTutorialOnChat;
+    public Text settingsGeneralStartServerOnInit;
     public Text settingDisplayStyleLabel;
     public Text settingDisplayMenuLabel;
     public TooltipTrigger settingServerServerInfoIconTooltipTrigger;
@@ -56,6 +58,7 @@ public class LanguageManager : MonoBehaviour
 
     public TooltipTrigger imageUseToggleTooltipTrigger;
     public TooltipTrigger webSearchButtonTooltipTrigger;
+    public TooltipTrigger serverStatusTutorialButtonTooltipTrigger;
 
     public TooltipTrigger radialMenuActionDance;
     public TooltipTrigger radialMenuActionGoLeft;
@@ -100,6 +103,8 @@ public class LanguageManager : MonoBehaviour
         settingsGeneralServerIDLabel.text = LanguageData.Translate(settingsGeneralServerIDLabel.text, targetLang);
         settingsGeneralAlwaysOnTopLabel.text = LanguageData.Translate(settingsGeneralAlwaysOnTopLabel.text, targetLang);
         settingsGeneralShowChatBoxOnClickLabel.text = LanguageData.Translate(settingsGeneralShowChatBoxOnClickLabel.text, targetLang);
+        settingsGeneralShowTutorialOnChat.text = LanguageData.Translate(settingsGeneralShowTutorialOnChat.text, targetLang);
+        settingsGeneralStartServerOnInit.text = LanguageData.Translate(settingsGeneralStartServerOnInit.text, targetLang);
 
         settingDisplayStyleLabel.text = LanguageData.Translate(settingDisplayStyleLabel.text, targetLang);
         settingDisplayMenuLabel.text = LanguageData.Translate(settingDisplayMenuLabel.text, targetLang);
@@ -111,6 +116,7 @@ public class LanguageManager : MonoBehaviour
         // chatBalloon
         imageUseToggleTooltipTrigger.tooltip = LanguageData.Translate(imageUseToggleTooltipTrigger.tooltip, targetLang);
         webSearchButtonTooltipTrigger.tooltip = LanguageData.Translate(webSearchButtonTooltipTrigger.tooltip, targetLang);
+        serverStatusTutorialButtonTooltipTrigger.tooltip = LanguageData.Translate(serverStatusTutorialButtonTooltipTrigger.tooltip, targetLang);
 
         // RadialMenuAction
         radialMenuActionDance.tooltip = LanguageData.Translate(radialMenuActionDance.tooltip, targetLang);
