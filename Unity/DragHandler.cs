@@ -163,7 +163,7 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
         {
             Destroy(emotionBalloonInstance);
         }
-        emotionBalloonInstance = EmotionBalloonManager.Instance.ShowEmotionBalloon(this.gameObject);
+        emotionBalloonInstance = EmotionBalloonManager.Instance.ShowEmotionBalloon(this.gameObject, "Love");
 
         // 기존 fx 삭제 후 재생성
         if (emotionFxInstance != null)

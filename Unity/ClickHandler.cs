@@ -108,7 +108,8 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
             }
             else if (!JarvisServerManager.Instance.IsJarvisServerRunning())  // 설치+환경+튜토리얼종료되어있는상태에서 서버가 켜져있지 않다면 기동
             {
-                JarvisServerManager.Instance.RunJarvisServerWithCheck();
+                StartCoroutine(ScenarioCommonManager.Instance.Scenario_C02_AskToStartServer());
+                // JarvisServerManager.Instance.RunJarvisServerWithCheck();
             }
         }
         else // 정상대화
