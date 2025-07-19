@@ -10,6 +10,8 @@ using System.IO;
 public class ServerManager : MonoBehaviour
 {
     public string baseUrl = "";
+    private string devUrl = "";  // dev 서버 URL 캐시
+
     private string ngrokUrl;
     private string ngrokStatus;
     private bool isConnected = false;  // 일단 1회라도 연결된적이 있는지(불가역)
@@ -97,6 +99,75 @@ public class ServerManager : MonoBehaviour
 
         return baseUrl;
     }
+
+    public void GetServerUrlFromServerId(string server_id, Action<string> onComplete)
+    {
+        // devUrl 캐시가 있는 경우 즉시 반환
+        if (server_id.ToLower().Contains("dev") && !string.IsNullOrEmpty(devUrl))
+        {
+            Debug.Log($"[GetServerUrlFromServerId] devUrl 캐시 사용: {devUrl}");
+            onComplete?.Invoke(devUrl);
+            return;
+        }
+
+        StartCoroutine(GetServerUrlCoroutine(server_id, onComplete));
+    }
+
+    private IEnumerator GetServerUrlCoroutine(string server_id, Action<string> onComplete)
+    {
+        string ngrokSupabaseUrl = "https://lxmkzckwzasvmypfoapl.supabase.co/storage/v1/object/sign/json_bucket/my_little_jarvis_plus_ngrok_server.json?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJqc29uX2J1Y2tldC9teV9saXR0bGVfamFydmlzX3BsdXNfbmdyb2tfc2VydmVyLmpzb24iLCJpYXQiOjE3MzM4Mzg4MjYsImV4cCI6MjA0OTE5ODgyNn0.ykDVTXYVXNnKJL5lXILSk0iOqt0_7UeKZqOd1Qv_pSY&t=2024-12-10T13%3A53%3A47.907Z";
+        string supabaseApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4bWt6Y2t3emFzdm15cGZvYXBsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM4MzUxNzQsImV4cCI6MjA0OTQxMTE3NH0.zmEKHhIcQa4ODekS2skgknlXi8Hbd8JjpjBlFZpPsJ8";
+
+        using (UnityWebRequest request = UnityWebRequest.Get(ngrokSupabaseUrl))
+        {
+            request.SetRequestHeader("Authorization", $"Bearer {supabaseApiKey}");
+            yield return request.SendWebRequest();
+
+            if (request.result == UnityWebRequest.Result.ConnectionError || request.result == UnityWebRequest.Result.ProtocolError)
+            {
+                Debug.LogError($"[GetServerUrlFromServerId] 요청 실패: {request.error}");
+                onComplete?.Invoke(null);
+                yield break;
+            }
+
+            string jsonResponse = request.downloadHandler.text;
+            var fullData = JsonConvert.DeserializeObject<Dictionary<string, NgrokJsonResponse>>(jsonResponse);
+
+            if (fullData != null && fullData.ContainsKey(server_id))
+            {
+                NgrokJsonResponse data = fullData[server_id];
+                Debug.Log($"[GetServerUrlFromServerId] 서버 ID '{server_id}' 의 URL: {data.url}");
+
+                if (data.status == "closed")
+                {
+                    NoticeBalloonManager.Instance?.ModifyNoticeBalloonText("Supabase Server Closed");
+                    onComplete?.Invoke(null);
+                    yield break;
+                }
+                else if (data.status != "open")
+                {
+                    NoticeBalloonManager.Instance?.ModifyNoticeBalloonText("Supabase Server Not Opened");
+                    onComplete?.Invoke(null);
+                    yield break;
+                }
+
+                // devUrl 저장 조건
+                if (server_id.ToLower().Contains("dev"))
+                {
+                    devUrl = data.url;
+                    Debug.Log($"[GetServerUrlFromServerId] devUrl 저장됨: {devUrl}");
+                }
+
+                onComplete?.Invoke(data.url);
+            }
+            else
+            {
+                Debug.LogWarning($"[GetServerUrlFromServerId] 서버 ID '{server_id}' 없음");
+                onComplete?.Invoke(null);
+            }
+        }
+    }
+
 
     // Base URL 설정 (FetchNgrokJsonData 이후)
     private IEnumerator SetBaseUrl()
@@ -294,7 +365,8 @@ public class ServerManager : MonoBehaviour
     private IEnumerator SetDevServer()
     {
         // 최대 3초 동안 server_id 대기
-        string server_id = "m9dev";
+        // string server_id = "m9dev";
+        string server_id = "sound_dev";
 
         // Supabase 요청 URL 및 API 키
         string ngrokSupabaseUrl = "https://lxmkzckwzasvmypfoapl.supabase.co/storage/v1/object/sign/json_bucket/my_little_jarvis_plus_ngrok_server.json?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJqc29uX2J1Y2tldC9teV9saXR0bGVfamFydmlzX3BsdXNfbmdyb2tfc2VydmVyLmpzb24iLCJpYXQiOjE3MzM4Mzg4MjYsImV4cCI6MjA0OTE5ODgyNn0.ykDVTXYVXNnKJL5lXILSk0iOqt0_7UeKZqOd1Qv_pSY&t=2024-12-10T13%3A53%3A47.907Z";
