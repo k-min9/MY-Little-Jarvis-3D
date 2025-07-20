@@ -44,6 +44,31 @@ public class InstallerManager : MonoBehaviour
         return result;
     }
 
+    // 문답무용으로 가장 단순한 lite 버전 설치
+    public void RunInstallerLite()
+    {
+        UnityEngine.Debug.Log("[Installer] RunInstallerLite() start");
+
+        // Install_Server.exe 파일 확인
+        string executablePath = Application.dataPath;  // Unity 실행 파일이 있는 폴더 경로
+        string installerPath = Path.Combine(Path.GetDirectoryName(executablePath), "Install_Server_Lite.exe");  // Install_Server.exe 파일 경로
+
+        if (File.Exists(installerPath))  // 파일 존재 여부 확인
+        {
+            installerProcess = RunInstallerProcess(installerPath);  // 인스톨러 프로세스 시작
+            AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();  // 알림창 표시
+            AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Running installer...");  // 알림 텍스트 수정
+        }
+        else
+        {
+            UnityEngine.Debug.LogError("[Installer] Installer not found: " + installerPath);  // 에러 로그 출력
+            AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();  // 알림창 표시
+            AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Installer not found");  // 알림 텍스트 수정
+        }
+
+        UnityEngine.Debug.Log("[Installer] RunInstallerLite() end");
+    }
+
     // jarvis_server.exe가 없으면 Install_Server.exe를 실행
     public void RunInstaller()
     {
@@ -97,6 +122,7 @@ public class InstallerManager : MonoBehaviour
         {
             FileName = exePath,  // 실행할 파일 경로
             UseShellExecute = true,  // 셸을 통해 실행
+            Verb = "runas", // 관리자 권한으로 실행
             CreateNoWindow = false  // 창 표시 (true면 숨김)
         };
 
