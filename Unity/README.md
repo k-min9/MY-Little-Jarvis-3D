@@ -61,12 +61,17 @@
     - DialogueManager : json으로 대사를 저장/로딩하여 관리
   - APIManager : MY-Little-Jarvis 서버를 호출하고 반환값을 관리
 
-## Handler
+### Handler
 
 - 개요 : 특정/단일 이벤트나 작업을 처리하는 단위
   - ChatHandler : 채팅시 일어나는 이벤트 관련
   - DragHandler : 드래그시 일어나는 이벤트 관련
   - ClickHandler : 클릭시 일어나는 이벤트 관련
+
+### Controller
+
+- 개요 : 여러개 있는 GameObject를 관리
+  - Portrait, Emotion...
 
 ## Assets
 
@@ -81,7 +86,7 @@
 - persistentDataPath : write에 대한 권리가 있는 장소.
   - API 등으로 전송받은 파일 저장, setting등의 로컬 파일 저장.
 
-## Troube Shooting
+## Trouble Shooting
 
 ### Windows API 사용
 
