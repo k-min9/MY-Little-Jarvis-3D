@@ -8,7 +8,9 @@ public class EmotionFaceMikaController : EmotionFaceController
     // public GameObject faceRelax, faceListen, faceWink;
     private SkinnedMeshRenderer skinnedMeshRenderer;
     private Coroutine talkCoroutine;
-    private bool talkStatus = false;
+    // private bool talkStatus = false;  // 과거방식 : Test후 삭제
+    private bool lastMouthState = false;  // update에서 변경될때만 처리되게 flag 관리
+    public string charType = "";  // 캐릭터타입을 줘서 소환시 + 분기에 사용 : ""(Sub), Operator, Main
 
     void Start()
     {
@@ -20,10 +22,34 @@ public class EmotionFaceMikaController : EmotionFaceController
     private List<string> faceEmotion = new List<string> { "normal" }; // , "relax", "listen", "wink" };
     private List<string> animationStates = new List<string> { "idle", "talk", "happy", "surprise", "wish", "wink", "><", "calm", "angry", "danger", "cry", "default" };
     private List<string> animationList = new List<string>   // Test(NextAnimation)용
-    { 
+    {
         "normal", //"relax", "listen", "wink", 
         "idle", "talk", "happy", "surprise", "wish", "wink", "><", "calm", "angry", "danger", "cry", "default"
     };
+
+    void Update()
+    {
+        bool current = StatusManager.Instance.isMouthActive;
+
+        if (current != lastMouthState)
+        {
+            lastMouthState = current;
+
+            if (current)
+            {
+                if (talkCoroutine == null)
+                    talkCoroutine = StartCoroutine(TalkAnimation());
+            }
+            else
+            {
+                if (talkCoroutine != null)
+                {
+                    StopCoroutine(talkCoroutine);
+                    talkCoroutine = null;
+                }
+            }
+        }
+    }
 
     // 얼굴 감정 변경 통합 함수
     public override void ShowEmotion(string emotion)
@@ -39,7 +65,7 @@ public class EmotionFaceMikaController : EmotionFaceController
         // }
     }
 
-     // listen등의 행동시 표정 변환
+    // listen등의 행동시 표정 변환
     public override void ShowEmotionFromAction(string action)
     {
         string selectedAnimation = "";
@@ -147,11 +173,11 @@ public class EmotionFaceMikaController : EmotionFaceController
     public void FaceNormalBlendShape(string blendType)
     {
         if (skinnedMeshRenderer == null) return;
-        
+
         // 항상 faceNormal을 활성화해야 함
         FaceChange("normal");
         ResetBlendShapes();
-        
+
         switch (blendType)
         {
             case "idle":
@@ -188,20 +214,20 @@ public class EmotionFaceMikaController : EmotionFaceController
                 skinnedMeshRenderer.SetBlendShapeWeight(GetBlendShapeIndex("B_sad2"), 100f);
                 skinnedMeshRenderer.SetBlendShapeWeight(GetBlendShapeIndex("E_cry_Eye"), 100f);
                 break;
-            case "talk":
-                if (!talkStatus)
-                {
-                    talkStatus = true;
-                    talkCoroutine = StartCoroutine(TalkAnimation());
-                }
-                break;
+            // case "talk":  // update로 일괄 통합
+            //     if (!talkStatus)
+            //     {
+            //         talkStatus = true;
+            //         talkCoroutine = StartCoroutine(TalkAnimation());
+            //     }
+            //     break;
             default:
-                if (talkCoroutine != null)
-                {
-                    StopCoroutine(talkCoroutine);
-                    talkCoroutine = null;
-                }
-                talkStatus = false;
+                // if (talkCoroutine != null)
+                // {
+                //     StopCoroutine(talkCoroutine);
+                //     talkCoroutine = null;
+                // }
+                // talkStatus = false;
                 ResetBlendShapes();
                 break;
         }
@@ -212,7 +238,7 @@ public class EmotionFaceMikaController : EmotionFaceController
         int blendShapeIndex = GetBlendShapeIndex("jaw_drop");
         if (blendShapeIndex == -1) yield break;
 
-        while (talkStatus)
+        while (StatusManager.Instance.isMouthActive)
         {
             float randomValue = Random.Range(10f, 100f);
             skinnedMeshRenderer.SetBlendShapeWeight(blendShapeIndex, randomValue);
@@ -225,7 +251,7 @@ public class EmotionFaceMikaController : EmotionFaceController
 
     private void ResetBlendShapes()
     {
-        talkStatus = false;
+        // talkStatus = false;
         for (int i = 0; i < skinnedMeshRenderer.sharedMesh.blendShapeCount; i++)
         {
             skinnedMeshRenderer.SetBlendShapeWeight(i, 0);
@@ -245,5 +271,15 @@ public class EmotionFaceMikaController : EmotionFaceController
         //         return i;
         // }
         // return -1; // 없으면 -1 반환
+    }
+
+    public override void SetCharType(string newCharType)
+    {
+        charType = newCharType;
+    }
+
+    public override string GetCharType()
+    {
+        return charType;
     }
 }

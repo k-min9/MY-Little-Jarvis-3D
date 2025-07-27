@@ -8,6 +8,7 @@ public class EmotionFaceAronaController : EmotionFaceController
     private SkinnedMeshRenderer skinnedMeshRenderer;
     private Coroutine talkCoroutine;
     private bool lastMouthState = false;  // update에서 변경될때만 처리되게 flag 관리
+    public string charType = "";  // 캐릭터타입을 줘서 소환시 + 분기에 사용 : ""(Sub), Operator, Main
 
     void Start()
     {
@@ -18,7 +19,17 @@ public class EmotionFaceAronaController : EmotionFaceController
 
     void Update()
     {
-        bool current = StatusManager.Instance.isMouthActive;
+        bool current = false;
+
+        if (charType == "Operator")
+        {
+            current = StatusManager.Instance.IsAnsweringPortrait;
+        }
+        else if (charType == "Main")
+        {
+            current = StatusManager.Instance.isMouthActive;
+        }
+        // Sub 또는 그 외: current = false (입 모션 없음)
 
         if (current != lastMouthState)
         {
@@ -43,9 +54,9 @@ public class EmotionFaceAronaController : EmotionFaceController
     private List<string> faceEmotion = new List<string> { "normal", "relax", "listen", "><" };
     private List<string> animationStates = new List<string> { "idle", "talk", "slant", "surprise", "confused", "star", "default" };
     private List<string> animationList = new List<string>   // Test(NextAnimation)용
-    { 
-        "normal", "relax", "listen", "><", 
-        "idle", "talk", "slant", "surprise", "confused", "star", "default" 
+    {
+        "normal", "relax", "listen", "><",
+        "idle", "talk", "slant", "surprise", "confused", "star", "default"
     };
 
     // 얼굴 감정 변경 통합 함수
@@ -156,11 +167,11 @@ public class EmotionFaceAronaController : EmotionFaceController
     public void FaceNormalBlendShape(string blendType)
     {
         if (skinnedMeshRenderer == null) return;
-        
+
         // 항상 faceNormal을 활성화해야 함
         FaceChange("normal");
         ResetBlendShapes();
-        
+
         switch (blendType)
         {
             case "idle":
@@ -191,13 +202,9 @@ public class EmotionFaceAronaController : EmotionFaceController
         int blendShapeIndex = GetBlendShapeIndex("mouth-a");
         if (blendShapeIndex == -1) yield break;
 
-        while (true)
+        while ((charType == "Operator" && StatusManager.Instance.IsAnsweringPortrait) ||
+            (charType == "Main" && StatusManager.Instance.isMouthActive))
         {
-            if (!StatusManager.Instance.isMouthActive)
-            {
-                break;
-            }
-
             float randomValue = Random.Range(10f, 100f);
             skinnedMeshRenderer.SetBlendShapeWeight(blendShapeIndex, randomValue);
             yield return new WaitForSeconds(Random.Range(0.1f, 0.3f));
@@ -228,5 +235,15 @@ public class EmotionFaceAronaController : EmotionFaceController
         //         return i;
         // }
         // return -1; // 없으면 -1 반환
+    }
+
+    public override void SetCharType(string newCharType)
+    {
+        charType = newCharType;
+    }
+
+    public override string GetCharType()
+    {
+        return charType;
     }
 }
