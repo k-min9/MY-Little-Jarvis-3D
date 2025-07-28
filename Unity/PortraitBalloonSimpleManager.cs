@@ -42,9 +42,6 @@ public class PortraitBalloonSimpleManager : MonoBehaviour
 
         if (StatusManager.Instance.IsAnsweringPortrait)
             UpdateBalloonPosition();
-
-        if (StatusManager.Instance.IsPicking || StatusManager.Instance.IsListening || StatusManager.Instance.IsAsking)
-            Hide();
     }
 
     public void ShowInf()
@@ -52,7 +49,6 @@ public class PortraitBalloonSimpleManager : MonoBehaviour
         hideTimer = 99999f;
         portraitBalloonSimple.SetActive(true);
         portraitText.text = string.Empty;
-        StatusManager.Instance.IsAnsweringPortrait = true;
         UpdateBalloonPosition();
     }
 
@@ -60,7 +56,6 @@ public class PortraitBalloonSimpleManager : MonoBehaviour
     {
         portraitBalloonSimple.SetActive(true);
         portraitText.text = string.Empty;
-        StatusManager.Instance.IsAnsweringPortrait = true;
         UpdateBalloonPosition();
     }
 
@@ -85,11 +80,15 @@ public class PortraitBalloonSimpleManager : MonoBehaviour
         }
     }
 
+    public void SetHideTimer(float newHideTimer)
+    {
+        if (hideTimer <= newHideTimer) hideTimer = newHideTimer;
+    }
+
     public void Hide()
     {
         hideTimer = 0f;
         portraitBalloonSimple.SetActive(false);
-        StatusManager.Instance.IsAnsweringPortrait = false;
     }
 
     private void UpdateBalloonPosition()
