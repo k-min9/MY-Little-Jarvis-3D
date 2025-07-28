@@ -459,6 +459,7 @@ public class APIManager : MonoBehaviour
 
         var memory = MemoryManager.Instance.GetAllConversationMemory();
         string memoryJson = JsonConvert.SerializeObject(memory);
+        string guidelineJson = UIUserCardManager.Instance.GetGuidelineListJson();
         string server_type = SettingManager.Instance.settings.server_type ?? "Auto";  // 0: Auto, 1: Server, 2: Free(Gemini), 3: Free(OpenRouter), 4: Paid(Gemini)
 
         // 요청 데이터 구성
@@ -475,6 +476,7 @@ public class APIManager : MonoBehaviour
             { "api_key_OpenRouter", ""},
             { "api_key_ChatGPT", ""},
             { "memory", memoryJson },
+            { "guideline_list", guidelineJson }, // ← 추가됨
             { "chatIdx", chatIdx},
             { "intent_web", ai_web_search},  // off, on, force
             { "intent_image", intent_image},  // on, off, force
