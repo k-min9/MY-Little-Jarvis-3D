@@ -37,6 +37,9 @@ public class CharManager : MonoBehaviour
 
     void Awake()
     {
+        // 선행작업 로딩
+        SettingManager.Instance.LoadSettings();
+
         // InitCharacter 호출해서 첫 번째 캐릭터를 생성
         InitCharacter();
 
@@ -59,7 +62,67 @@ public class CharManager : MonoBehaviour
         setCharSize();
     }
 
+    // 250708 기존코드
     // 첫 번째 캐릭터를 RectTransform (0,0,-70)에 생성하는 함수
+    // private void InitCharacter()
+    // {
+    //     if (charList.Count == 0)
+    //     {
+    //         Debug.LogError("Character list is empty.");
+    //         return;
+    //     }
+
+    //     // 첫 번째 캐릭터 생성, Canvas의 자식으로 설정
+    //     StatusManager.Instance.IsDragging = false;
+    //     currentCharacter = Instantiate(charList[0], Vector3.zero, charList[0].transform.rotation, canvas.transform);
+    //     currentCharacterInitLocalScale = currentCharacter.transform.localScale.x;
+
+    //     // Handler에 값 setting
+    //     setDragHandlerVar(currentCharacter);
+    //     setClickHandlerVar(currentCharacter);
+    //     setPhysicsManagerVar(currentCharacter);
+    //     setAnswerBalloonVar(currentCharacter);
+    //     setAnswerBalloonSimpleVar(currentCharacter);
+    //     setChatBalloonVar(currentCharacter);
+    //     setAskBalloonVar(currentCharacter);
+    //     setTalkMenuVar(currentCharacter);
+    //     setStatusManagerVar(currentCharacter);
+    //     setEmotionFaceController(currentCharacter);
+
+    //     // RectTransform을 찾아서 위치를 (0, 0, -70)으로 설정
+    //     RectTransform rectTransform = currentCharacter.GetComponent<RectTransform>();
+    //     if (rectTransform != null)
+    //     {
+    //         rectTransform.anchoredPosition3D = new Vector3(0, 0, -70);
+    //     }
+
+    //     // 현재 인덱스 업데이트
+    //     charIndex = 0;
+
+    // #if UNITY_ANDROID && !UNITY_EDITOR  // 안드로이드
+    //     // 현재 Dialogue 업데이트 + 변경 음성 출력
+    //     StartCoroutine(LoadAndPlayGreeting());
+    // #else
+    //     // 현재 Dialogue 업데이트
+    //     DialogueManager.Instance.LoadDialoguesFromJSON();
+
+    //     // 변경 음성 출력
+    //     Dialogue greeting = DialogueManager.Instance.GetRandomGreeting();
+    //     VoiceManager.Instance.PlayAudioFromPath(greeting.filePath);
+    // #endif
+
+    //     // 캐릭터 닉네임 출력
+    //     string nickname = GetNickname(currentCharacter);
+    //     if (!string.IsNullOrEmpty(nickname))
+    //     {
+    //         Debug.Log("Initialized character: " + nickname);
+    //     }
+    //     else
+    //     {
+    //         Debug.Log("Initialized character has no nickname.");
+    //     }
+    // }
+
     private void InitCharacter()
     {
         if (charList.Count == 0)
@@ -68,12 +131,73 @@ public class CharManager : MonoBehaviour
             return;
         }
 
-        // 첫 번째 캐릭터 생성, Canvas의 자식으로 설정
+        // 초기화
         StatusManager.Instance.IsDragging = false;
-        currentCharacter = Instantiate(charList[0], Vector3.zero, charList[0].transform.rotation, canvas.transform);
-        currentCharacterInitLocalScale = currentCharacter.transform.localScale.x;
 
-        // Handler에 값 setting
+        // 캐릭터 설정 로드 보장
+        SettingCharManager.Instance.LoadSettingChar();
+
+        // 마지막 캐릭터로 시작 옵션 사용시 charcode 검색
+        if (SettingManager.Instance.settings.isStartWithLastChar)
+        {
+            string lastChar = SettingCharManager.Instance.GetLastChar();
+            string charCode = null;
+
+            if (!string.IsNullOrEmpty(lastChar))
+            {
+                var setting = SettingCharManager.Instance.GetCharSetting(lastChar);
+                if (setting != null && !string.IsNullOrEmpty(setting.char_code))
+                {
+                    charCode = setting.char_code;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(charCode))
+            {
+                InitCharacterFromCharCode(charCode);
+                return;
+            }
+        }
+
+        // 그 외에는 무조건 기본값(arona)으로 초기화
+        InitCharacterFromCharCode("ch0184");
+
+        // fallback 저장 (최후 캐릭터/arona 저장)
+        // string nickname = GetNickname(currentCharacter);
+        // string resolvedCode = currentCharacter.GetComponent<CharAttributes>()?.charcode ?? "arona";
+
+        // SettingCharManager.Instance.SetLastChar(nickname);
+        // SettingCharManager.Instance.SaveSettingCharOutfit(nickname, resolvedCode);
+    }
+
+    private void InitCharacterFromCharCode(string charCode)
+    {
+        GameObject selectedChar = null;
+
+        foreach (GameObject obj in charList)
+        {
+            var attr = obj.GetComponent<CharAttributes>();
+            if (attr != null && attr.charcode == charCode)
+            {
+                selectedChar = obj;
+                Debug.Log($"{charCode} founded");
+                break;
+            }
+        }
+
+        // 그래도 못 찾는 경우 0번으로 fallback (이건 안전망)
+        if (selectedChar == null)
+        {
+            selectedChar = charList[0];
+            Debug.LogWarning($"charCode '{charCode}'에 해당하는 캐릭터를 찾을 수 없어 기본 캐릭터로 대체합니다.");
+        }
+
+        // 캐릭터 인스턴스 생성 및 초기화
+        StatusManager.Instance.IsDragging = false;
+        currentCharacter = Instantiate(selectedChar, Vector3.zero, selectedChar.transform.rotation, canvas.transform);
+        currentCharacterInitLocalScale = currentCharacter.transform.localScale.x;
+        Debug.Log("currentCharacterInitLocalScale : "+ currentCharacterInitLocalScale);
+
         setDragHandlerVar(currentCharacter);
         setClickHandlerVar(currentCharacter);
         setPhysicsManagerVar(currentCharacter);
@@ -83,50 +207,45 @@ public class CharManager : MonoBehaviour
         setAskBalloonVar(currentCharacter);
         setTalkMenuVar(currentCharacter);
         setStatusManagerVar(currentCharacter);
+        setEmotionFaceController(currentCharacter);
 
-        // RectTransform을 찾아서 위치를 (0, 0, -70)으로 설정
         RectTransform rectTransform = currentCharacter.GetComponent<RectTransform>();
         if (rectTransform != null)
-        {
+        { 
             rectTransform.anchoredPosition3D = new Vector3(0, 0, -70);
         }
+            
+        charIndex = charList.IndexOf(selectedChar);
+        Debug.Log("charIndex : " + charIndex);
 
-        // 현재 인덱스 업데이트
-        charIndex = 0;
-
-    #if UNITY_ANDROID && !UNITY_EDITOR  // 안드로이드
+#if UNITY_ANDROID && !UNITY_EDITOR
         // 현재 Dialogue 업데이트 + 변경 음성 출력
         StartCoroutine(LoadAndPlayGreeting());
-    #else
+#else
         // 현재 Dialogue 업데이트
         DialogueManager.Instance.LoadDialoguesFromJSON();
 
         // 변경 음성 출력
         Dialogue greeting = DialogueManager.Instance.GetRandomGreeting();
         VoiceManager.Instance.PlayAudioFromPath(greeting.filePath);
-    #endif
+#endif
 
-        // 캐릭터 닉네임 출력
         string nickname = GetNickname(currentCharacter);
-        if (!string.IsNullOrEmpty(nickname))
-        {
-            Debug.Log("Initialized character: " + nickname);
-        }
-        else
-        {
-            Debug.Log("Initialized character has no nickname.");
-        }
+        Debug.Log(string.IsNullOrEmpty(nickname) ? "Initialized character has no nickname." : $"Initialized character: {nickname}");
     }
+
 
     // 캐릭터 크기 설정 함수 (퍼센트 기반)
     public void setCharSize(int percent = 100)
-    {   
+    {
+        Debug.Log("setCharSize start");
         float char_size = SettingManager.Instance.settings.char_size;
+        Debug.Log("setCharSize 1 : " + char_size);
         if (currentCharacter != null)
         {
             float scaleFactor = currentCharacterInitLocalScale * char_size * percent / 10000f; // 퍼센트를 소수점 비율로 변환
             currentCharacter.transform.localScale = new Vector3(scaleFactor, scaleFactor, scaleFactor); // X, Y, Z 동일한 비율로 크기 조정
-            // Debug.Log("Character size set to: " + char_size + "%");
+            Debug.Log("Character size set to: " + char_size + "%");
         }
     }
 
@@ -188,6 +307,7 @@ public class CharManager : MonoBehaviour
         setAskBalloonVar(currentCharacter);
         setTalkMenuVar(currentCharacter);
         setStatusManagerVar(currentCharacter);
+        setEmotionFaceController(currentCharacter);
 
         // RectTransform 위치를 (0, 0, -70)으로 설정 (또는 이전 위치로 유지)
         RectTransform newRectTransform = currentCharacter.GetComponent<RectTransform>();
@@ -253,6 +373,25 @@ public class CharManager : MonoBehaviour
         }
         Debug.Log("ChangeCharacterFromGameObject => 일치캐릭터 없음");
     }
+
+    // 캐릭터 교체 from charcode
+    public bool ChangeCharacterFromCharCode(string changeCharcode)
+    {
+        for (int i = 0; i < charList.Count; i++)
+        {
+            CharAttributes attributes = charList[i].GetComponent<CharAttributes>();
+            if (attributes != null && attributes.charcode == changeCharcode)
+            {
+                Debug.Log($"'{changeCharcode}'로 {attributes.nickname} 발견.");
+                ChangeCharacter(i);
+                return true;
+            }
+        }
+
+        Debug.LogWarning($"ChangeCharacterFromCharCode => charCode '{changeCharcode}'에 해당하는 캐릭터를 찾을 수 없습니다.");
+        return false;
+    }
+
 
     // 다음 캐릭터로 변경하는 함수
     public void ChangeNextChar()
@@ -439,5 +578,14 @@ public class CharManager : MonoBehaviour
     public void setStatusManagerVar(GameObject charObj)
     {
         StatusManager.Instance.characterTransform = charObj.GetComponent<RectTransform>();
+    }
+    public void setEmotionFaceController(GameObject charObj)
+    {
+        EmotionFaceController emotionFaceController = charObj.GetComponentInChildren<EmotionFaceController>();
+        if (emotionFaceController != null)
+        {
+            // 있을경우 CharType을 Main으로
+            emotionFaceController.SetCharType("Main");
+        }
     }
 }
