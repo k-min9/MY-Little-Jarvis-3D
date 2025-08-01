@@ -28,9 +28,9 @@ public class OperatorManager : MonoBehaviour
 
     public GameObject currentOperator;  // 현재 Operator (현재는 아로나 고정) > TODO : ChangeOperator 구현
 
-    public bool isOperating = false; // 현재 보여주는지 확인
-    public bool isPortraitShowing = false; // 현재 보여주는지 확인
-    public bool isMouthActive = false; // 입이 현재 움직이는 중인지 여부
+    // 일정 시간 후에 종료
+    private Coroutine hideCoroutine;
+    private float hideScheduleTime = -1f;  // 기존타이머가 더 긴지 체크
 
     // Canvas 좌측 상단 기준 + (100, 100)에 오퍼레이터 배치
     public void SetBasicPosition()
@@ -40,21 +40,10 @@ public class OperatorManager : MonoBehaviour
         portraitTransform.anchoredPosition = new Vector2(100f, -180f);  // 상단 좌측 기준이므로 Y는 -
     }
 
-    // // 오퍼레이터 말풍선과 대사를 표시
-    // public void ShowPortrait(string dialogue)
-    // {
-    //     // 기본 위치 세팅
-    //     SetBasicPosition();
-
-    //     // 말풍선 표시
-    //     PortraitBalloonSimpleManager.Instance.Show();
-    //     PortraitBalloonSimpleManager.Instance.ModifyText(dialogue);
-    //     PortraitBalloonSimpleManager.Instance.HideAfterAudio();
-    // }
-
     public void ShowPortrait(string dialogue)
     {
         if (StatusManager.Instance.IsAnsweringPortrait) return;
+        StatusManager.Instance.IsAnsweringPortrait = true;
 
         SetBasicPosition();  // 여기서 portraitTransform.anchoredPosition은 최종 위치 기준임
 
@@ -75,11 +64,29 @@ public class OperatorManager : MonoBehaviour
         {
             PortraitBalloonSimpleManager.Instance.Show();
             PortraitBalloonSimpleManager.Instance.ModifyText(dialogue);
-            PortraitBalloonSimpleManager.Instance.HideAfterAudio();
+            // PortraitBalloonSimpleManager.Instance.HideAfterAudio();
         });
     }
 
+    public void HidePortrait()
+    {
+        if (!StatusManager.Instance.IsAnsweringPortrait) return;
+        StatusManager.Instance.IsAnsweringPortrait = false;
 
+        Vector2 currentPos = portraitTransform.anchoredPosition;
+        float width = portraitTransform.sizeDelta.x;
+        Vector2 targetPos = new Vector2(currentPos.x - width * 0.5f, currentPos.y);
+
+        Sequence seq = DOTween.Sequence();
+        seq.Append(portraitTransform.DOScaleX(0f, 0.4f).SetEase(Ease.InCubic));
+        seq.Join(portraitTransform.DOAnchorPos(targetPos, 0.4f).SetEase(Ease.InCubic));
+
+        // 일단은 자체적으로 update중
+        // seq.OnComplete(() =>
+        // {
+        //     PortraitBalloonSimpleManager.Instance.Hide();
+        // });
+    }
 
     // 현재 캐릭터의 public Getter 추가
     public GameObject GetCurrentOperator()
@@ -87,4 +94,31 @@ public class OperatorManager : MonoBehaviour
         return currentOperator;
     }
 
+    public void SetHideTimer(float delay)
+    {
+        float currentTime = Time.time;
+        float newHideTime = currentTime + delay;
+
+        // 기존 예약된 타이머가 없거나, 새 타이밍이 더 빠를 경우만 교체
+        if (hideCoroutine == null || newHideTime < hideScheduleTime)
+        {
+            if (hideCoroutine != null)
+            {
+                StopCoroutine(hideCoroutine);
+            }
+
+            hideScheduleTime = newHideTime;
+            hideCoroutine = StartCoroutine(HidePortraitAfterDelay(delay));
+        }
+    }
+
+    private IEnumerator HidePortraitAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+
+        HidePortrait();
+
+        hideCoroutine = null;
+        hideScheduleTime = -1f;
+    }
 }
