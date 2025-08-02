@@ -7,7 +7,7 @@ public class PortraitController : MonoBehaviour
     public GameObject character;
     public Animator characterAnimator;  // 자동검색
     public Camera portraitCamera;       // 자동검색
-    public GameObject focusTarget;
+    public GameObject focusTarget;      // TODO : 캐릭터 변경시 가장 머리 아픈 사항이 될 듯 (모델 속 head_pose 등의 노드용 gameobject 참조)
 
     private void Start()
     {

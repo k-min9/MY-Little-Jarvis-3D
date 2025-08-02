@@ -13,7 +13,8 @@ isAsking = 현재 유저의 질문을 듣고 있는지 여부 (음성인식)
 isChatting = 현재 유저의 질문을 듣고 있는지 여부 (음성인식)
 isListening = 현재 유저의 질문을 듣고 있는지 여부 (음성인식)
 isAnswering = 현재 유저에게 답하고 있는지 여부
-isAnsweringSimple = 현재 유저에게 답하고 있는지 여부 (AnswerBalloonSimple update 병렬용)
+isAnsweringSimple = 현재 유저에게 답하고 있는지 여부 (AnswerBalloonSimple update 병렬용)`1
+IsAnsweringPortrait = 현재 오퍼레이터 사용 여부(PortraitBalloonSimpleManager update 병렬용)
 isThinking = 현재 유저의 질문에 대한 답을 연산하고 있는지 여부
 isConversationing = set은 없고, isAsking, isChatting, isListening, isThinking, isAnswering이 하나라도 True이면 True를 반환
 isOptioning = 우클릭, 메뉴등의 대기 상태
@@ -55,12 +56,14 @@ public class StatusManager : MonoBehaviour
     public bool isChatting;
     public bool isAnswering;
     public bool isAnsweringSimple;  // AnswerBalloonSimple 용
+    public bool isAnsweringPortrait;  // PortraitBalloonSimple 용
     public bool isThinking;
     public bool isOptioning;
     public bool isOnTop;
     public bool isMinimize;
     public bool isAiUsing;
     public bool isMouthActive = false; // 입이 현재 움직이는 중인지 여부
+    public bool isScenario = false;  // 튜토리얼 등의 시나리오는 여러가지가 동시에 진행될 수 없음
 
     // 그 외
     public RectTransform characterTransform;
@@ -124,6 +127,11 @@ public class StatusManager : MonoBehaviour
     {
         get { return isAnsweringSimple; }
         set { isAnsweringSimple = value; }
+    }
+    public bool IsAnsweringPortrait
+    {
+        get { return isAnsweringPortrait; }
+        set { isAnsweringPortrait = value; }
     }
 
     public bool IsThinking

@@ -24,13 +24,13 @@ public class PortraitClickHandler : MonoBehaviour, IPointerClickHandler
         // 좌클릭
         if (eventData.button == PointerEventData.InputButton.Left)
         {
-            Debug.Log("Left Clicked");
+            // Debug.Log("Left Clicked");
             HandleLeftClick();
         }
         // 중앙클릭
         if (eventData.button == PointerEventData.InputButton.Middle)
         {
-            Debug.Log("Middle Clicked");
+            // Debug.Log("Middle Clicked");
             HandleMiddleClick();
         }
 #endif
@@ -105,8 +105,7 @@ public class PortraitClickHandler : MonoBehaviour, IPointerClickHandler
 
     private void HandleMiddleClick()
     {
-        Dialogue idle = DialogueManager.Instance.GetRandomIdle();
-        DoDialogueBehaviour(idle);
+        Debug.Log("Middle Clicked");
     }
 
     private void PlayRandomAnimation()
