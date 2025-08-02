@@ -18,6 +18,7 @@ public class SettingManager : MonoBehaviour
     [SerializeField] private Toggle isAlwaysOnTopToggle;
     [SerializeField] private Toggle isShowChatBoxOnClickToggle;
     [SerializeField] private Toggle isShowTutorialOnChatToggle;
+    [SerializeField] private Toggle isStartServerOnInitToggle;
 
     [Header("Character")]
     [SerializeField] private Slider charSizeSlider;
@@ -25,6 +26,8 @@ public class SettingManager : MonoBehaviour
     [SerializeField] private Slider charMobilitySlider;
     [SerializeField] private Toggle isGravityToggle;
     [SerializeField] private Toggle isWindowsCollisionToggle;
+    [SerializeField] private Toggle isStartWithLastCharToggle;
+    [SerializeField] private Toggle isRememberCharOutfitsToggle;
 
     [Header("Sound")]
     [SerializeField] private Dropdown soundLanguageDropdown;
@@ -50,6 +53,7 @@ public class SettingManager : MonoBehaviour
     [SerializeField] private Text keyTestResultText;
 
     [Header("AI")]
+    [SerializeField] private Dropdown aiServerStatusDropdown;
     [SerializeField] private Dropdown aiWebSearchDropdown;
     [SerializeField] private Dropdown aiAskIntentDropdown;
     [SerializeField] private Dropdown aiLangDropdown;
@@ -65,6 +69,9 @@ public class SettingManager : MonoBehaviour
     [SerializeField] private Text aiInfoTranslator;
     [SerializeField] private Text aiInfoTime;
     [SerializeField] private Text aiInfoIntent;
+
+    [Header("Dev")]
+    [SerializeField] private Toggle devHowlingToggle;
 
     // 기타 표시용 UI
     public Text soundSpeedMasterText;
@@ -84,6 +91,8 @@ public class SettingManager : MonoBehaviour
         public bool isAlwaysOnTop;
         public bool isShowChatBoxOnClick;
         public bool isShowTutorialOnChat;
+        public bool isTutorialCompleted;
+        public bool isStartServerOnInit;
 
         public string char_lastUsed;
         public float char_size;
@@ -91,6 +100,8 @@ public class SettingManager : MonoBehaviour
         public float char_speed;
         public bool isGravity;
         public bool isWindowsCollision;
+        public bool isStartWithLastChar;
+        public bool isRememberCharOutfits;
 
         public int sound_language_idx;  // 0 : ko, 1 : jp, 2: en
         public string sound_language;
@@ -103,6 +114,7 @@ public class SettingManager : MonoBehaviour
         public string api_key_gemini;
         public string api_key_openRouter;
         public string model_type;  // qwen-14b 등
+        
         public int ai_web_search_idx;  // 0 : off, 1 : on, 2: force
         public string ai_web_search;
         public int ai_ask_intent_idx;  // 0 : off, 1 : on
@@ -111,6 +123,9 @@ public class SettingManager : MonoBehaviour
         public bool isAskedTurnOnServer;
         public bool isAPITest;
         public bool confirmUserIntent;
+
+        // Dev용 데이터
+        public bool isDevHowling;  
 
         // UI외 데이터
         public bool wantFreeServer;  // 무료서버연결의향
@@ -146,7 +161,8 @@ public class SettingManager : MonoBehaviour
         SaveSettings(); 
     }
     public void SetIsShowChatBoxOnClick(bool value) {settings.isShowChatBoxOnClick = value; SaveSettings(); }
-    public void SetIsShowTutorialOnChat(bool value) {settings.isShowTutorialOnChat = value; SaveSettings(); }
+    public void SetIsShowTutorialOnChat(bool value) {settings.isShowTutorialOnChat = value; settings.isTutorialCompleted = !value; SaveSettings(); }
+    public void SetIsisStartServerOnInit(bool value) {settings.isStartServerOnInit = value; SaveSettings(); }
 
     public void SetCharLastUsed(string value) { settings.char_lastUsed = value; SaveSettings(); }
     public void SetCharSize(float value) { settings.char_size = value; CharManager.Instance.setCharSize(); SaveSettings(); charSizeText.text="Size ("+(int)settings.char_size+")";}
@@ -154,26 +170,31 @@ public class SettingManager : MonoBehaviour
     public void SetCharMobility(float value) { settings.char_mobility = value; SaveSettings(); }
     public void SetIsGravity(bool value) { settings.isGravity = value; SaveSettings(); }
     public void SetIsWindowsCollision(bool value) { settings.isWindowsCollision = value; WindowCollisionManager.Instance.SetWindowsRectChecking(value); SaveSettings(); }
+    public void SetIsStartWithLastChar(bool value) { settings.isStartWithLastChar = value; SaveSettings(); }
+    public void SetIsRememberCharOutfits(bool value) { settings.isRememberCharOutfits = value; SaveSettings(); }
 
     public void SetSoundLanguageType() { int value=soundLanguageDropdown.value; settings.sound_language_idx = value; settings.sound_language=getLangFromIdx(value); SaveSettings(); }
     public void SetSoundVolumeMaster(float value) { settings.sound_volumeMaster = value; SaveSettings(); }
     public void SetSoundSpeedMaster(float value) { settings.sound_speedMaster = value; SaveSettings(); soundSpeedMasterText.text="Speed (" + (int)settings.sound_speedMaster + "%)";}
 
     public void SetServerType() { int value=serverTypeDropdown.value; settings.server_type_idx = value; settings.server_type=getServerTypeFromIdx(value); LanguageManager.Instance.SetServerServerTypeInfoTooltip(value); SetServerUIFromServerType(value); SaveSettings(); LanguageManager.Instance.SetUILanguage(); }
+    public void SetServerTypeByValue(int value) { serverTypeDropdown.value = value; settings.server_type_idx = value; settings.server_type=getServerTypeFromIdx(value); LanguageManager.Instance.SetServerServerTypeInfoTooltip(value); SetServerUIFromServerType(value); SaveSettings(); LanguageManager.Instance.SetUILanguage(); }
     public void SetServerID(string value) { settings.server_id = value; SaveSettings(); }
     public void SetAPIKeyGemini(string value) { settings.api_key_gemini = value; SaveSettings(); }
     public void SetAPIKeyOpenRouter(string value) { settings.api_key_openRouter = value; SaveSettings(); }
-    public void SetServerModelType() { int value = serverModelTypeDropdown.value; string displayName = serverModelTypeDropdown.options[value].text; settings.model_type = ServerModelData.GetIdByDisplayName(displayName); SetServerUIFromServerModel(ServerModelData.GetFileNameByDisplayName(displayName)); SaveSettings(); }    
-    public void SetAIWebSearch() { int value=aiWebSearchDropdown.value; settings.ai_web_search_idx = value; settings.ai_web_search=getONOFFTypeFromIdx(value); SaveSettings(); }
+    public void SetServerModelType() { int value = serverModelTypeDropdown.value; string displayName = serverModelTypeDropdown.options[value].text; settings.model_type = ServerModelData.GetIdByDisplayName(displayName); SetServerUIFromServerModel(ServerModelData.GetFileNameByDisplayName(displayName)); SaveSettings(); }
+
+    public void SetAIWebSearch() { int value = aiWebSearchDropdown.value; settings.ai_web_search_idx = value; settings.ai_web_search = getONOFFTypeFromIdx(value); SaveSettings(); }
     public void SetAIAskIntent() { int value=aiAskIntentDropdown.value; settings.ai_ask_intent_idx = value; settings.server_type=getONOFFTypeFromIdx(value); SaveSettings(); }
     public void SetIsAskedTurnOnServer(bool value) { settings.isAskedTurnOnServer = value; SaveSettings(); }
     public void SetIsAPITest(bool value) { settings.isAPITest = value; SaveSettings(); }
     public void SetConfirmUserIntent(bool value) { settings.confirmUserIntent = value; SaveSettings(); }  // SetAIAskIntent Toggle 버전
     public void SetAiLanguage() { int value=aiLangDropdown.value; settings.ai_language_idx = value; settings.ai_language=getAiLangFromIdx(value); SaveSettings(); }
 
+    public void SetIsDevHowlingToggle(bool value) { settings.isDevHowling = value; SaveSettings(); }  
 
     // 표시용
-    public void SetServerInfoText(string text) {serverInfoText.text=text;}
+    public void SetServerInfoText(string text) { serverInfoText.text = text; }
     public void RefreshAIInfoText(string ai_info_server_type, string ai_info_model, string ai_info_prompt, string ai_info_lang_used, string ai_info_translator, string ai_info_time, string ai_info_intent) {
     aiInfoServerType.text = ai_info_server_type;
     aiInfoModel.text = ai_info_model;
@@ -188,17 +209,6 @@ public class SettingManager : MonoBehaviour
 
     void Awake()
     {
-        // 싱글톤 설정
-        if (instance == null)
-        {
-            instance = this;
-        }
-        else
-        {
-            // Destroy(gameObject);
-            return;
-        }
-
         // 저장 경로를 Application.persistentDataPath로 설정
         string directoryPath = Path.Combine(Application.persistentDataPath, "config");
         configFilePath = Path.Combine(directoryPath, "settings.json");
@@ -221,6 +231,9 @@ public class SettingManager : MonoBehaviour
         // 현재 플랫폼 세팅
         SetPlatformInfoDropdown();
         SetServerModelDropdownOptions();
+
+        // 서버 상태 세팅
+        SetInstallStatus();
 
         // 로딩후 UI
         SetUIAfterLoading();
@@ -247,21 +260,79 @@ public class SettingManager : MonoBehaviour
             platformInfoDropdown.value = 2; // Extra
         #endif
     }
-        
-    private void SetDefaultServerTypeByPlatform()
+    
+    [Serializable]
+    public class InstallStatusData
     {
-        serverTypeDropdown.value = 2; // Server
-#if UNITY_EDITOR
-        serverTypeDropdown.value = 1; // Local
-#elif UNITY_STANDALONE
-            serverTypeDropdown.value = 1; // Local
-#else
-            serverTypeDropdown.value = 2; // Server
-#endif
-
-        settings.server_type_idx = serverTypeDropdown.value;
-        settings.server_type = getServerTypeFromIdx(serverTypeDropdown.value);
+        public string version;  // "lite" or "full"
     }
+
+    public void SetInstallStatus()
+    {
+        try
+        {
+            // 실행 파일 기준 ../config/install_status.json
+            string executablePath = Application.dataPath;
+            string installStatusPath = Path.Combine(Path.GetDirectoryName(executablePath), "config/install_status.json");
+            // string installStatusPath = Path.Combine(Application.dataPath, "../config/install_status.json");
+            if (!File.Exists(installStatusPath))
+            {
+                Debug.LogWarning("설치 상태 파일이 존재하지 않습니다.");
+                return;
+            }
+
+            string json = File.ReadAllText(installStatusPath);
+            InstallStatusData installStatus = JsonUtility.FromJson<InstallStatusData>(json);
+
+            if (installStatus == null || string.IsNullOrEmpty(installStatus.version))
+            {
+                Debug.LogWarning("설치 상태를 읽을 수 없습니다.");
+                return;
+            }
+
+            if (installStatus.version == "lite")
+            {
+                Debug.Log("Lite 버전으로 설치됨");
+                // 필요한 UI 제한 또는 정보 표기 가능
+                aiServerStatusDropdown.value = 1;  // Lite
+            }
+            else if (installStatus.version == "full")
+            {
+                Debug.Log("Full 버전으로 설치됨");
+                aiServerStatusDropdown.value = 2;  // Full
+            }
+            else
+            {
+                Debug.LogWarning("알 수 없는 설치 버전: " + installStatus.version);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("설치 상태 확인 중 오류 발생: " + ex.Message);
+        }
+    }
+
+    public int GetInstallStatus()
+    {
+        return aiServerStatusDropdown.value;
+    }
+
+            
+        
+//     private void SetDefaultServerTypeByPlatform()
+//     {
+//         serverTypeDropdown.value = 2; // Server
+// #if UNITY_EDITOR
+//         serverTypeDropdown.value = 1; // Local
+// #elif UNITY_STANDALONE
+//             serverTypeDropdown.value = 1; // Local
+// #else
+//             serverTypeDropdown.value = 2; // Server
+// #endif
+
+    //         settings.server_type_idx = serverTypeDropdown.value;
+    //         settings.server_type = getServerTypeFromIdx(serverTypeDropdown.value);
+    //     }
 
     private void SetServerModelDropdownOptions()
     {
@@ -356,8 +427,11 @@ public class SettingManager : MonoBehaviour
 
 
     // 설정 데이터를 JSON 파일에서 불러오기
-    private void LoadSettings()
+    public void LoadSettings()
     {
+        string directoryPath = Path.Combine(Application.persistentDataPath, "config");
+        configFilePath = Path.Combine(directoryPath, "settings.json");
+
         try
         {
             if (File.Exists(configFilePath))
@@ -377,6 +451,8 @@ public class SettingManager : MonoBehaviour
             SetDefaultValues();
             SaveSettings();
         }
+        Debug.Log("LoadSettings End");
+        Debug.Log(settings);
     }
 
     // UI 세팅 적용
@@ -388,13 +464,16 @@ public class SettingManager : MonoBehaviour
         isAlwaysOnTopToggle.isOn = settings.isAlwaysOnTop;
         isShowChatBoxOnClickToggle.isOn = settings.isShowChatBoxOnClick;
         isShowTutorialOnChatToggle.isOn = settings.isShowTutorialOnChat;
+        isStartServerOnInitToggle.isOn = settings.isStartServerOnInit;
 
         charSizeSlider.value = settings.char_size;
         charSpeedSlider.value = settings.char_speed;
         charMobilitySlider.value = settings.char_mobility;
         isGravityToggle.isOn = settings.isGravity;
         isWindowsCollisionToggle.isOn = settings.isWindowsCollision;
-
+        isStartWithLastCharToggle.isOn = settings.isStartWithLastChar;
+        isRememberCharOutfitsToggle.isOn = settings.isRememberCharOutfits;
+        
         soundLanguageDropdown.value = settings.sound_language_idx;
         soundVolumeMasterSlider.value = settings.sound_volumeMaster;
         soundSpeedMasterSlider.value = settings.sound_speedMaster;
@@ -409,10 +488,12 @@ public class SettingManager : MonoBehaviour
         isAPITestToggle.isOn = settings.isAPITest;
         confirmUserIntentToggle.isOn = settings.confirmUserIntent;
 
+        devHowlingToggle.isOn = settings.isDevHowling;
+
         // Text 계열
-        soundSpeedMasterText.text="Speed (" + (int)settings.sound_speedMaster + "%)";
-        charSizeText.text="Size ("+(int)settings.char_size+"%)";
-        RefreshAIInfoText("","","","","","","");
+        soundSpeedMasterText.text = "Speed (" + (int)settings.sound_speedMaster + "%)";
+        charSizeText.text = "Size (" + (int)settings.char_size + "%)";
+        RefreshAIInfoText("", "", "", "", "", "", "");
 
         // 초기값일 경우 UI가 반영되지 않으므로 한번 더 호출
         LanguageManager.Instance.SetUILanguage();
@@ -421,6 +502,8 @@ public class SettingManager : MonoBehaviour
     // 설정 데이터를 JSON 파일에 저장하는 함수
     public void SaveSettings()
     {
+        string directoryPath = Path.Combine(Application.persistentDataPath, "config");
+        configFilePath = Path.Combine(directoryPath, "settings.json");
         try
         {
             // 설정 데이터를 JSON으로 변환
@@ -492,7 +575,7 @@ public class SettingManager : MonoBehaviour
     // 서버 모델 보유시 아이콘 변경
     public void SetServerUIFromServerModel(string modelFileName)
     {
-        Debug.Log(modelFileName);
+        // Debug.Log(modelFileName);
         // 링크설정용
         // string streamingAssetsPath = Application.streamingAssetsPath;  // StreamingAssets 폴더 경로
         // string executablePath = Application.dataPath;  // Unity 실행 파일이 있는 폴더 경로
@@ -528,6 +611,8 @@ public class SettingManager : MonoBehaviour
         settings.isAlwaysOnTop = false;
         settings.isShowChatBoxOnClick = false;
         settings.isShowTutorialOnChat = true;
+        settings.isTutorialCompleted = false;
+        settings.isStartServerOnInit = true;
 
         settings.char_size = 100;
         settings.char_lastUsed = "mari";
@@ -535,6 +620,8 @@ public class SettingManager : MonoBehaviour
         settings.char_speed = 100;
         settings.isGravity = true;
         settings.isWindowsCollision = false;
+        settings.isStartWithLastChar = true;
+        settings.isRememberCharOutfits = false;
 
         settings.sound_language_idx = 1;  // jp
         settings.sound_language = "jp";
@@ -553,6 +640,8 @@ public class SettingManager : MonoBehaviour
         settings.isAskedTurnOnServer = true;
         settings.isAPITest = false;
         settings.confirmUserIntent = false;
+
+        settings.isDevHowling = false;
 
         settings.wantFreeServer = false;  // 무료서버연결의향
     }
