@@ -6,12 +6,14 @@ using DevionGames.UIWidgets;
 using ContextMenu = DevionGames.UIWidgets.ContextMenu;
 using UnityEngine.EventSystems;
 using System;
+using UnityEngine.Events;
 
 public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 {
     private TransparentWindow _transparentWindow;
     private CharAttributes _charAttributes;
     private ContextMenu m_ContextMenu;
+    private ContextMenu m_ContextMenuSub;
     private bool itemChkFlag = false;
     private float chkTimer = 0f; // 타이머 변수 추가
     private bool isLeftClickHeld = false; // 좌클릭 상태
@@ -23,6 +25,7 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     private void Start()
     {
         this.m_ContextMenu = WidgetUtility.Find<ContextMenu>("ContextMenu");
+        this.m_ContextMenuSub = WidgetUtility.Find<ContextMenu>("ContextMenuSub"); // SubMenu 인스턴스 직접 참조
         this._transparentWindow = FindObjectOfType<TransparentWindow>();  // GameObject에 있음
         this._charAttributes = FindObjectOfType<CharAttributes>();
         this.m_RadialMenuAction = WidgetUtility.Find<RadialMenu>("RadialMenuAction");
@@ -90,6 +93,37 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         }
     }
 
+    /*
+    Context Menu
+    ├ Settings(세팅 창 열기)
+    ├ Character
+    │   ├ Action (원형 메뉴: 이동/행동 등)
+    │   ├ Change Char (캐릭터 변경)
+    │   ├ Summon Char (서브 캐릭터 소환)
+    │   └ Change Clothes (의상 변경)
+    ├ Chat
+    │   ├ Guideline (주의사항)
+    │   ├ Situation (퍼스트메시지)
+    │   ├ Chat History (채팅 이력 보기)
+    │   └ Erase Memory (대화 메모리 초기화)
+    ├ Control
+    │   ├ Show TalkMenu (음성입력 리모컨)
+    │   └ Show/Hide TalkInfo (음성 텍스트 토글)
+    ├ Screen
+    │   ├ Set Screenshot Area (스크린샷 범위 설정)
+    │   └ Show Screenshot (스크린샷 결과 보기)
+    ├ Talk
+    │   ├ Show Tutorial (튜토리얼 시작하기)
+    │   └ Idle Talk (자율 발화 시작)
+    ├ Util
+    │   ├ Alarm (알람 기능)
+    │   └ Minigame1 (미니게임 실행)
+    ├ Dev (Editor 전용)
+    │   ├ Debug (디버그 로그 실행)
+    │   ├ Test / Test2 / Test3 (서브 메뉴 테스트)
+    ├ Version (버전 창 열기) 
+    └ Exit (프로그램 종료) 
+    */
     private void TriggerMenu()
     {
         this.m_ContextMenu.Clear();
@@ -99,82 +133,119 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         string targetLang = SettingManager.Instance.settings.ui_language; // 0 : ko, 1 : jp, 2: en 
 
         // setting
-        // menuName = LanguageData.Translate("Settings", targetLang);
-        m_ContextMenu.AddMenuItem("Settings", delegate {   // Language로 향하는 과정은 전부 영어로만
+        // menuName = LanguageData.Translate("Settings", targetLang);  // Setting은 언어 상관없이 영어로
+        m_ContextMenu.AddMenuItem("Settings", delegate {
             UIManager.Instance.showSettings();
         });
-        menuName = LanguageData.Translate("Settings", targetLang);
-        m_ContextMenu.AddMenuItem("Action", delegate { 
-            OnPointerDownRadialMenuAction();
-        });
-        m_ContextMenu.AddMenuItem("Change Char", delegate { 
-            UIManager.Instance.ShowCharChange();
-        });
-        m_ContextMenu.AddMenuItem("Summon Char", delegate { 
-            UIManager.Instance.ShowCharAdd();
-        });
-        m_ContextMenu.AddMenuItem("Chat History", delegate { 
-            UIManager.Instance.ShowChatHistory();
+
+        // 캐릭터 분류
+        m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Character", targetLang), new List<(string, UnityAction)>
+        {
+            (LanguageData.Translate("Action", targetLang), delegate { OnPointerDownRadialMenuAction(); }),
+            (LanguageData.Translate("Change Char", targetLang), delegate { UIManager.Instance.ShowCharChange(); }),
+            (LanguageData.Translate("Summon Char", targetLang), delegate { UIManager.Instance.ShowCharAdd(); }),
+            (LanguageData.Translate("Change Clothes", targetLang), delegate {
+                if (_charAttributes.toggleClothes != null || _charAttributes.changeClothes != null)
+                {
+                    CharManager.Instance.ChangeClothes();
+                }
+            }),
         });
 
-        if (_charAttributes.toggleClothes != null || _charAttributes.changeClothes!=null) {
-            m_ContextMenu.AddMenuItem("Change Clothes", delegate { 
-                CharManager.Instance.ChangeClothes();
-            });
-        }
-
-        m_ContextMenu.AddMenuItem("Erase Memory", delegate { 
-            MemoryManager.Instance.ResetConversationMemory();
-
-            AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
-            AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Memory Erased");
+        // Chat
+        m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Chat", targetLang), new List<(string, UnityAction)>
+        {
+            (LanguageData.Translate("Guideline", targetLang), delegate { UIManager.Instance.ShowGuideLine(); }), 
+            (LanguageData.Translate("Situation", targetLang), delegate { Debug.Log("Situation 선택됨"); }), // TODO : 구현 예정
+            (LanguageData.Translate("New Chat", targetLang), delegate {
+                MemoryManager.Instance.ResetConversationMemory();
+                AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+                AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Memory Erased");
+            }),
+            (LanguageData.Translate("Chat History", targetLang), delegate { UIManager.Instance.ShowChatHistory(); }),
         });
 
-        if (TalkMenuManager.Instance.isShowing == false) {
-            m_ContextMenu.AddMenuItem("Show TalkMenu", delegate { 
-                TalkMenuManager.Instance.ShowTalkMenu();
-            });
-        }
+        // Control
+        m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Control", targetLang), new List<(string, UnityAction)>
+        {
+            (LanguageData.Translate("Show Voice Panel", targetLang), delegate { TalkMenuManager.Instance.ShowTalkMenu(); }),
+            (
+                NoticeBalloonManager.Instance.noticeBalloon.activeSelf ?
+                LanguageData.Translate("Hide TalkInfo", targetLang) :
+                LanguageData.Translate("Show TalkInfo", targetLang),
+                delegate {
+                    if (NoticeBalloonManager.Instance.noticeBalloon.activeSelf)
+                    {
+                        NoticeBalloonManager.Instance.HideNoticeBalloon();
+                    }
+                    else
+                    {
+                        NoticeBalloonManager.Instance.ShowNoticeBalloon();
+                    }
+                }
+            )
+        });
 
-        if (NoticeBalloonManager.Instance.noticeBalloon.activeSelf) {
-            m_ContextMenu.AddMenuItem("Hide TalkInfo", delegate { 
-                NoticeBalloonManager.Instance.HideNoticeBalloon();
-            });
-        } else {
-            m_ContextMenu.AddMenuItem("Show TalkInfo", delegate { 
-                NoticeBalloonManager.Instance.ShowNoticeBalloon();
-            });
-        }
+        // Screen
+#if UNITY_STANDALONE_WIN
+        m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Screen", targetLang), new List<(string, UnityAction)>
+        {
+            (LanguageData.Translate("Set Screenshot Area", targetLang), delegate {
+                ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+                if (sm != null) sm.SetScreenshotArea();
+            }),
+            (LanguageData.Translate("Show Screenshot", targetLang), delegate {
+                ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+                if (sm != null) {
+                    sm.SaveScreenshot();
+                    sm.ShowScreenshotImage();
+                }
+            })
+        });
+#endif
+        // Talk
+        m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Talk", targetLang), new List<(string, UnityAction)>
+        {
+            (LanguageData.Translate("Show Tutorial", targetLang), delegate { ScenarioTutorialManager.Instance.StartTutorial(); }),
+            (LanguageData.Translate("Idle Talk", targetLang), delegate { Debug.Log("Idle Talk 시작"); }) // 구현 예정
+        });
 
-        #if UNITY_STANDALONE_WIN
-        m_ContextMenu.AddMenuItem("Change Monitor", delegate { 
-            _transparentWindow.NextMonitor(); 
+        // Util
+        m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Util", targetLang), new List<(string, UnityAction)>
+        {
+            (LanguageData.Translate("Alarm", targetLang), delegate { Debug.Log("[Alarm] 알람 기능 호출됨"); }),
+            (LanguageData.Translate("Minigame1", targetLang), delegate { Debug.Log("[Minigame] 미니게임1 호출됨"); })
         });
-        m_ContextMenu.AddMenuItem("Set Screenshot Area", delegate {  
-            ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();  // 최상위 ScreenshotManager
-            sm.SetScreenshotArea();
+
+        // Dev
+#if UNITY_EDITOR
+        m_ContextMenu.AddMenuItem(LanguageData.Translate("Debug", targetLang), delegate {
+            // EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), 10.0f);
+
+            // AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+            // AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Testing...");
+            // StartCoroutine(ScenarioCommonManager.Instance.Scenario_C02_AskToStartServer());
+            // CharManager.Instance.ChangeCharacterFromCharCode("ch0139");
         });
-        m_ContextMenu.AddMenuItem("Get Screenshot", delegate { 
-            ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();  // 최상위 ScreenshotManager
-            sm.SaveScreenshot(); 
+        m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Dev", targetLang), new List<(string, UnityAction)>
+        {
+            (LanguageData.Translate("Test", targetLang), delegate {
+                Debug.Log("Test 실행");
+            }),
+            (LanguageData.Translate("Test2", targetLang), delegate { Debug.Log("Test2 실행"); }),
+            (LanguageData.Translate("Test3", targetLang), delegate { Debug.Log("Test3 실행"); })
         });
-        #endif
-        // m_ContextMenu.AddMenuItem("Local AI Server", delegate { 
-        //     ServerManager.AskStartServer();
-        // });
-        m_ContextMenu.AddMenuItem("Version", delegate { 
+#endif
+
+        // Version
+        m_ContextMenu.AddMenuItem(LanguageData.Translate("Version", targetLang), delegate {
             UIManager.Instance.ShowVersion();
         });
-        // For Test
-// #if UNITY_EDITOR
-        m_ContextMenu.AddMenuItem("Debug", delegate {  // 테스트용
-            Debug.Log("======Test Start======");
-            // EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), 10.0f);
-            EmotionManager.Instance.NextEmotion();
-            Debug.Log("=======Test End=======");
+
+        // Exit
+        m_ContextMenu.AddMenuItem(LanguageData.Translate("Exit", targetLang), delegate {
+            Application.Quit();
         });
-// #endif
-        m_ContextMenu.AddMenuItem("Exit", delegate { Application.Quit(); });
 
         // 메뉴 보이기
         this.m_ContextMenu.Show();
@@ -202,3 +273,4 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         m_RadialMenuAction.GetComponent<RectTransform>().anchoredPosition = new Vector2(characterTransformPos.x, characterTransformPos.y + 200 * SettingManager.Instance.settings.char_size / 100f + 100);
     }
 }
+
