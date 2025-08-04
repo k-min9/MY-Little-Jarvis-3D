@@ -140,27 +140,17 @@ public class CharManager : MonoBehaviour
         // 마지막 캐릭터로 시작 옵션 사용시 charcode 검색
         if (SettingManager.Instance.settings.isStartWithLastChar)
         {
-            string lastChar = SettingCharManager.Instance.GetLastChar();
-            string charCode = null;
+            string last_char = SettingCharManager.Instance.GetLastChar();
 
-            if (!string.IsNullOrEmpty(lastChar))
+            if (!string.IsNullOrEmpty(last_char))
             {
-                var setting = SettingCharManager.Instance.GetCharSetting(lastChar);
-                if (setting != null && !string.IsNullOrEmpty(setting.char_code))
-                {
-                    charCode = setting.char_code;
-                }
-            }
-
-            if (!string.IsNullOrEmpty(charCode))
-            {
-                InitCharacterFromCharCode(charCode);
+                InitCharacterFromCharCode(last_char);
                 return;
             }
         }
 
         // 그 외에는 무조건 기본값(arona)으로 초기화
-        InitCharacterFromCharCode("ch0184");
+        InitCharacterFromCharCode("arona");
 
         // fallback 저장 (최후 캐릭터/arona 저장)
         // string nickname = GetNickname(currentCharacter);
@@ -172,6 +162,7 @@ public class CharManager : MonoBehaviour
 
     private void InitCharacterFromCharCode(string charCode)
     {
+        Debug.Log("InitCharacterFromCharCode Start : " + charCode);
         GameObject selectedChar = null;
 
         foreach (GameObject obj in charList)
@@ -267,6 +258,31 @@ public class CharManager : MonoBehaviour
             return;
         }
 
+        // 캐릭터 복장 기억 설정이 켜져 있으면 char_code 기반으로 idx 교체 시도
+        if (SettingManager.Instance.settings.isRememberCharOutfits)
+        {
+            string nicknameCurrentCharacter = GetNickname(currentCharacter);
+            string nicknameForOutfit = GetNickname(charList[index]);
+            if (!string.IsNullOrEmpty(nicknameForOutfit) &&
+                (!string.IsNullOrEmpty(nicknameCurrentCharacter) && nicknameCurrentCharacter != nicknameForOutfit))  // 현재캐릭터가 아님
+            {
+                var setting = SettingCharManager.Instance.GetCharSetting(nicknameForOutfit);
+                if (setting != null && !string.IsNullOrEmpty(setting.char_code))
+                {
+                    for (int i = 0; i < charList.Count; i++)
+                    {
+                        var attr = charList[i].GetComponent<CharAttributes>();
+                        if (attr != null && attr.charcode == setting.char_code)
+                        {
+                            Debug.Log($"[Outfit Recall] '{nicknameForOutfit}' 저장된 의상 '{setting.char_code}' 사용 → index {i}로 대체");
+                            index = i;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
         // 기존 캐릭터 제거 전 정보제거
         // 기존의 answerballoon이 있을경우 Hide
         if (AnswerBalloonManager.Instance.isAnswered) AnswerBalloonManager.Instance.HideAnswerBalloon();
@@ -299,7 +315,7 @@ public class CharManager : MonoBehaviour
 
         // Handler에 값 setting
         setDragHandlerVar(currentCharacter);
-        setClickHandlerVar (currentCharacter);
+        setClickHandlerVar(currentCharacter);
         setPhysicsManagerVar(currentCharacter);
         setAnswerBalloonVar(currentCharacter);
         setAnswerBalloonSimpleVar(currentCharacter);
@@ -319,19 +335,19 @@ public class CharManager : MonoBehaviour
         // 현재 인덱스 업데이트
         charIndex = index;
 
-    #if UNITY_ANDROID && !UNITY_EDITOR  // 안드로이드
+#if UNITY_ANDROID && !UNITY_EDITOR  // 안드로이드
         // 현재 Dialogue 업데이트 + 변경 음성 출력
         StartCoroutine(LoadAndPlayGreeting());
-    #else
+#else
         // 현재 Dialogue 업데이트
         DialogueManager.Instance.LoadDialoguesFromJSON();
 
         // 변경 음성 출력
         Dialogue greeting = DialogueManager.Instance.GetRandomGreeting();
         VoiceManager.Instance.PlayAudioFromPath(greeting.filePath);
-    #endif
+#endif
 
-        // TODO : 이펙트(FX, SFX) 효과
+        // 이펙트(FX, SFX) 효과
         fx_change.transform.position = canvas.transform.TransformPoint(previousPosition);
         fx_change.Play();
 
@@ -346,6 +362,9 @@ public class CharManager : MonoBehaviour
         {
             Debug.Log("Character has no nickname.");
         }
+
+        // 현재 캐릭터 설정 SettingCharManager로 settings_char.json에 저장 (옷변경도 해당함수 사용)
+        SaveCurrentCharacterSetting();
     }
 
     public IEnumerator LoadAndPlayGreeting()
@@ -456,6 +475,21 @@ public class CharManager : MonoBehaviour
         }
         return null;
     }
+
+    // 현재 캐릭터 정보를 SettingCharManager에 저장
+    private void SaveCurrentCharacterSetting()
+    {
+        if (currentCharacter == null) return;
+
+        string nickname = GetNickname(currentCharacter);
+        string charCode = currentCharacter.GetComponent<CharAttributes>()?.charcode ?? "arona";
+
+        SettingCharManager.Instance.SetLastChar(charCode);
+        SettingCharManager.Instance.SaveSettingCharOutfit(nickname, charCode);
+
+        Debug.Log($"캐릭터 설정 저장됨: nickname={nickname}, charcode={charCode}");
+    }
+
 
     // 캐릭터 프리팹에서 Nickname 컴포넌트가 있는 경우, 닉네임을 가져오는 함수
     public Sprite GetCharSprite(GameObject character)
