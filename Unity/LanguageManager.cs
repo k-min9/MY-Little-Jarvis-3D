@@ -51,6 +51,10 @@ public class LanguageManager : MonoBehaviour
     public Text settingsGeneralShowChatBoxOnClickLabel;
     public Text settingsGeneralShowTutorialOnChat;
     public Text settingsGeneralStartServerOnInit;
+    public Text settingsCharApplyGravity;
+    public Text settingsCharWindowsCollision;
+    public Text settingsCharStartWithLastChar;
+    public Text settingsCharRememberCharOutfits;
     public Text settingDisplayStyleLabel;
     public Text settingDisplayMenuLabel;
     public TooltipTrigger settingServerServerInfoIconTooltipTrigger;
@@ -105,9 +109,13 @@ public class LanguageManager : MonoBehaviour
         settingsGeneralShowChatBoxOnClickLabel.text = LanguageData.Translate(settingsGeneralShowChatBoxOnClickLabel.text, targetLang);
         settingsGeneralShowTutorialOnChat.text = LanguageData.Translate(settingsGeneralShowTutorialOnChat.text, targetLang);
         settingsGeneralStartServerOnInit.text = LanguageData.Translate(settingsGeneralStartServerOnInit.text, targetLang);
-
+        settingsCharApplyGravity.text = LanguageData.Translate(settingsCharApplyGravity.text, targetLang);
+        settingsCharWindowsCollision.text = LanguageData.Translate(settingsCharWindowsCollision.text, targetLang);
+        settingsCharStartWithLastChar.text = LanguageData.Translate(settingsCharStartWithLastChar.text, targetLang);
+        settingsCharRememberCharOutfits.text = LanguageData.Translate(settingsCharRememberCharOutfits.text, targetLang);
         settingDisplayStyleLabel.text = LanguageData.Translate(settingDisplayStyleLabel.text, targetLang);
         settingDisplayMenuLabel.text = LanguageData.Translate(settingDisplayMenuLabel.text, targetLang);
+        
         settingServerServerInfoIconTooltipTrigger.tooltip = LanguageData.Translate(settingServerServerInfoIconTooltipTrigger.tooltip, targetLang);
         settingServerModelTypeDownloadTooltipTrigger.tooltip = LanguageData.Translate(settingServerModelTypeDownloadTooltipTrigger.tooltip, targetLang);
 
