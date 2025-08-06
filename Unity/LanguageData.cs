@@ -6,6 +6,7 @@ public static class LanguageData
 {
     public static readonly List<Dictionary<string, string>> Texts = new List<Dictionary<string, string>>
     {
+        // UI
         new Dictionary<string, string> { { "ko", "설정" }, { "jp", "設定" }, { "en", "Settings" } },
         new Dictionary<string, string> { { "ko", "플레이어 이름" }, { "jp", "プレイヤー名" }, { "en", "Player Name" } },
         new Dictionary<string, string> { { "ko", "서버 ID" }, { "jp", "サーバーID" }, { "en", "Server ID" } },
@@ -15,8 +16,62 @@ public static class LanguageData
         new Dictionary<string, string> { { "ko", "기동 시 서버 실행" }, { "jp", "起動時にサーバー実行" }, { "en", "Start Server On Init" } },
 
 
+        new Dictionary<string, string> { { "ko", "중력 적용" }, { "jp", "重力を適用" }, { "en", "Apply Gravity" } },
+        new Dictionary<string, string> { { "ko", "윈도우 충돌" }, { "jp", "ウィンドウ衝突" }, { "en", "Windows Collision" } },
+        new Dictionary<string, string> { { "ko", "마지막 캐릭터로 시작" }, { "jp", "最後のキャラで開始" }, { "en", "Start With Last Character" } },
+        new Dictionary<string, string> { { "ko", "캐릭터별 의상 기억" }, { "jp", "キャラ別衣装を記憶" }, { "en", "Remember Char Outfits" } },
+
+        // Menu
         new Dictionary<string, string> { { "ko", "안내" }, { "jp", "案内" }, { "en", "Inform" } },
         new Dictionary<string, string> { { "ko", "메뉴" }, { "jp", "メニュー" }, { "en", "Menu" } },
+        // Main Categories
+        new Dictionary<string, string> { { "ko", "세팅" }, { "jp", "セッティング" }, { "en", "Settings" } },  // 사용은 안할거임. 기본 영어로.
+        new Dictionary<string, string> { { "ko", "캐릭터" }, { "jp", "キャラクター" }, { "en", "Character" } },
+        new Dictionary<string, string> { { "ko", "채팅" }, { "jp", "チャット" }, { "en", "Chat" } },
+        new Dictionary<string, string> { { "ko", "제어" }, { "jp", "コントロール" }, { "en", "Control" } },
+        new Dictionary<string, string> { { "ko", "화면" }, { "jp", "スクリーン" }, { "en", "Screen" } },
+        new Dictionary<string, string> { { "ko", "대화" }, { "jp", "トーク" }, { "en", "Talk" } },
+        new Dictionary<string, string> { { "ko", "유틸" }, { "jp", "ユーティリティ" }, { "en", "Util" } },
+        new Dictionary<string, string> { { "ko", "개발" }, { "jp", "開発" }, { "en", "Dev" } },
+        new Dictionary<string, string> { { "ko", "버전" }, { "jp", "バージョン" }, { "en", "Version" } },
+        new Dictionary<string, string> { { "ko", "종료" }, { "jp", "終了" }, { "en", "Exit" } },
+
+        // Character submenu
+        new Dictionary<string, string> { { "ko", "행동" }, { "jp", "アクション" }, { "en", "Action" } },
+        new Dictionary<string, string> { { "ko", "캐릭터 변경" }, { "jp", "キャラ変更" }, { "en", "Change Char" } },
+        new Dictionary<string, string> { { "ko", "캐릭터 소환" }, { "jp", "キャラ召喚" }, { "en", "Summon Char" } },
+        new Dictionary<string, string> { { "ko", "의상 변경" }, { "jp", "衣装変更" }, { "en", "Change Clothes" } },
+
+        // Chat submenu
+        new Dictionary<string, string> { { "ko", "지침" }, { "jp", "指針" }, { "en", "Guideline" } },  // 대화에 참고할 행동기준
+        new Dictionary<string, string> { { "ko", "상황" }, { "jp", "シチュエーション" }, { "en", "Situation" } },
+        new Dictionary<string, string> { { "ko", "이력" }, { "jp", "履歴" }, { "en", "Chat History" } },
+        new Dictionary<string, string> { { "ko", "기억 초기화" }, { "jp", "記憶消去" }, { "en", "Erase Memory" } },
+        new Dictionary<string, string> { { "ko", "새 대화" }, { "jp", "新しいチャット" }, { "en", "New Chat" } },
+
+        // Control submenu
+        new Dictionary<string, string> { { "ko", "음성 제어창 열기" }, { "jp", "音声コントロール表示" }, { "en", "Show Voice Panel" } },
+        new Dictionary<string, string> { { "ko", "대화 정보 보기"}, { "jp", "トーク情報表示"}, { "en", "Show TalkInfo"} },
+        new Dictionary<string, string> { { "ko", "대화 정보 숨기기"}, { "jp", "トーク情報非表示"}, { "en", "Hide TalkInfo"} },
+
+        // Screen submenu
+        new Dictionary<string, string> { { "ko", "스크린샷 영역 설정" }, { "jp", "スクショエリア設定" }, { "en", "Set Screenshot Area" } },
+        new Dictionary<string, string> { { "ko", "스크린샷 결과 보기" }, { "jp", "スクショ結果表示" }, { "en", "Show Screenshot Result" } },
+
+        // Talk submenu
+        new Dictionary<string, string> { { "ko", "튜토리얼 시작" }, { "jp", "チュートリアル開始" }, { "en", "Show Tutorial" } },
+        new Dictionary<string, string> { { "ko", "잡담" }, { "jp", "フリートーク" }, { "en", "Idle Talk" } },
+
+        // Util submenu
+        new Dictionary<string, string> { { "ko", "알람" }, { "jp", "アラーム" }, { "en", "Alarm" } },
+        new Dictionary<string, string> { { "ko", "미니게임1" }, { "jp", "ミニゲーム1" }, { "en", "Minigame1" } },
+
+        // Dev submenu
+        new Dictionary<string, string> { { "ko", "디버그" }, { "jp", "デバッグ" }, { "en", "Debug" } },
+        new Dictionary<string, string> { { "ko", "테스트1" }, { "jp", "テスト1" }, { "en", "Test" } },
+        new Dictionary<string, string> { { "ko", "테스트2" }, { "jp", "テスト2" }, { "en", "Test2" } },
+        new Dictionary<string, string> { { "ko", "테스트3" }, { "jp", "テスト3" }, { "en", "Test3" } },
+
 
         // ToolTip Trigger
         new Dictionary<string, string> { { "ko", "답변에 이미지 사용" }, { "jp", "回答に画像を使用" }, { "en", "Use Image in Answer" } },
