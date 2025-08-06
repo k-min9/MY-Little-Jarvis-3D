@@ -12,10 +12,22 @@ public class UIManager : MonoBehaviour
     [SerializeField] private Text versionThanksContent; // version+thanks
     [SerializeField] private GameObject settings; // settings
     [SerializeField] private GameObject chatHistory; // chatHistory
+    [SerializeField] private GameObject guideLine; // guideLine
 
     // 싱글톤 인스턴스
     private static UIManager instance;
-
+    public static UIManager Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = FindObjectOfType<UIManager>();
+            }
+            return instance;
+        }
+    }
+    
     private void Awake()
     {
         // 싱글톤 패턴 구현
@@ -35,24 +47,34 @@ public class UIManager : MonoBehaviour
         version.SetActive(false);
         settings.SetActive(false);
         chatHistory.SetActive(false);
+        // guideLine.SetActive(false);
 
-//         // 안드로이드 or 테스트용
-// #if UNITY_ANDROID || UNITY_EDITOR
-//         charChange.SetActive(true);
-//         settings.SetActive(true);
-// #endif
+        // UIWidget 존재하면 Close
+        TryCloseWidget(charChange);
+        TryCloseWidget(charAdd);
+        TryCloseWidget(version);
+        TryCloseWidget(settings);
+        TryCloseWidget(chatHistory);
+        TryCloseWidget(guideLine);
+
+        //         // 안드로이드 or 테스트용
+        // #if UNITY_ANDROID || UNITY_EDITOR
+        //         charChange.SetActive(true);
+        //         settings.SetActive(true);
+        // #endif
     }
 
-    // 싱글톤 인스턴스에 접근하는 속성
-    public static UIManager Instance
+
+
+    // GameObject에 UIWidget이 있으면 Close() 호출
+    private void TryCloseWidget(GameObject target)
     {
-        get
+        if (target == null) return;
+
+        UIWidget widget = target.GetComponent<UIWidget>();
+        if (widget != null)
         {
-            if (instance == null)
-            {
-                instance = FindObjectOfType<UIManager>();
-            }
-            return instance;
+            widget.Close();
         }
     }
 
@@ -60,6 +82,22 @@ public class UIManager : MonoBehaviour
     public void ShowCharChange()
     {
         UIWidget uIWidget = charChange.GetComponent<UIWidget>();
+        uIWidget.Show();
+    }
+
+    // GuideLine-UIWidget의 Show 작동
+    public void ShowGuideLine()
+    {
+        UIWidget uIWidget = guideLine.GetComponent<UIWidget>();
+
+        // 이미 활성화되어 있지 않은 경우라면 위치 조정
+        if (!guideLine.activeSelf)
+        {
+            // Vector3 position = UIPositionManager.Instance.GetCanvasPositionRight();
+            Vector3 position = UIPositionManager.Instance.GetMenuPosition("guideline");
+            guideLine.GetComponent<RectTransform>().position = position;
+        }
+
         uIWidget.Show();
     }
 
