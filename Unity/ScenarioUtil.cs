@@ -50,9 +50,8 @@ public static class ScenarioUtil
             // OperatorManager의 호출
             OperatorManager.Instance.SetBasicPosition();
             OperatorManager.Instance.ShowPortrait(dialogue);  // StatusManager.Instance.IsAnsweringPortrait 때문에 서순 중요
-            PortraitBalloonSimpleManager.Instance.ShowInf();
+            PortraitBalloonSimpleManager.Instance.Show();
             PortraitBalloonSimpleManager.Instance.ModifyText(dialogue);
-
 
             // 음성재생
             string file_name = scenarioId + "_ja.wav";
@@ -67,7 +66,7 @@ public static class ScenarioUtil
 
             string filePath = Path.Combine("Audio", file_name);
             SubVoiceManager.Instance.PlayWavAudioFromPath(filePath);  // SubVoiceManager
-            
+
             // 선택지 보여주기
             float duration = 3f;
             try
@@ -80,11 +79,29 @@ public static class ScenarioUtil
 
             }
             duration += 0.5f;
-
+            PortraitBalloonSimpleManager.Instance.SetHideTimer(duration);
+            OperatorManager.Instance.SetHideTimer(duration);
+            
             return duration;
         }
 
         // 무언가 잘못되었을때를 위한 return
         return 3f;
+    }
+    
+    public static void ShowEmotion(string emotion)
+    {
+        // 현재캐릭터가 아로나일 경우와 아닐경우에서 분기
+        string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
+        if (nickname == "arona")
+        {
+            EmotionManager.Instance.ShowEmotion(emotion);  // "><"
+        }
+        else
+        { 
+            GameObject gameObject = OperatorManager.Instance.GetCurrentOperator();
+            Debug.Log(gameObject);
+            EmotionManager.Instance.ShowEmotion(emotion, gameObject);
+        }
     }
 }

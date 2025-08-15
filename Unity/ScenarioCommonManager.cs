@@ -50,7 +50,7 @@ public class ScenarioCommonManager : MonoBehaviour
     public IEnumerator Run_C01_ServerStarted()
     {
         float d1 = ScenarioUtil.Narration("C01_server_started_1", "선생님, 서버가 준비되었어요!");
-        EmotionManager.Instance.ShowEmotion("star");
+        ScenarioUtil.ShowEmotion("star");
         yield return new WaitForSeconds(d1);
     }
 
@@ -58,11 +58,11 @@ public class ScenarioCommonManager : MonoBehaviour
     public IEnumerator Scenario_C02_AskToStartServer()
     {
         float d1 = ScenarioUtil.Narration("C02_ask_start_server_1", "선생님, 안녕하세요!");
-        EmotionManager.Instance.ShowEmotion("smile");
+        ScenarioUtil.ShowEmotion("smile");
         yield return new WaitForSeconds(d1);
 
         float d2 = ScenarioUtil.Narration("C02_ask_start_server_2", "현재 서버를 기동하지 않으셨는데 기동하셔도 괜찮으실까요?");
-        EmotionManager.Instance.ShowEmotion("confused");
+        ScenarioUtil.ShowEmotion("confused");
         yield return new WaitForSeconds(d2);
 
         yield return new WaitForSeconds(0.2f);
@@ -73,7 +73,7 @@ public class ScenarioCommonManager : MonoBehaviour
     private IEnumerator Scenario_C02_1_ApproveStart()
     {
         float d1 = ScenarioUtil.Narration("C02_approve_start_1", "네! 서버를 기동할게요.");
-        EmotionManager.Instance.ShowEmotion("star");
+        ScenarioUtil.ShowEmotion("star");
         yield return new WaitForSeconds(d1);
 
         JarvisServerManager.Instance.RunJarvisServerWithCheck();  // 서버 기동
@@ -83,7 +83,7 @@ public class ScenarioCommonManager : MonoBehaviour
     private IEnumerator Scenario_C02_2_DeclineStart()
     {
         float d1 = ScenarioUtil.Narration("C02_decline_start_1", "마음이 바뀌시면 언제든지 다시 말 걸어주세요, 선생님!");
-        EmotionManager.Instance.ShowEmotion("relax");
+        ScenarioUtil.ShowEmotion("relax");
         yield return new WaitForSeconds(d1);
     }
 

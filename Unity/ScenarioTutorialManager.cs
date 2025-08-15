@@ -261,8 +261,8 @@ public class ScenarioTutorialManager : MonoBehaviour
     private IEnumerator Scenario_A00_EntryCondition()
     {
         float d1 = ScenarioUtil.Narration("A00_entry_condition_1", "선생님, 안녕하세요!");
-        EmotionManager.Instance.ShowEmotion("><");  // 아로나만 표정
-        // EmotionManager.Instance.ShowEmotionFromEmotion("Joy");  // TODO : 나중에 전체 캐릭터에도 표정 적용
+        ScenarioUtil.ShowEmotion("><");  // 아로나만 표정
+        // ScenarioUtil.ShowEmotionFromEmotion("Joy");  // TODO : 나중에 전체 캐릭터에도 표정 적용
         yield return new WaitForSeconds(d1);
 
         // 무료서버의향 = true일 경우 의도 확인
@@ -292,7 +292,7 @@ public class ScenarioTutorialManager : MonoBehaviour
     private IEnumerator Scenario_A01_FreeServerOffer()
     {
         float d1 = ScenarioUtil.Narration("A01_free_server_offer_1", "전에 무료 서버를 사용하려고 하셨던 것 같아요.");
-        EmotionManager.Instance.ShowEmotion("><");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("><");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         float d2 = ScenarioUtil.Narration("A01_free_server_offer_2", "다시 연결해볼까요?");
@@ -345,15 +345,15 @@ public class ScenarioTutorialManager : MonoBehaviour
         if (success)
         {
             float d1 = ScenarioUtil.Narration("A01_1_1_connect_success_1", "성공적으로 연결되었어요, 선생님.");
-            EmotionManager.Instance.ShowEmotion("star");
+            ScenarioUtil.ShowEmotion("star");
             yield return new WaitForSeconds(d1);
 
             float d2 = ScenarioUtil.Narration("A01_1_1_connect_success_2", "다만, 무료 서버는 응답 속도가 느리거나 다시 요청해야 될 수도 있어요.");
-            EmotionManager.Instance.ShowEmotion("confused");
+            ScenarioUtil.ShowEmotion("confused");
             yield return new WaitForSeconds(d2);
 
             float d3 = ScenarioUtil.Narration("A01_1_1_connect_success_3", "대화가 자연스럽지 않거나, 힘드시면 다른 방법을 시도해주세요.");
-            EmotionManager.Instance.ShowEmotion("><");
+            ScenarioUtil.ShowEmotion("><");
             yield return new WaitForSeconds(d3);
 
             StartCoroutine(Scenario_A99_ConfigEnd());
@@ -361,11 +361,11 @@ public class ScenarioTutorialManager : MonoBehaviour
         else
         {
             float d1 = ScenarioUtil.Narration("A01_1_2_connect_failed_1", "연결에 실패했어요, 선생님.");
-            EmotionManager.Instance.ShowEmotion("confused");
+            ScenarioUtil.ShowEmotion("confused");
             yield return new WaitForSeconds(d1);
 
             float d2 = ScenarioUtil.Narration("A01_1_2_connect_failed_2", "무료 서버는 가끔 연결이 불안정할 수 있어요. 계속 시도해볼까요?");
-            EmotionManager.Instance.ShowEmotion("confused");
+            ScenarioUtil.ShowEmotion("confused");
             yield return new WaitForSeconds(d2);
 
             ChoiceManager.Instance.ShowChoice(3, "A01_1_2_connect_failed");
@@ -376,7 +376,7 @@ public class ScenarioTutorialManager : MonoBehaviour
     private IEnumerator Scenario_A01_1_2_1_ConnectRetry()
     {
         float d1 = ScenarioUtil.Narration("A01_1_2_1_connect_retry_1", "다시 연결을 시도해볼게요.");
-        EmotionManager.Instance.ShowEmotion("><");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("><");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         StartCoroutine(Scenario_A01_1_ConnectTry()); // 재시도 루프
@@ -386,7 +386,7 @@ public class ScenarioTutorialManager : MonoBehaviour
     private IEnumerator Scenario_A01_1_2_2_ConnectPending()
     {
         float d1 = ScenarioUtil.Narration("A01_1_2_2_connect_pending_1", "네. 원하실 때 언제든지 다시 시도하실 수 있어요.");
-        EmotionManager.Instance.ShowEmotion("><");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("><");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         // 무료서버의향 = true + 저장
@@ -416,7 +416,7 @@ public class ScenarioTutorialManager : MonoBehaviour
     private IEnumerator Scenario_A01_2_RefuseFree()
     {
         float d1 = ScenarioUtil.Narration("A01_1_2_3_connect_refuse_1", "네. 그러면...");
-        EmotionManager.Instance.ShowEmotion("relax");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("relax");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         // 무료서버의향 = false 저장
@@ -440,15 +440,15 @@ public class ScenarioTutorialManager : MonoBehaviour
     private IEnumerator Scenario_A02_PlatformCheck()
     {
         float d1 = ScenarioUtil.Narration("A02_platform_check_1", "저와 대화하시려면 먼저 환경 설정이 필요해요.");
-        EmotionManager.Instance.ShowEmotion("star");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         float d2 = ScenarioUtil.Narration("A02_platform_check_2", "제가 대화 전 세팅을 도와드릴게요.");
-        EmotionManager.Instance.ShowEmotion("star");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d2);
 
         float d3 = ScenarioUtil.Narration("A02_platform_check_3", "지금 접속하신 기기가 PC는 아닌 것 같은데, 맞으실까요?");
-        EmotionManager.Instance.ShowEmotion("listen");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("listen");  // 아로나만 표정
         yield return new WaitForSeconds(d3);
 
         ChoiceManager.Instance.ShowChoice(3, "A02_platform_check");  // <응, 맞아>, <아니, PC 맞아>, <필요 없어>
@@ -457,11 +457,11 @@ public class ScenarioTutorialManager : MonoBehaviour
     private IEnumerator Scenario_A02_1_CheckServerStatus()
     {
         float d1 = ScenarioUtil.Narration("A02_1_check_server_status_1", "확인해주셔서 고마워요, 선생님.");
-        EmotionManager.Instance.ShowEmotion("star");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         float d2 = ScenarioUtil.Narration("A02_1_check_server_status_2", "일단 지금 AI 서버가 실행된 PC 정보가 있으실까요?");
-        EmotionManager.Instance.ShowEmotion("><");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("><");  // 아로나만 표정
         yield return new WaitForSeconds(d2);
 
         ChoiceManager.Instance.ShowChoice(3, "A02_1_check_server_status");  // <연결할 PC가 있어>, <외부 플랫폼을 사용하려고 해>, <자세히 설명해줄 수 있어?>
@@ -470,7 +470,7 @@ public class ScenarioTutorialManager : MonoBehaviour
     private IEnumerator Scenario_A02_1_1_PCIdInput()
     {
         float d1 = ScenarioUtil.Narration("A02_1_1_pc_id_input_1", "좋아요! 그럼 연결할 ID를 입력해주시면 바로 설정할게요.");
-        EmotionManager.Instance.ShowEmotion("star");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         // ID 입력 UI 트리거 필요 시 연결
@@ -480,22 +480,22 @@ public class ScenarioTutorialManager : MonoBehaviour
     private IEnumerator Scenario_A02_1_2_HelpExplain()
     {
         float d1 = ScenarioUtil.Narration("A02_1_2_help_explain_1", "저를 다운로드 받은 곳에서 PC 버전을 다운로드 받으실 수 있어요.");
-        EmotionManager.Instance.ShowEmotion("star");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         float d2 = ScenarioUtil.Narration("A02_1_2_help_explain_2", "서버프로그램(`server.exe`) 실행 시 입력한 ID를 제게도 입력해주시면 연결돼요.");
-        EmotionManager.Instance.ShowEmotion("relax");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("relax");  // 아로나만 표정
         yield return new WaitForSeconds(d2);
 
         float d3 = ScenarioUtil.Narration("A02_1_2_help_explain_3", "자세한 내용은 M9Dev 유튜브 채널에서도 확인하실 수 있어요.");
-        EmotionManager.Instance.ShowEmotion("star");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d3);
     }
 
     private IEnumerator Scenario_A02_2_PCConfirmed()
     {
         float d1 = ScenarioUtil.Narration("A02_2_1_pc_confirmed_1", "확인 감사합니다, 선생님.");
-        EmotionManager.Instance.ShowEmotion("star");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         // 다음단계 : A03으로
@@ -505,7 +505,7 @@ public class ScenarioTutorialManager : MonoBehaviour
     private IEnumerator Scenario_A02_3_RefusePlatformCheck()
     {
         float d1 = ScenarioUtil.Narration("A02_3_1_refuse_platform_check_1", "언제든 저와 이야기하고 싶으실 때 불러주세요, 선생님!");
-        EmotionManager.Instance.ShowEmotion("><");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("><");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         EndTutorial();
@@ -515,11 +515,11 @@ public class ScenarioTutorialManager : MonoBehaviour
     private IEnumerator Scenario_A03_InferenceSelect()
     {
         float d1 = ScenarioUtil.Narration("A03_inference_select_1", "AI가 작동하려면 먼저 서버 설정이 필요해요.");
-        EmotionManager.Instance.ShowEmotion("relax");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("relax");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         float d2 = ScenarioUtil.Narration("A03_inference_select_2", "지금 사용 중인 이 PC로 연산하는 것도 가능해요.");
-        EmotionManager.Instance.ShowEmotion("star");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d2);
 
         yield return new WaitForSeconds(0.2f);
@@ -577,11 +577,11 @@ public class ScenarioTutorialManager : MonoBehaviour
     private IEnumerator Scenario_A04_ExternalServerSelect()
     {
         float d1 = ScenarioUtil.Narration("A04_external_server_select_1", "그러면 외부 서버와 연결해볼게요.");
-        EmotionManager.Instance.ShowEmotion("><");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("><");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         float d2 = ScenarioUtil.Narration("A04_external_server_select_2", "무료 서버를 이용하시거나, API 키를 입력해서 외부 플랫폼(Gemini, ChatGPT...)과 연결하실 수 있어요.");
-        EmotionManager.Instance.ShowEmotion("listen");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("listen");  // 아로나만 표정
         yield return new WaitForSeconds(d2);
 
         yield return new WaitForSeconds(0.2f);
@@ -653,14 +653,14 @@ public class ScenarioTutorialManager : MonoBehaviour
         if (isConnected)
         {
             float d1 = ScenarioUtil.Narration("A04_1_free_server_external_success", "무료 서버에 성공적으로 연결되었어요.");
-            EmotionManager.Instance.ShowEmotion("><");  // 아로나만 표정
+            ScenarioUtil.ShowEmotion("><");  // 아로나만 표정
             yield return new WaitForSeconds(d1);
             StartCoroutine(Scenario_A99_ConfigEnd());
         }
         else
         {
             float d1 = ScenarioUtil.Narration("A04_1_1_connect_failed_1", "연결이 잘 되지 않았어요. 다시 시도해볼까요?");
-            EmotionManager.Instance.ShowEmotion("confused");  // 아로나만 표정
+            ScenarioUtil.ShowEmotion("confused");  // 아로나만 표정
             yield return new WaitForSeconds(d1);
 
             if (!serverAlive)
@@ -677,7 +677,7 @@ public class ScenarioTutorialManager : MonoBehaviour
     private IEnumerator Scenario_A04_1_1_ConnectFailedLater()
     {
         float d = ScenarioUtil.Narration("A04_1_1_connect_failed_later", "네. 언제든지 말씀만 해주시면 다시 시도해볼게요, 선생님.");
-        EmotionManager.Instance.ShowEmotion("><");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("><");  // 아로나만 표정
         yield return new WaitForSeconds(d);
 
         // 무료서버의향 = true 저장
@@ -688,7 +688,7 @@ public class ScenarioTutorialManager : MonoBehaviour
     public IEnumerator Scenario_A04_2_APIKeyInput()
     {
         float d1 = ScenarioUtil.Narration("A04_2_api_key_input_1", "API KEY 관련 모델을 골라주세요");
-        EmotionManager.Instance.ShowEmotion("star");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         yield return new WaitForSeconds(0.2f);
@@ -704,7 +704,7 @@ public class ScenarioTutorialManager : MonoBehaviour
 
         // 음성 출력 (예상 시간)
         float d1 = ScenarioUtil.Narration("A97_connect_test_1", $"{target}에 연결을 시도하고 있어요...");
-        EmotionManager.Instance.ShowEmotion("relax");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("relax");  // 아로나만 표정
 
         // 연결 시도 전 시간 측정 시작
         float startTime = Time.realtimeSinceStartup;
@@ -756,14 +756,14 @@ public class ScenarioTutorialManager : MonoBehaviour
         if (isConnected)
         {
             float d2 = ScenarioUtil.Narration("A97_connect_test_2", "성공했어요 선생님");
-            EmotionManager.Instance.ShowEmotion("><");  // 아로나만 표정
+            ScenarioUtil.ShowEmotion("><");  // 아로나만 표정
             yield return new WaitForSeconds(d2);
             StartCoroutine(Scenario_A99_ConfigEnd());
         }
         else
         {
             float d3 = ScenarioUtil.Narration("A97_connect_test_3", "실패했어요 선생님. 다시 시도해볼까요?");
-            EmotionManager.Instance.ShowEmotion("confused");  // 아로나만 표정
+            ScenarioUtil.ShowEmotion("confused");  // 아로나만 표정
             yield return new WaitForSeconds(d3);
 
             yield return new WaitForSeconds(0.2f);
@@ -792,15 +792,15 @@ public class ScenarioTutorialManager : MonoBehaviour
         JarvisServerManager.Instance.RunJarvisServerWithCheck();
 
         float d1 = ScenarioUtil.Narration("A99_config_end_1", "설정이 완료되었어요, 선생님!");
-        EmotionManager.Instance.ShowEmotion("star");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         float d2 = ScenarioUtil.Narration("A99_config_end_2", "필요하실 땐 언제든지 다시 설정하실 수 있어요.");
-        EmotionManager.Instance.ShowEmotion("star");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d2);
 
         float d3 = ScenarioUtil.Narration("A99_config_end_3", "이제 준비가 끝났어요, 선생님. 앞으로 나눌 이야기들이 정말 기대돼요!");
-        EmotionManager.Instance.ShowEmotion("star");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d3);
 
         SettingManager.Instance.settings.isTutorialCompleted = true;

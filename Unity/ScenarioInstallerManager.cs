@@ -177,11 +177,11 @@ public class ScenarioInstallerManager : MonoBehaviour
     private IEnumerator Scenario_I01_EntryCondition()
     {
         float d1 = ScenarioUtil.Narration("I01_entry_condition_1", "선생님. 대화를 위한 기본적인 파일이 설치되어 있지 않아요.");
-        EmotionManager.Instance.ShowEmotion("confused");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("confused");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         float d2 = ScenarioUtil.Narration("I01_entry_condition_2", "설치를 위한 프로그램을 구동해도 될까요?");
-        EmotionManager.Instance.ShowEmotion("star");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d2);
 
         yield return new WaitForSeconds(0.2f);
@@ -191,7 +191,7 @@ public class ScenarioInstallerManager : MonoBehaviour
     private IEnumerator Scenario_I01_0_InstallServerType()
     {
         float d1 = ScenarioUtil.Narration("I01_1_install_server_type_1", "Lite 버전과 Full 버전 어느쪽으로 설치할까요?");
-        EmotionManager.Instance.ShowEmotion("star");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         yield return new WaitForSeconds(0.2f);
@@ -203,19 +203,19 @@ public class ScenarioInstallerManager : MonoBehaviour
     private IEnumerator Scenario_I01_0_InstallServerExplain()
     {
         float d1 = ScenarioUtil.Narration("I01_0_install_server_explain_1", "Lite는 음성 인식 같은 기본 기능만 설치돼요. 연산은 외부 플랫폼에 맡기기 때문에 설치도 빠르고 용량도 가벼워요.");
-        EmotionManager.Instance.ShowEmotion("smile");
+        ScenarioUtil.ShowEmotion("smile");
         yield return new WaitForSeconds(d1);
 
         float d2 = ScenarioUtil.Narration("I01_0_install_server_explain_2", "Full은 Lite의 기능이 제공되고, AI 연산도 선생님의 컴퓨터에서 직접 처리해요. 외부 서버 상태에 영향을 받지 않고 안정적인 품질을 기대하실 수 있어요.");
-        EmotionManager.Instance.ShowEmotion("relax");
+        ScenarioUtil.ShowEmotion("relax");
         yield return new WaitForSeconds(d2);
 
         float d3 = ScenarioUtil.Narration("I01_0_install_server_explain_3", "그만큼 용량도 크고, 컴퓨터 성능에 따라 답변 속도가 달라질 수 있어요.");
-        EmotionManager.Instance.ShowEmotion("confused");
+        ScenarioUtil.ShowEmotion("confused");
         yield return new WaitForSeconds(d3);
 
         float d4 = ScenarioUtil.Narration("I01_0_install_server_explain_4", "두 버전은 나중에 언제든지 바꾸실 수 있으니까, 편하게 골라주세요.");
-        EmotionManager.Instance.ShowEmotion("star");
+        ScenarioUtil.ShowEmotion("star");
         yield return new WaitForSeconds(d4);
 
         yield return new WaitForSeconds(0.2f);
@@ -225,7 +225,7 @@ public class ScenarioInstallerManager : MonoBehaviour
     private IEnumerator Scenario_I01_1_InstallServerLite()
     {
         float d1 = ScenarioUtil.Narration("I01_1_install_server_1", "설치 프로그램을 실행할게요.");
-        EmotionManager.Instance.ShowEmotion("star");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
 
@@ -240,7 +240,7 @@ public class ScenarioInstallerManager : MonoBehaviour
     private IEnumerator Scenario_I01_1_InstallServer()
     {
         float d1 = ScenarioUtil.Narration("I01_1_install_server_1", "설치 프로그램을 실행할게요.");
-        EmotionManager.Instance.ShowEmotion("star");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         // InstallerManager를 통해 설치 실행
@@ -254,7 +254,7 @@ public class ScenarioInstallerManager : MonoBehaviour
     private IEnumerator Scenario_I01_2_InstallLater()
     {
         float d1 = ScenarioUtil.Narration("I01_2_install_later_1", "언제든 필요하실 때 다시 말씀해주세요.");
-        EmotionManager.Instance.ShowEmotion("relax");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("relax");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         EndInstaller();
@@ -265,11 +265,11 @@ public class ScenarioInstallerManager : MonoBehaviour
         yield return new WaitForSeconds(1f);  // 기존 말풍선이 꺼지면서 첫 말풍선이 누락되는 것 방지
 
         float d1 = ScenarioUtil.Narration("I01_3_already_installed_1", "아, 이미 설치되어 있네요!");
-        EmotionManager.Instance.ShowEmotion("star");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         float d2 = ScenarioUtil.Narration("I01_3_already_installed_2", "이제 서버를 시작하면 저와 대화할 수 있어요.");
-        EmotionManager.Instance.ShowEmotion("><");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("><");  // 아로나만 표정
         yield return new WaitForSeconds(d2);
 
         EndInstaller();
@@ -280,11 +280,11 @@ public class ScenarioInstallerManager : MonoBehaviour
         yield return new WaitForSeconds(1f);  // 기존 말풍선이 꺼지면서 첫 말풍선이 누락되는 것 방지
 
         float d1 = ScenarioUtil.Narration("I01_4_already_running_1", "설치 프로그램이 이미 실행 중이에요.");
-        EmotionManager.Instance.ShowEmotion("confused");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("confused");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         float d2 = ScenarioUtil.Narration("I01_4_already_running_2", "잠시만 기다려주세요.");
-        EmotionManager.Instance.ShowEmotion("relax");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("relax");  // 아로나만 표정
         yield return new WaitForSeconds(d2);
 
         EndInstaller();
@@ -295,11 +295,11 @@ public class ScenarioInstallerManager : MonoBehaviour
         yield return new WaitForSeconds(1f);  // 이전 말풍선이 꺼지는 시간 확보
 
         float d1 = ScenarioUtil.Narration("I02_install_complete_1", "설치가 완료되었어요!");
-        EmotionManager.Instance.ShowEmotion("star");  // 아로나만 표정
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d1);
 
         float d2 = ScenarioUtil.Narration("I02_install_complete_2", "바로 서버를 시작해볼게요, 선생님!");
-        EmotionManager.Instance.ShowEmotion("><");  // 아로나 표정
+        ScenarioUtil.ShowEmotion("><");  // 아로나 표정
         yield return new WaitForSeconds(d2);
 
         // 서버 기동
