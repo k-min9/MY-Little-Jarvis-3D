@@ -42,12 +42,13 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.MediaType;
@@ -63,8 +64,13 @@ import retrofit2.converter.gson.GsonConverterFactory;
 
 public class MyBackgroundService extends Service {
 
+    // 기본 설정
+
+    private static final String CHANNEL_ID = "Tikitaka Channel";
     private AudioRecord audioRecord; // Replaces AudioClip(Unity)
     private AudioTrack audioTrack;
+    private int chatIdx = 0;  // 채팅횟수 + 현재 채팅상황
+    private String chatIdxSuccess = "-1";  // 최근 가장 성공한 채팅번호(CallConversationStream 참조)
 
     // VAD Check
     private static final int SAMPLE_RATE = 16000; // 16kHz
@@ -83,6 +89,13 @@ public class MyBackgroundService extends Service {
     private static final int GAP_LIMIT = 4; // 유예 기간 (0.5초 * 4 = 2초)
     private int gapCounter = 0;
     private int outputCounter = 0;
+    private int sttRecordCounter = 0;
+    ExecutorService streamingExecutor = Executors.newFixedThreadPool(5); // 스트림 전용
+    ExecutorService apiExecutor = Executors.newFixedThreadPool(10); // 일반 API
+
+    // WAV
+    private MediaPlayer mediaPlayer;
+    private final Queue<File> audioQueue = new LinkedList<>();
 
 
 
@@ -95,15 +108,19 @@ public class MyBackgroundService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.i("SERVICE", "onStartCommand notification start");
-        createNotificationChannel();
-        startNotification();
-        Log.i("SERVICE", "onStartCommand notification end");
-        super.onCreate();
+        try {
+            Log.i("SERVICE", "onStartCommand notification start");
+            createNotificationChannel();
+            startNotification();
+            Log.i("SERVICE", "onStartCommand notification end");
+            super.onCreate();
 
-        Log.i("SERVICE", "startVAD thread call");
-        startVAD();
-        Log.i("SERVICE", "startVAD thread start");
+            Log.i("SERVICE", "startVAD thread call");
+            startVAD();
+            Log.i("SERVICE", "startVAD thread start");
+        } catch (Exception e) {
+            Log.e("SERVICE", "onStartCommand error" + e.getMessage());
+        }
 
         return START_NOT_STICKY;
     }
@@ -152,7 +169,7 @@ public class MyBackgroundService extends Service {
         Log.d("SERVICE VAD", "startVAD start");
 
         setupAudioRecord();
-        setupAudioTrack();
+//        setupAudioTrack();
 
         if (audioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
             Log.e("SERVICE VAD", "AudioRecord initialization failed!");
@@ -174,13 +191,13 @@ public class MyBackgroundService extends Service {
 
                     // VAD 감지
                     boolean isCurrentlyActive = evaluateVad();
-                    Log.d("SERVICE VAD", "simpleVad : " + isCurrentlyActive);
 
                     // 저장할 wav
                     if (isCurrentlyActive) {
-                        Log.d("SERVICE VAD", "startVAD recoding start");
+                        Log.d("SERVICE VAD", "simpleVad : " + isCurrentlyActive);
                         gapCounter = 0; // 유예 카운터 초기화
                         if (!isVoiceActive) {
+                            Log.d("SERVICE VAD", "startVAD recoding start");
                             isVoiceActive = true;
                             recordedAudio.clear(); // 새로운 녹음 세션 시작
                             if (initBuffer != null) {
@@ -189,12 +206,20 @@ public class MyBackgroundService extends Service {
                         }
                         recordedAudio.add(buffer.clone());
                     } else if (isVoiceActive) {
+                        Log.d("SERVICE VAD", "simpleVad : " + isCurrentlyActive + "(" + gapCounter + ")");
                         gapCounter++;
                         recordedAudio.add(buffer.clone()); // 유예 동안 데이터를 계속 저장
                         if (gapCounter >= GAP_LIMIT) {
                             isVoiceActive = false; // 유예 기간 종료
+                            // recordedAudio의 복사본 생성하여 wav 파일 저장
+                            List<short[]> audioDataCopy = new ArrayList<>(recordedAudio);
+                            saveWavFile(audioDataCopy); // WAV 파일 저장
+
+                            List<short[]> finalBuffer = new ArrayList<>();
+                            finalBuffer.add(buffer.clone());
+                            saveWavFile(finalBuffer);
+
                             initBuffer = null;  // 다음 저장을 위해 초기화
-                            saveWavFile(recordedAudio); // WAV 파일 저장
                         }
                     }
 
@@ -247,12 +272,13 @@ public class MyBackgroundService extends Service {
 
     // WAV 파일 저장
     private void saveWavFile(List<short[]> audioData) {
-        Log.d("SERVICE VAD", "saveWavFile start");
+        Log.d("SERVICE VAD", "saveWavFile start : " + audioData.size());
+        sttRecordCounter = (sttRecordCounter+1)%10;
         File outputFile = new File(getExternalFilesDir(null),
-                "recorded_audio_" + System.currentTimeMillis() + ".wav");
+                "recorded_audio" + sttRecordCounter + ".wav");
         try (FileOutputStream fos = new FileOutputStream(outputFile)) {
             // WAV 헤더 작성
-            writeWavHeader(fos, audioData.size() * BUFFER_SIZE);
+            writeWavHeader(fos, audioData.size() * BUFFER_SIZE * 2);
 
             // 오디오 데이터 작성
             for (short[] buffer : audioData) {
@@ -264,7 +290,7 @@ public class MyBackgroundService extends Service {
                 fos.write(byteBuffer.array());
             }
 
-            Log.d("SERVICE VAD", "saveWavFile end");
+            Log.d("SERVICE VAD", "saveWavFile end : " + sttRecordCounter + ".wav");
 
             sendWav(outputFile);
         } catch (IOException e) {
@@ -309,15 +335,15 @@ public class MyBackgroundService extends Service {
     public static boolean simpleVad(float[] data, int sampleRate, float lastSec, float vadThd, float freqThd) {
         int num = data.length;
         int num2 = (int) (sampleRate * lastSec);
-        Log.d("SERVICE VAD", "num : " + num + " / num2 : " + num2);
+//        Log.d("SERVICE VAD", "num : " + num + " / num2 : " + num2);
         if (num2 >= num) {
             return false;
         }
 
         if (freqThd > 0f) {
-            Log.d("SERVICE VAD", "highPassFilter start : " + Arrays.toString(data));
+//            Log.d("SERVICE VAD", "highPassFilter start : " + Arrays.toString(data));
             highPassFilter(data, freqThd, sampleRate);
-            Log.d("SERVICE VAD", "highPassFilter end : " + Arrays.toString(data));
+//            Log.d("SERVICE VAD", "highPassFilter end : " + Arrays.toString(data));
         }
 
         float totalEnergy = 0f;
@@ -332,7 +358,7 @@ public class MyBackgroundService extends Service {
         totalEnergy /= num;
         lastSecEnergy /= num2;
 
-        Log.d("SERVICE VAD", "totalEnergy : " + totalEnergy + " / lastSecEnergy : " + lastSecEnergy);
+//        Log.d("SERVICE VAD", "totalEnergy : " + totalEnergy + " / lastSecEnergy : " + lastSecEnergy);
         return lastSecEnergy > vadThd * totalEnergy;
     }
 
@@ -392,9 +418,9 @@ public class MyBackgroundService extends Service {
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             final NotificationChannel notificationChannel = new NotificationChannel(
-                    "Audio Background SERVICE CHANNEL",
+                    CHANNEL_ID,
                     "Service Channel",
-                    NotificationManager.IMPORTANCE_DEFAULT
+                    NotificationManager.IMPORTANCE_LOW
             );
             final NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
             notificationManager.createNotificationChannel(notificationChannel);
@@ -402,14 +428,25 @@ public class MyBackgroundService extends Service {
     }
 
     private void startNotification(){
+        // 알림 삭제 시 수행할 PendingIntent 설정
+        Intent deleteIntent = new Intent(this, NotificationDeleteReceiver.class);
+        PendingIntent deletePendingIntent = PendingIntent.getBroadcast(
+                this,
+                0,
+                deleteIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+        // 클릭시 프로그램 최대화
         Intent notificationIntent = new Intent(this, Bridge.unityActivity.getClass());
         PendingIntent pendingIntent = PendingIntent.getActivity(this,
                 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
-        Notification notification = new NotificationCompat.Builder(this, "PedometerLib")
+        // 알림 Start
+        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("Service Running")
                 .setContentText("ARONA is listening...")
                 .setSmallIcon(R.drawable.custom_icon)
                 .setContentIntent(pendingIntent)
+                .setDeleteIntent(deletePendingIntent)
                 .setOngoing(true)
                 .build();
         startForeground(112, notification);  // SERVICE_NOTIFICATION_ID : 112
@@ -445,68 +482,132 @@ public class MyBackgroundService extends Service {
         }
     }
 
-    // stt로 송신
+    // STT 송신 (Unity VADController.SendWavFile 로직 기반)
     public void sendWav(File file) {
-//        File file = new File(getExternalFilesDir(null), fileName);
-
         if (!file.exists()) {
-            System.err.println("File not found: " + file.getAbsolutePath());
+            Log.e("SERVICE", "File not found: " + file.getAbsolutePath());
             return;
         }
 
+        // Unity 로직: chatIdx 증가 및 regenerateCount 초기화
+        chatIdx = chatIdx + 1;
+        
+        // Unity 로직: server_type_idx 체크 (Android에서는 내부 Whisper 없으므로 외부 서버 사용)
+        String serverTypeIdx = Bridge.server_type_idx != null ? Bridge.server_type_idx : "0";
+        if ("2".equals(serverTypeIdx)) {
+            Log.d("SERVICE STT", "Note: Unity uses internal Whisper for server_type_idx=2, but Android sends to external server");
+        }
+        
+        Log.d("SERVICE STT", "Starting STT request - chatIdx: " + chatIdx + ", server_type_idx: " + serverTypeIdx);
+
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl(baseUrl)
-                .addConverterFactory(GsonConverterFactory.create()) // JSON 파싱 변환기
+                .addConverterFactory(GsonConverterFactory.create())
+                .callbackExecutor(apiExecutor)
                 .build();
         ApiService apiService = retrofit.create(ApiService.class);
 
-        // 파일 및 텍스트 파라미터 생성
+        // Unity와 동일한 파라미터 구성
         RequestBody requestFile = RequestBody.create(MediaType.parse("audio/wav"), file);
-        MultipartBody.Part filePart = MultipartBody.Part.createFormData("file", file.getName(), requestFile);
+        MultipartBody.Part filePart = MultipartBody.Part.createFormData("file", "stt.wav", requestFile);
 
         RequestBody lang = RequestBody.create(MediaType.parse("text/plain"), "ko");
         RequestBody level = RequestBody.create(MediaType.parse("text/plain"), "small");
-        RequestBody chatIdx = RequestBody.create(MediaType.parse("text/plain"), "1");
+        RequestBody chatIdxStr = RequestBody.create(MediaType.parse("text/plain"), String.valueOf(chatIdx));
 
         // API 호출
-        Call<JsonObject> call = apiService.uploadAudio(filePart, lang, level, chatIdx);
+        Call<JsonObject> call = apiService.uploadAudio(filePart, lang, level, chatIdxStr);
         call.enqueue(new Callback<JsonObject>() {
             @Override
             public void onResponse(Call<JsonObject> call, Response<JsonObject> response) {
                 if (response.isSuccessful()) {
                     JsonObject jsonResponse = response.body();
                     if (jsonResponse != null) {
-                        String transText = jsonResponse.get("text").getAsString();
-                        String transLang = jsonResponse.get("lang").getAsString();
-                        String chatIdx = jsonResponse.get("chatIdx").getAsString();
+                        try {
+                            String transText = jsonResponse.get("text").getAsString();
+                            String transLang = jsonResponse.get("lang").getAsString();
+                            String responseChatIdx = jsonResponse.get("chatIdx").getAsString();
 
-                        callConversationStream(transText, chatIdx);
+                            Log.d("SERVICE STT", "STT Success - Text: " + transText + ", Lang: " + transLang + ", ChatIdx: " + responseChatIdx);
+
+                            // Unity 로직: 빈 결과 체크
+                            if (transText == null || transText.trim().isEmpty()) {
+                                Log.w("SERVICE STT", "STT result is empty. Skipping response processing.");
+                                return;
+                            }
+
+                            // Unity 스타일 알림 업데이트 (Unity의 NoticeBalloonManager 역할)
+                            UnitySendMessage("GameManager", "OnSTTResult", transText);
+
+                            // 대화 스트림 시작
+                            callConversationStream(transText, responseChatIdx);
+
+                            // 기존 음성 중지 및 초기화
+                            ResetAudio();
+
+                        } catch (Exception e) {
+                            Log.e("SERVICE STT", "Error parsing STT response: " + e.getMessage());
+                        }
                     }
                 } else {
-                    System.err.println("Request failed. Response Code: " + response.code());
+                    Log.e("SERVICE STT", "STT request failed. Response Code: " + response.code());
+                    try {
+                        String errorBody = response.errorBody() != null ? response.errorBody().string() : "No error details";
+                        Log.e("SERVICE STT", "Error details: " + errorBody);
+                    } catch (Exception e) {
+                        Log.e("SERVICE STT", "Error reading error body: " + e.getMessage());
+                    }
                 }
             }
 
             @Override
             public void onFailure(Call<JsonObject> call, Throwable t) {
+                Log.e("SERVICE STT", "STT request failed: " + t.getMessage());
                 t.printStackTrace();
             }
         });
     }
 
     public void callConversationStream(String query, String chatIdx) {
+        callConversationStream(query, chatIdx, "");
+    }
 
-        String streamUrl = baseUrl + "/conversation_stream";
+    // Unity CallConversationStream 로직 기반으로 개선된 대화 스트림 호출
+    public void callConversationStream(String query, String chatIdx, String aiLangIn) {
+        
+        // Unity 로직: chatIdxSuccess 업데이트
+        if (!"-1".equals(chatIdx)) {
+            chatIdxSuccess = chatIdx;
+            Log.d("SERVICE API", "Updated chatIdxSuccess: " + chatIdxSuccess);
+        }
 
-        String nickname = "arona";
-        String playerName = "";
-        String aiLanguage = "";
-        String aiLanguageIn = "";
-        String aiLanguageOut = "";
+        // Unity 로직: server_type_idx 분기 처리
+        String serverTypeIdx = Bridge.server_type_idx != null ? Bridge.server_type_idx : "0";
+        
+        String streamUrl;
+        if ("2".equals(serverTypeIdx)) {
+            // server_type_idx == 2 (Free Gemini): conversation_stream_gemini 사용
+            streamUrl = baseUrl + "/conversation_stream_gemini";
+            Log.d("SERVICE API", "Using Gemini conversation stream (server_type_idx=2)");
+        } else {
+            // 기본: conversation_stream 사용
+            streamUrl = baseUrl + "/conversation_stream";
+            Log.d("SERVICE API", "Using default conversation stream (server_type_idx=" + serverTypeIdx + ")");
+        }
+        Log.d("SERVICE API", "Starting conversation stream - URL: " + streamUrl);
 
-        String memoryJson = "";
+        // Unity와 동일한 파라미터 구성
+        String nickname = Bridge.nickname != null ? Bridge.nickname : "arona";
+        String playerName = Bridge.player_name != null ? Bridge.player_name : "sensei";
+        String aiLanguage = "";  // 추론 언어 설정
+        String aiLanguageIn = aiLangIn;  // STT에서 감지된 언어
+        String aiLanguageOut = Bridge.sound_language != null ? Bridge.sound_language : "ko";  // TTS 출력 언어
 
-        // 요청 데이터 생성
+        // Unity 스타일 메모리 가져오기
+        String memoryJson = ConversationManager.getAllConversationMemory();
+        Log.d("SERVICE API", "Memory loaded: " + (memoryJson != null ? memoryJson.length() + " chars" : "null"));
+
+        // Unity 스타일 요청 데이터 구성
         Map<String, String> requestData = new HashMap<>();
         requestData.put("query", query);
         requestData.put("player", playerName);
@@ -514,8 +615,25 @@ public class MyBackgroundService extends Service {
         requestData.put("ai_language", aiLanguage);
         requestData.put("ai_language_in", aiLanguageIn);
         requestData.put("ai_language_out", aiLanguageOut);
+        requestData.put("ai_emotion", "off");
         requestData.put("memory", memoryJson);
         requestData.put("chatIdx", chatIdx);
+        
+        // Unity 추가 파라미터들 (기본값으로 설정)
+        requestData.put("api_key_Gemini", "");
+        requestData.put("api_key_OpenRouter", "");
+        requestData.put("api_key_ChatGPT", "");
+        requestData.put("guideline_list", "[]");  // Unity UIUserCardManager 역할
+        requestData.put("situation", "{}");  // Unity UIChatSituationManager 역할
+        requestData.put("intent_web", "off");  // 웹 검색 설정
+        requestData.put("intent_image", "off");  // 이미지 생성 설정
+        requestData.put("intent_confirm", "false");  // 의도 확인 설정
+        requestData.put("intent_confirm_type", "");
+        requestData.put("intent_confirm_answer", "");
+        requestData.put("regenerate_count", "0");  // Unity 재생성 카운트
+        requestData.put("server_type", "Auto");
+
+        Log.d("SERVICE API", "Request data prepared - Query: " + query + ", ChatIdx: " + chatIdx);
 
         fetchStreamingData(streamUrl, requestData);
     }
@@ -523,7 +641,10 @@ public class MyBackgroundService extends Service {
     public void fetchStreamingData(String url, Map<String, String> data) {
         String jsonData = new Gson().toJson(data);
         String curChatIdx = data.get("chatIdx");
-        int curChatIdxNum = Integer.parseInt(curChatIdx);
+        // 공용변수 최신화
+        if(!"-1".equals(curChatIdx)) {
+            chatIdxSuccess = curChatIdx;
+        }
 
         OkHttpClient client = new OkHttpClient.Builder()
                 .connectTimeout(100, TimeUnit.SECONDS)
@@ -533,6 +654,7 @@ public class MyBackgroundService extends Service {
                 .baseUrl(baseUrl)
                 .client(client)
                 .addConverterFactory(GsonConverterFactory.create())
+                .callbackExecutor(streamingExecutor)
                 .build();
 
         ApiService apiService = retrofit.create(ApiService.class);
@@ -544,6 +666,8 @@ public class MyBackgroundService extends Service {
             @Override
             public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
                 if (response.isSuccessful()) {
+                    JsonObject lastJsonObject = null;
+
                     try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.body().byteStream()))) {
                         String line;
                         while ((line = reader.readLine()) != null) {
@@ -555,11 +679,18 @@ public class MyBackgroundService extends Service {
 
                                     // 최신 대화 처리 로직 미반영
                                     processReply(jsonObject);
+
+                                    // lastJsonObject 갱신
+                                    lastJsonObject = jsonObject;
                                 } catch (JsonSyntaxException e) {
                                     Log.e("SERVICE API","JSON decode error: " + e.getMessage());
                                 }
                             }
                         }
+
+                        // OnFinalResponseReceived 호출
+                        OnFinalResponseReceived(lastJsonObject);
+
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -575,16 +706,46 @@ public class MyBackgroundService extends Service {
         });
     }
 
+    // 최후의 대화를 save
+    private void OnFinalResponseReceived(JsonObject lastJsonObject) {
+        if (lastJsonObject == null) return;
+        Log.d("SERVICE API", "OnFinalResponseReceived start.");
+
+
+        String query_trans = lastJsonObject.getAsJsonObject("query").get("text").getAsString();
+
+        List<String> replyListEn = new ArrayList<>();  // 저장용 대화
+        JsonArray replyArray = lastJsonObject.getAsJsonArray("reply_list");
+        for (JsonElement replyElement : replyArray) {
+            JsonObject reply = replyElement.getAsJsonObject();
+            String answerEn = reply.has("answer_en") ? reply.get("answer_en").getAsString() : "";
+            replyListEn.add(answerEn);
+        }
+        String replyEn = String.join(" ", replyListEn);
+        
+        // 대화 내용 저장
+        ConversationManager.saveConversationMemory("player", query_trans, query_trans);
+        ConversationManager.saveConversationMemory("character", replyEn, replyEn);
+    }
+
     private void processReply(JsonObject jsonObject) {
         Log.d("SERVICE API","ProcessReply started.");
         Log.d("SERVICE API", "jsonObject : " + String.valueOf(jsonObject));
 
-        List<String> replyListKo = new ArrayList<>();
-        List<String> replyListJp = new ArrayList<>();
-        List<String> replyListEn = new ArrayList<>();
+//         // 말풍선 없으니 필요없긴 함
+//        List<String> replyListKo = new ArrayList<>();
+//        List<String> replyListJp = new ArrayList<>();
+//        List<String> replyListEn = new ArrayList<>();  // 저장용 대화
+        String query_trans = jsonObject.getAsJsonObject("query").get("text").getAsString();
 
         JsonArray replyArray = jsonObject.getAsJsonArray("reply_list");
         String chatIdx = jsonObject.get("chat_idx").getAsString();
+
+        // 현재 대화가 최신인지 체크
+        if (chatIdxSuccess == null || !chatIdxSuccess.equals(chatIdx)) {
+            Log.d("SERVICE API", "chatIdx Too Old : " + chatIdx + "/"+ chatIdxSuccess);
+            return;
+        }
 
         if (replyArray != null) {
             String answerVoice = null;
@@ -598,88 +759,218 @@ public class MyBackgroundService extends Service {
 
                 answerVoice = answerJp;
 
-//                if (!answerJp.isEmpty()) {
+                if (!answerJp.isEmpty()) {
 //                    replyListJp.add(answerJp);
-//                    if ("jp".equals(SettingManager.getInstance().getSettings().getSoundLanguage())) {
-//                        answerVoice = answerJp;
-//                    }
-//                }
-//
-//                if (!answerKo.isEmpty()) {
+                    if ("jp".equals(Bridge.sound_language)) {
+                        answerVoice = answerJp;
+                    }
+                }
+
+                if (!answerKo.isEmpty()) {
 //                    replyListKo.add(answerKo);
-//                    if ("ko".equals(SettingManager.getInstance().getSettings().getSoundLanguage())) {
-//                        answerVoice = answerKo;
-//                    }
-//                }
-//
-//                if (!answerEn.isEmpty()) {
+                    if ("ko".equals(Bridge.sound_language)) {
+                        answerVoice = answerKo;
+                    }
+                }
+
+                if (!answerEn.isEmpty()) {
 //                    replyListEn.add(answerEn);
-//                    if ("en".equals(SettingManager.getInstance().getSettings().getSoundLanguage())) {
-//                        answerVoice = answerEn;
-//                    }
-//                }
+                    if ("en".equals(Bridge.sound_language)) {
+                        answerVoice = answerEn;
+                    }
+                }
             }
 
-            String replyKo = String.join(" ", replyListKo);
-            String replyJp = String.join(" ", replyListJp);
-            String replyEn = String.join(" ", replyListEn);
+//            String replyKo = String.join(" ", replyListKo);
+//            String replyJp = String.join(" ", replyListJp);
+//            String replyEn = String.join(" ", replyListEn);
+//            Log.d("SERVICE API","Reply (Ko): " + replyKo);
+//            Log.d("SERVICE API","Reply (Jp): " + replyJp);
+//            Log.d("SERVICE API","Reply (En): " + replyEn);
 
-            Log.d("SERVICE API","Reply (Ko): " + replyKo);
-            Log.d("SERVICE API","Reply (Jp): " + replyJp);
-            Log.d("SERVICE API","Reply (En): " + replyEn);
             Log.d("SERVICE API","answerVoice: " + answerVoice);
 
-            getJpWavFromAPI(answerVoice, chatIdx);
-
-
+            if (answerVoice != null) {
+                if ("ko".equals(Bridge.sound_language) || "en".equals(Bridge.sound_language)) {
+                    getKoWavFromAPI(answerVoice, chatIdx);
+                } else if ("jp".equals(Bridge.sound_language)) {
+                    getJpWavFromAPI(answerVoice, chatIdx);
+                } else {
+                    getJpWavFromAPI(answerVoice, chatIdx);
+                }
+            }
         }
     }
 
+    // Unity GetJpWavFromAPI 로직 기반 일본어 TTS
     public void getJpWavFromAPI(String text, String chatIdx) {
+        Log.d("SERVICE API", "Starting Japanese TTS - Text: " + text + ", ChatIdx: " + chatIdx);
+        
+        // Unity 로직: server_type_idx == 2일 때 dev_voice 서버 사용
+        String serverTypeIdx = Bridge.server_type_idx != null ? Bridge.server_type_idx : "0";
+        String ttsBaseUrl = baseUrl;
+        
+        if ("2".equals(serverTypeIdx) && Bridge.dev_voice_url != null && !Bridge.dev_voice_url.isEmpty()) {
+            ttsBaseUrl = Bridge.dev_voice_url;
+            Log.d("SERVICE API", "Using dev_voice server for JP TTS (server_type_idx=2): " + ttsBaseUrl);
+        } else {
+            Log.d("SERVICE API", "Using default server for JP TTS (server_type_idx=" + serverTypeIdx + "): " + ttsBaseUrl);
+        }
+        
         // Retrofit 설정
         Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl(baseUrl)
+                .baseUrl(ttsBaseUrl)
                 .addConverterFactory(GsonConverterFactory.create())
+                .callbackExecutor(apiExecutor)
                 .build();
         ApiService apiService = retrofit.create(ApiService.class);
 
-        // 요청 데이터 생성
+        // Unity 스타일 요청 데이터 생성
         JsonObject requestData = new JsonObject();
         requestData.addProperty("text", text);
-        requestData.addProperty("char", "arona"); // 캐릭터 이름 예시
-        requestData.addProperty("lang", "ja");
-        requestData.addProperty("speed", "100"); // 예: 속도 100%
+        requestData.addProperty("char", Bridge.nickname != null ? Bridge.nickname : "arona");
+        requestData.addProperty("lang", "ja");  // Unity GetJpWavFromAPI와 동일
+        requestData.addProperty("speed", Bridge.sound_speed != null ? Bridge.sound_speed : "1.0");
         requestData.addProperty("chatIdx", chatIdx);
 
         // API 호출
+        Log.d("SERVICE API", "Calling JP TTS API with params: " + requestData.toString());
         Call<ResponseBody> call = apiService.synthesizeSound(requestData);
         call.enqueue(new Callback<ResponseBody>() {
             @Override
             public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+                Log.d("SERVICE API", "JP TTS response received");
                 if (response.isSuccessful()) {
                     try {
+                        // Unity 로직: Chat-Idx 헤더 체크하여 과거 대화 무시
+                        String chatIdxHeader = response.headers().get("Chat-Idx");
+                        if (chatIdxHeader != null) {
+                            int chatIdxHeaderNum = Integer.parseInt(chatIdxHeader);
+                            int chatIdxSuccessNum = Integer.parseInt(chatIdxSuccess);
+                            if (chatIdxSuccessNum > chatIdxHeaderNum) {
+                                Log.d("SERVICE API", "Ignoring old voice: current=" + chatIdxSuccess + ", response=" + chatIdxHeader);
+                                return;
+                            }
+                        }
+
                         // 응답 파일 저장 경로 설정
-                        outputCounter = (outputCounter+1)%10;
-                        File outputFile = new File(getExternalFilesDir(null), "android_output"+outputCounter+".wav");
+                        outputCounter = (outputCounter + 1) % 10;
+                        File outputFile = new File(getExternalFilesDir(null), "android_output" + outputCounter + ".wav");
 
                         // 파일 저장
+                        Log.d("SERVICE API", "Saving JP TTS WAV: " + outputFile.getAbsolutePath());
                         if (saveResponseToFile(response.body(), outputFile)) {
-                            Log.d("API", "WAV 파일 저장 성공: " + outputFile.getAbsolutePath());
+                            Log.d("SERVICE API", "JP TTS WAV saved successfully");
 
-                            // 음성 재생 관리
+                            // Unity 스타일 음성 재생 관리
                             manageAudioPlayback(outputFile);
                         }
                     } catch (Exception e) {
-                        Log.e("API", "오류 발생: " + e.getMessage());
+                        Log.e("SERVICE API", "Error processing JP TTS response: " + e.getMessage());
+                        e.printStackTrace();
                     }
                 } else {
-                    Log.e("API", "요청 실패, 상태 코드: " + response.code());
+                    Log.e("SERVICE API", "JP TTS request failed, status: " + response.code());
+                    try {
+                        String errorBody = response.errorBody() != null ? response.errorBody().string() : "No error details";
+                        Log.e("SERVICE API", "JP TTS error details: " + errorBody);
+                    } catch (Exception e) {
+                        Log.e("SERVICE API", "Error reading JP TTS error body: " + e.getMessage());
+                    }
                 }
             }
 
             @Override
             public void onFailure(Call<ResponseBody> call, Throwable t) {
-                Log.e("API", "요청 실패: " + t.getMessage());
+                Log.e("SERVICE API", "JP TTS request failed: " + t.getMessage());
+                t.printStackTrace();
+            }
+        });
+    }
+
+
+    // Unity GetKoWavFromAPI 로직 기반 한국어/영어 TTS
+    public void getKoWavFromAPI(String text, String chatIdx) {
+        Log.d("SERVICE API", "Starting Korean/English TTS - Text: " + text + ", ChatIdx: " + chatIdx);
+        
+        // Unity 로직: server_type_idx == 2일 때 dev_voice 서버 사용
+        String serverTypeIdx = Bridge.server_type_idx != null ? Bridge.server_type_idx : "0";
+        String ttsBaseUrl = baseUrl;
+        
+        if ("2".equals(serverTypeIdx) && Bridge.dev_voice_url != null && !Bridge.dev_voice_url.isEmpty()) {
+            ttsBaseUrl = Bridge.dev_voice_url;
+            Log.d("SERVICE API", "Using dev_voice server for KO TTS (server_type_idx=2): " + ttsBaseUrl);
+        } else {
+            Log.d("SERVICE API", "Using default server for KO TTS (server_type_idx=" + serverTypeIdx + "): " + ttsBaseUrl);
+        }
+        
+        // Retrofit 설정
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(ttsBaseUrl)
+                .addConverterFactory(GsonConverterFactory.create())
+                .callbackExecutor(apiExecutor)
+                .build();
+        ApiService apiService = retrofit.create(ApiService.class);
+
+        // Unity 스타일 요청 데이터 생성
+        JsonObject requestData = new JsonObject();
+        requestData.addProperty("text", text);
+        requestData.addProperty("char", Bridge.nickname != null ? Bridge.nickname : "arona");
+        requestData.addProperty("lang", Bridge.sound_language != null ? Bridge.sound_language : "ko");
+        requestData.addProperty("speed", Bridge.sound_speed != null ? Bridge.sound_speed : "1.0");
+        requestData.addProperty("chatIdx", chatIdx);
+
+        // API 호출
+        Log.d("SERVICE API", "Calling KO TTS API with params: " + requestData.toString());
+        Call<ResponseBody> call = apiService.synthesizeSoundKo(requestData);
+        call.enqueue(new Callback<ResponseBody>() {
+            @Override
+            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+                Log.d("SERVICE API", "KO TTS response received");
+                if (response.isSuccessful()) {
+                    try {
+                        // Unity 로직: Chat-Idx 헤더 체크하여 과거 대화 무시
+                        String chatIdxHeader = response.headers().get("Chat-Idx");
+                        if (chatIdxHeader != null) {
+                            int chatIdxHeaderNum = Integer.parseInt(chatIdxHeader);
+                            int chatIdxSuccessNum = Integer.parseInt(chatIdxSuccess);
+                            if (chatIdxSuccessNum > chatIdxHeaderNum) {
+                                Log.d("SERVICE API", "Ignoring old voice: current=" + chatIdxSuccess + ", response=" + chatIdxHeader);
+                                return;
+                            }
+                        }
+
+                        // 응답 파일 저장 경로 설정
+                        outputCounter = (outputCounter + 1) % 10;
+                        File outputFile = new File(getExternalFilesDir(null), "android_output" + outputCounter + ".wav");
+
+                        // 파일 저장
+                        Log.d("SERVICE API", "Saving KO TTS WAV: " + outputFile.getAbsolutePath());
+                        if (saveResponseToFile(response.body(), outputFile)) {
+                            Log.d("SERVICE API", "KO TTS WAV saved successfully");
+
+                            // Unity 스타일 음성 재생 관리
+                            manageAudioPlayback(outputFile);
+                        }
+                    } catch (Exception e) {
+                        Log.e("SERVICE API", "Error processing KO TTS response: " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                } else {
+                    Log.e("SERVICE API", "KO TTS request failed, status: " + response.code());
+                    try {
+                        String errorBody = response.errorBody() != null ? response.errorBody().string() : "No error details";
+                        Log.e("SERVICE API", "KO TTS error details: " + errorBody);
+                    } catch (Exception e) {
+                        Log.e("SERVICE API", "Error reading KO TTS error body: " + e.getMessage());
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ResponseBody> call, Throwable t) {
+                Log.e("SERVICE API", "KO TTS request failed: " + t.getMessage());
+                t.printStackTrace();
             }
         });
     }
@@ -695,13 +986,12 @@ public class MyBackgroundService extends Service {
             }
             return true;
         } catch (IOException e) {
-            Log.e("API", "파일 저장 중 오류 발생: " + e.getMessage());
+            Log.e("SERVICE API", "파일 저장 중 오류 발생: " + e.getMessage());
             return false;
         }
     }
 
-    private MediaPlayer mediaPlayer;
-    private final Queue<File> audioQueue = new LinkedList<>();
+
 
     private void manageAudioPlayback(File audioFile) {
         if (mediaPlayer == null) {
@@ -715,10 +1005,22 @@ public class MyBackgroundService extends Service {
         }
 
         try {
+            // 음량 값을 설정
+            float volume = 1.0f; // 기본값 (100%)
+            if (Bridge.sound_volume != null) {
+                try {
+                    int volumeInt = Integer.parseInt(Bridge.sound_volume);
+                    volume = Math.max(0, Math.min(volumeInt / 100f, 1.0f)); // 0.0 ~ 1.0 사이로 클램핑
+                } catch (NumberFormatException e) {
+                    Log.e("Audio", "Invalid volume value, defaulting to 100%.");
+                }
+            }
+
             // 음성 재생 설정
             mediaPlayer.reset();
             mediaPlayer.setDataSource(audioFile.getAbsolutePath());
             mediaPlayer.prepare();
+            mediaPlayer.setVolume(volume, volume);  // 음량 적용
             mediaPlayer.start();
 
             mediaPlayer.setOnCompletionListener(mp -> {
@@ -731,7 +1033,16 @@ public class MyBackgroundService extends Service {
         }
     }
 
-
+    private void ResetAudio() {
+        if (mediaPlayer != null) {
+            if (mediaPlayer.isPlaying()) {
+                mediaPlayer.stop(); // 현재 재생 중인 음성을 멈춤
+            }
+            mediaPlayer.reset(); // MediaPlayer 리소스 초기화
+        }
+        audioQueue.clear(); // 큐 초기화
+        Log.d("Audio", "Reset Audio from STT");
+    }
 
     // 필요할 경우 음성재생용 sampleRATE를 여기서 설정해서 audioTrack 선언시 사용해야 함
     private int getSampleRate(File file) {
