@@ -23,9 +23,14 @@ public interface ApiService {
     );
 
     @POST("/conversation_stream")
+    @Streaming
     Call<ResponseBody> streamConversation(@Body RequestBody requestBody);
 
     @POST("getSound/jp")
-    @Streaming
+//    @Streaming
     Call<ResponseBody> synthesizeSound(@Body JsonObject requestData);
+
+    @POST("getSound/ko")
+//    @Streaming
+    Call<ResponseBody> synthesizeSoundKo(@Body JsonObject requestData);
 }
