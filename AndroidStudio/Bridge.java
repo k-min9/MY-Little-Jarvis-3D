@@ -1,20 +1,31 @@
 package com.example.mylittlejarvisandroid;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.app.Application;
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
+import android.provider.Settings;
 import android.util.Log;
 
 public class Bridge extends Application {
     private static Context context;
     static Activity unityActivity;
+    
+    // 전달받은 유니티 값
     static String baseUrl;
+    static String nickname;
+    static String player_name;
+    static String sound_language;
+    static String sound_volume;
+    static String sound_speed;
+    static String file_path;
+    static String server_type_idx;  // 0: Auto, 1: Server, 2: Free(Gemini), 3: Free(OpenRouter), 4: Paid(Gemini)
+    static String dev_voice_url;  // dev_voice 서버 URL (server_type_idx == 2일 때 사용)
+
 
     private static final int NOTIFICATION_ID = 1;
     private static final String CHANNEL_ID = "ForegroundServiceChannel";
@@ -53,58 +64,119 @@ public class Bridge extends Application {
     public static void ReceiveActivityInstance(Activity tempActivity) {
         unityActivity = tempActivity;
         Log.i("BRIDGE", "Activity received.");
-
-//        String[] perms= new String[1];
-//        perms[0]= Manifest.permission.ACTIVITY_RECOGNITION;
-//        if (ContextCompat.checkSelfPermission(unityActivity, Manifest.permission.ACTIVITY_RECOGNITION)
-//                != PackageManager.PERMISSION_GRANTED) {
-//            Log.i("BRIDGE", "Permision isnt granted!");
-//            ActivityCompat.requestPermissions(Bridge.unityActivity,
-//                    perms,
-//                    1);
-//        }
-        Log.i("BRIDGE", "ReceiveActivityInstance ended.");
     }
 
-    public static void ReceiveBaseUrl(String tempUrl) {
-        baseUrl = tempUrl;
+    public static void ReceiveBaseUrl(String receivedText) {
+        baseUrl = receivedText;
         Log.i("BRIDGE", "ReceiveBaseUrl received. : " + baseUrl);
     }
+    public static void ReceiveNickname(String receivedText) {
+        nickname = receivedText;
+        Log.i("BRIDGE", "ReceiveNickname received. : " + nickname);
+    }
+    public static void ReceivePlayerName(String receivedText) {
+        player_name = receivedText;
+        Log.i("BRIDGE", "ReceivePlayerName received. : " + player_name);
+    }
+    public static void ReceiveSoundLanguage(String receivedText) {
+        sound_language = receivedText;
+        Log.i("BRIDGE", "ReceiveSoundLanguage received. : " + sound_language);
+    }
+    public static void ReceiveSoundVolume(String receivedText) {
+        sound_volume = receivedText;
+        Log.i("BRIDGE", "ReceiveSoundVolume received. : " + sound_volume);
+    }
+    public static void ReceiveSoundSpeed(String receivedText) {
+        sound_speed = receivedText;
+        Log.i("BRIDGE", "ReceiveSoundSpeed received. : " + sound_speed);
+    }
+    public static void ReceiveFilePath(String receivedText) {
+        file_path = receivedText;
+        Log.i("BRIDGE", "ReceiveFilePath received. : " + file_path);
+    }
+    public static void ReceiveServerTypeIdx(String receivedText) {
+        server_type_idx = receivedText;
+        Log.i("BRIDGE", "ReceiveServerTypeIdx received. : " + server_type_idx);
+    }
+    public static void ReceiveDevVoiceUrl(String receivedText) {
+        dev_voice_url = receivedText;
+        Log.i("BRIDGE", "ReceiveDevVoiceUrl received. : " + dev_voice_url);
+    }
+
+
 
     public static void StartService() {
         if (unityActivity != null) {
             // 알림 생성 및 반복 발행
-            CreateNotification();
-            StartNotificationLoop();
+//            CreateNotification();
+//            StartNotificationLoop();
 
-            for (final Intent intent : POWERMANAGER_INTENTS) {  // 제조사별 인텐트 검사
-                if (unityActivity.getPackageManager().resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY) != null) {
-                    Log.i("BRIDGE", "Auto start is required");
-                    AlertDialog alertDialog = new AlertDialog.Builder(unityActivity).create();
-                    alertDialog.setTitle("Auto start is required");
-                    alertDialog.setMessage("Please enable auto start to provide correct work");
-                    alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "OK",
-                            new DialogInterface.OnClickListener() {
-                                public void onClick(DialogInterface dialog, int which) {
-                                    unityActivity.startActivity(intent);
-                                }
-                            });
-                    alertDialog.show();
-                    break;
-                }
+//            for (final Intent intent : POWERMANAGER_INTENTS) {  // 제조사별 인텐트 검사
+//                if (unityActivity.getPackageManager().resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY) != null) {
+//                    Log.i("BRIDGE", "Auto start is required");
+//                    AlertDialog alertDialog = new AlertDialog.Builder(unityActivity).create();
+//                    alertDialog.setTitle("Auto start is required");
+//                    alertDialog.setMessage("Please enable auto start to provide correct work");
+//                    alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "OK",
+//                            new DialogInterface.OnClickListener() {
+//                                public void onClick(DialogInterface dialog, int which) {
+//                                    unityActivity.startActivity(intent);
+//                                }
+//                            });
+//                    alertDialog.show();
+//                    break;
+//                }
+//            }
+
+            try {
+                // SERVICE 시작
+                Intent serviceIntent = new Intent(unityActivity, MyBackgroundService.class);
+                unityActivity.startForegroundService(serviceIntent);
+                Log.i("BRIDGE", "Foreground service started.");
+
+                // SendMessage Test
+                UnitySendMessage("GameManager", "SayHello", "Mingu");
+            } catch (Exception e) {
+                Log.e("BRIDGE", "Cannot start Service.");
             }
 
-            // SERVICE 로그 확인
-            Intent serviceIntent = new Intent(unityActivity, MyBackgroundService.class);
-            unityActivity.startForegroundService(serviceIntent);
-            Log.i("BRIDGE", "Foreground service started.");
-
-            // SendMessage Test
-            UnitySendMessage("GameManager", "SayHello", "Mingu");
         } else {
             Log.e("BRIDGE", "Unity Activity is null. Cannot start service.");
         }
     }
+
+    public static void OpenBatteryOptiSettings() {
+        if (unityActivity != null) {
+            try {
+                String packageName = unityActivity.getPackageName();
+                Intent intent;
+                Log.i("BRIDGE", "OpenBatteryOptiSettings  service started.");
+
+                // Android 버전에 따라 Intent 다르게 설정
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                    intent.setData(Uri.parse("package:" + packageName));
+                } else {
+                    // Android M 미만에서는 배터리 최적화 관련 설정이 없음
+                    intent = new Intent(Settings.ACTION_SETTINGS);
+                }
+
+                unityActivity.startActivity(intent);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+//    // legacy > 핸드폰 전체의 최적화 된 앱들을 보여주고 거기서 선택하게 하는 방식
+//    public static void OpenBatteryOptiSettings() {
+//        if (unityActivity != null) {
+//            Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+//            unityActivity.startActivity(intent);
+//        }
+//    }
+
 
     // 1. 알림 생성 메서드
     private static void CreateNotification() {
