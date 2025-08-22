@@ -203,7 +203,7 @@ public class ServerManager : MonoBehaviour
         }
 
         // 2. Check ngrokUrl
-        Debug.Log("ngrokUrl : " + ngrokUrl);
+        // Debug.Log("ngrokUrl : " + ngrokUrl);
         if (!string.IsNullOrEmpty(ngrokUrl))
         {
             yield return StartCoroutine(IsUrlReachable(ngrokUrl + "/health", result => isReachable = result));
@@ -301,14 +301,14 @@ public class ServerManager : MonoBehaviour
         // 타임아웃 발생 시 기본 값 사용
         if (string.IsNullOrEmpty(SettingManager.Instance.settings?.server_id))
         {
-            Debug.LogWarning("server_id 초기화 시간 초과. 기본 값 사용.");
+            // Debug.LogWarning("server_id 초기화 시간 초과. 기본 값 사용.");
         }
         else
         {
             server_id = SettingManager.Instance.settings.server_id;
         }
 
-        Debug.Log("server_id : " + server_id);
+        // Debug.Log("server_id : " + server_id);
 
         // Supabase 요청 URL 및 API 키
         string ngrokSupabaseUrl = "https://lxmkzckwzasvmypfoapl.supabase.co/storage/v1/object/sign/json_bucket/my_little_jarvis_plus_ngrok_server.json?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJqc29uX2J1Y2tldC9teV9saXR0bGVfamFydmlzX3BsdXNfbmdyb2tfc2VydmVyLmpzb24iLCJpYXQiOjE3MzM4Mzg4MjYsImV4cCI6MjA0OTE5ODgyNn0.ykDVTXYVXNnKJL5lXILSk0iOqt0_7UeKZqOd1Qv_pSY&t=2024-12-10T13%3A53%3A47.907Z";
@@ -325,7 +325,7 @@ public class ServerManager : MonoBehaviour
             // 에러 처리
             if (request.result == UnityWebRequest.Result.ConnectionError || request.result == UnityWebRequest.Result.ProtocolError)
             {
-                Debug.LogError($"Error fetching JSON data: {request.error}");
+                // Debug.LogError($"Error fetching JSON data: {request.error}");
             }
             else
             {
@@ -337,7 +337,7 @@ public class ServerManager : MonoBehaviour
                 if (fullData != null && fullData.ContainsKey(server_id))
                 {
                     NgrokJsonResponse data = fullData[server_id];
-                    Debug.Log($"Fetched URL: {data.url}");
+                    // Debug.Log($"Fetched URL: {data.url}");
 
                     ngrokUrl = data.url;
                     ngrokStatus = data.status;
