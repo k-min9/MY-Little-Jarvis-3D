@@ -207,9 +207,9 @@ public class StatusManager : MonoBehaviour
         faceTextureChanger = CharManager.Instance.GetCurrentCharacter().GetComponentInChildren<FaceTextureChanger>();
         if (faceTextureChanger==null) return;     
 
-        // 0.5초에 한번 입모양 변경
+        // 2초에 한번 입모양 변경
         faceTextureChanger.mouthIndex += 1;
-        if (faceTextureChanger.mouthIndex < 30) return;
+        if (faceTextureChanger.mouthIndex < 120) return;
         faceTextureChanger.mouthIndex = 0;
 
         if (faceTextureChanger.mouthStatus == 5) {

@@ -150,7 +150,7 @@ public class SettingManager : MonoBehaviour
 
     // setter
     public void SetPlayerName(string value) { settings.player_name = value; SaveSettings(); }
-    public void SetUiLanguage() { int value=uiLangDropdown.value; settings.ui_language_idx = value; settings.ui_language=getLangFromIdx(value); LanguageManager.Instance.SetUILanguage(); SaveSettings(); }
+    public void SetUiLanguage() { int value=uiLangDropdown.value; Debug.Log("SetUiLanguage" + uiLangDropdown.value); settings.ui_language_idx = value; settings.ui_language=getLangFromIdx(value); LanguageManager.Instance.SetUILanguage(); SaveSettings(); }
     public void SetAiLanguageIn(string value) { settings.ai_language_in = value; SaveSettings(); }
     public void SetAiLanguageOut(string value) { settings.ai_language_out = value; SaveSettings(); }
     public void SetIsAlwaysOnTop(bool value) { 
@@ -219,11 +219,12 @@ public class SettingManager : MonoBehaviour
             Directory.CreateDirectory(directoryPath);
         }
         LoadSettings();
+        SetUIAfterLoading();
 
         // 플랫폼별 UI 적용
-        # if UNITY_ANDROID
+#if UNITY_ANDROID
         isAlwaysOnTopToggle.gameObject.SetActive(false);
-        # endif
+#endif
     }
 
     void Start()
@@ -452,12 +453,13 @@ public class SettingManager : MonoBehaviour
             SaveSettings();
         }
         Debug.Log("LoadSettings End");
-        Debug.Log(settings);
+        Debug.Log(settings.ui_language);
     }
 
     // UI 세팅 적용
     private void SetUIAfterLoading()
     {
+        Debug.Log("SetUIAfterLoading" + settings.ui_language_idx);
         playerNameInputField.text = settings.player_name;
         uiLangDropdown.value = settings.ui_language_idx;
         aiLangDropdown.value = settings.ai_language_idx;
@@ -601,6 +603,7 @@ public class SettingManager : MonoBehaviour
     // 기본값 설정
     private void SetDefaultValues()
     {
+        Debug.Log("SetDefaultValues");
         settings.player_name = "Sensei";
         settings.ui_language_idx = 0;
         settings.ui_language = "ko";
@@ -628,7 +631,7 @@ public class SettingManager : MonoBehaviour
         settings.sound_volumeMaster = 70;
         settings.sound_speedMaster = 100;
 
-        settings.server_type_idx = 0;  // 0: Auto, 1: Server, 2: Free(Gemini), 3: Free(OpenRouter), 4: Paid(Gemini)
+        settings.server_type_idx = 2;  // 0: Auto, 1: Server, 2: Free(Gemini), 3: Free(OpenRouter), 4: Paid(Gemini)
         settings.server_type = "Auto";
         settings.server_id = "temp";
         settings.api_key_gemini = "";
