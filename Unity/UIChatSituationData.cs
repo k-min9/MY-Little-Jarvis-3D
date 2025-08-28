@@ -5,6 +5,8 @@ using System;
 [Serializable]
 public class UIChatSituationInfo
 {
+    public string key;                     // 상황 키 (예: "beach_trip")
+    public string lang;                    // 언어 코드 (예: "ko", "en", "jp")
     public string situationTitle;          // 상황 제목 (예: "별빛 아래에서")
     public string situationDescription;    // 전체 상황 설명 (예: "조용한 밤, 별을 바라보는 낭만적인 분위기")
     public List<string> firstMessages;     // 시작 메시지 리스트 (예: ["선생님, 오늘 일정은 어떠세요?"])
@@ -27,6 +29,8 @@ public static class UIChatSituationData
                 {
                     "ko", new UIChatSituationInfo
                     {
+                        key = "default",
+                        lang = "ko",
                         situationTitle = "기본 설정",
                         situationDescription = "",
                         firstMessages = new List<string>(),
@@ -40,6 +44,8 @@ public static class UIChatSituationData
                 {
                     "en", new UIChatSituationInfo
                     {
+                        key = "default",
+                        lang = "en",
                         situationTitle = "Default Setting",
                         situationDescription = "",
                         firstMessages = new List<string>(),
@@ -51,8 +57,10 @@ public static class UIChatSituationData
                     }
                 },
                 {
-                    "ja", new UIChatSituationInfo
+                    "jp", new UIChatSituationInfo
                     {
+                        key = "default",
+                        lang = "jp",
                         situationTitle = "デフォルト設定",
                         situationDescription = "",
                         firstMessages = new List<string>(),
@@ -71,6 +79,8 @@ public static class UIChatSituationData
                 {
                     "ko", new UIChatSituationInfo
                     {
+                        key = "assistant_classroom",
+                        lang = "ko",
                         situationTitle = "샬레 도우미",
                         situationDescription = "현재 샬레 집무실에서 근무 중입니다. 캐릭터는 그런 선생님을 위해 방문했습니다.",
                         firstMessages = new List<string>
@@ -90,6 +100,8 @@ public static class UIChatSituationData
                 {
                     "en", new UIChatSituationInfo
                     {
+                        key = "assistant_classroom",
+                        lang = "en",
                         situationTitle = "SCHALE Assistant",
                         situationDescription = "You are working in the SCHALE office. The character has come to assist you during your duties.",
                         firstMessages = new List<string>
@@ -107,8 +119,10 @@ public static class UIChatSituationData
                     }
                 },
                 {
-                    "ja", new UIChatSituationInfo
+                    "jp", new UIChatSituationInfo
                     {
+                        key = "assistant_classroom",
+                        lang = "jp",
                         situationTitle = "シャーレのアシスタント",
                         situationDescription = "現在、シャーレの執務室で勤務中です。キャラクターは先生をお手伝いするために訪れました。",
                         firstMessages = new List<string>
@@ -133,6 +147,8 @@ public static class UIChatSituationData
                 {
                     "ko", new UIChatSituationInfo
                     {
+                        key = "beach_trip",
+                        lang = "ko",
                         situationTitle = "바닷가에서의 하루",
                         situationDescription = "오늘은 해변으로 놀러 온 날입니다. 비일상적인 분위기 속에서 시원한 바다를 만끽하고 있습니다.",
                         firstMessages = new List<string>
@@ -151,6 +167,8 @@ public static class UIChatSituationData
                 {
                     "en", new UIChatSituationInfo
                     {
+                        key = "beach_trip",
+                        lang = "en",
                         situationTitle = "A Day at the Beach",
                         situationDescription = "It’s a beach day! You’re here to enjoy the summer breeze and break from the ordinary.",
                         firstMessages = new List<string>
@@ -167,8 +185,10 @@ public static class UIChatSituationData
                     }
                 },
                 {
-                    "ja", new UIChatSituationInfo
+                    "jp", new UIChatSituationInfo
                     {
+                        key = "beach_trip",
+                        lang = "jp",
                         situationTitle = "海辺での一日",
                         situationDescription = "今日はビーチに遊びに来た日です。非日常の雰囲気の中で、涼しい海を満喫しています。",
                         firstMessages = new List<string>
@@ -192,6 +212,8 @@ public static class UIChatSituationData
                 {
                     "ko", new UIChatSituationInfo
                     {
+                        key = "stargazing_night",
+                        lang = "ko",
                         situationTitle = "별빛 아래에서",
                         situationDescription = "조용한 밤, 둘이 함께 별을 바라보며 낭만적인 분위기를 느끼고 있습니다.",
                         firstMessages = new List<string>
@@ -210,6 +232,8 @@ public static class UIChatSituationData
                 {
                     "en", new UIChatSituationInfo
                     {
+                        key = "stargazing_night",
+                        lang = "en",
                         situationTitle = "Under the Starlight",
                         situationDescription = "It’s a quiet night. The two of you are gazing at the stars together in a romantic setting.",
                         firstMessages = new List<string>
@@ -226,8 +250,10 @@ public static class UIChatSituationData
                     }
                 },
                 {
-                    "ja", new UIChatSituationInfo
+                    "jp", new UIChatSituationInfo
                     {
+                        key = "stargazing_night",
+                        lang = "jp",
                         situationTitle = "星空の下で",
                         situationDescription = "静かな夜、二人で星を眺めながらロマンチックな雰囲気を感じています。",
                         firstMessages = new List<string>
