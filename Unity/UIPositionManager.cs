@@ -86,12 +86,14 @@ public class UIPositionManager : MonoBehaviour
     // 특정 메뉴 이름에 따라 하드코딩된 위치 반환 (예시만)
     public Vector3 GetMenuPosition(string menuName)  
     {
-        switch (menuName.ToLower())
+        switch (menuName)
         {
             case "guideline":
                 return canvas.transform.TransformPoint(new Vector3(0f, 100f, 0f)); // 중앙보다 위
-            case "charchange":
-                return canvas.transform.TransformPoint(new Vector3(-200f, 50f, 0f));
+            case "charChange":
+                return canvas.transform.TransformPoint(new Vector3(700f, 150f, 0f));
+            case "charSummon":
+                return canvas.transform.TransformPoint(new Vector3(1000f, 50f, 0f));
             case "settings":
                 return canvas.transform.TransformPoint(new Vector3(250f, -50f, 0f));
             case "version":

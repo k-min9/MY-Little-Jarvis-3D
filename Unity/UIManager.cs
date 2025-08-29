@@ -7,12 +7,13 @@ using UnityEngine.UI;
 public class UIManager : MonoBehaviour
 {
     [SerializeField] private GameObject charChange; // CharChange
-    [SerializeField] private GameObject charAdd; // charAdd
+    [SerializeField] private GameObject charSummon; // charSummon
     [SerializeField] private GameObject version; // version+thanks
     [SerializeField] private Text versionThanksContent; // version+thanks
     [SerializeField] private GameObject settings; // settings
     [SerializeField] private GameObject chatHistory; // chatHistory
     [SerializeField] private GameObject guideLine; // guideLine
+    [SerializeField] private GameObject situation; // UIChatSituation
 
     // 싱글톤 인스턴스
     private static UIManager instance;
@@ -43,19 +44,21 @@ public class UIManager : MonoBehaviour
 
         // 자체 함수로 비활성화
         charChange.SetActive(false);
-        charAdd.SetActive(false);
+        charSummon.SetActive(false);
         version.SetActive(false);
         settings.SetActive(false);
         chatHistory.SetActive(false);
         // guideLine.SetActive(false);
+        // situation.SetActive(false);
 
         // UIWidget 존재하면 Close
         TryCloseWidget(charChange);
-        TryCloseWidget(charAdd);
+        TryCloseWidget(charSummon);
         TryCloseWidget(version);
         TryCloseWidget(settings);
         TryCloseWidget(chatHistory);
         TryCloseWidget(guideLine);
+        TryCloseWidget(situation);
 
         //         // 안드로이드 or 테스트용
         // #if UNITY_ANDROID || UNITY_EDITOR
@@ -82,6 +85,15 @@ public class UIManager : MonoBehaviour
     public void ShowCharChange()
     {
         UIWidget uIWidget = charChange.GetComponent<UIWidget>();
+
+        // 이미 활성화되어 있지 않은 경우라면 위치 조정
+        if (!charChange.activeSelf)
+        {
+            // Vector3 position = UIPositionManager.Instance.GetCanvasPositionRight();
+            Vector3 position = UIPositionManager.Instance.GetMenuPosition("charChange");
+            charChange.GetComponent<RectTransform>().position = position;
+        }
+
         uIWidget.Show();
     }
 
@@ -101,10 +113,41 @@ public class UIManager : MonoBehaviour
         uIWidget.Show();
     }
 
-    // charChange-UIWidget의 Show 작동
-    public void ShowCharAdd()
+    // ChatSituation 활성화 후 -UIWidget의 Show 작동
+    public void ShowUIChatSituation()
     {
-        UIWidget uIWidget = charAdd.GetComponent<UIWidget>();
+
+        UIWidget uIWidget = situation.GetComponent<UIWidget>();
+
+        // 이미 활성화되어 있지 않은 경우라면 위치 조정
+        if (!situation.activeSelf)
+        {
+            situation.SetActive(true);  // 활성화 해야 Load 가능
+            UIChatSituationManager.Instance.LoadChatSituationData();  // 언어 ui 변경가능성 있으니 그냥 load (data가 아직은 가벼움)
+
+            Vector3 position = UIPositionManager.Instance.GetCanvasPositionCenter();
+            // Vector3 position = UIPositionManager.Instance.GetMenuPosition("situation");
+            situation.GetComponent<RectTransform>().position = position;
+        }
+
+        uIWidget.Show();
+    }
+
+
+    // charChange-UIWidget의 Show 작동
+    public void ShowCharSummon()
+    {
+        UIWidget uIWidget = charSummon.GetComponent<UIWidget>();
+
+        // 이미 활성화되어 있지 않은 경우라면 위치 조정
+        if (!charSummon.activeSelf)
+        {
+            // Vector3 position = UIPositionManager.Instance.GetCanvasPositionRight();
+            Vector3 position = UIPositionManager.Instance.GetMenuPosition("charSummon");
+            Debug.Log(position);
+            charSummon.GetComponent<RectTransform>().position = position;
+        }
+
         uIWidget.Show();
     }
 
