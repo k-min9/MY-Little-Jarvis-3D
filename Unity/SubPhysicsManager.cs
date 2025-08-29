@@ -31,18 +31,18 @@ public class SubPhysicsManager : MonoBehaviour
 
     private void Update()
     {
-        // Test코드
-        // 충돌 감지
-        Vector2 newPosition = rectTransform.anchoredPosition;
-        if (WindowCollisionManager.Instance.IsCollisionWithWindowsRect(newPosition))
-        {
-            NoticeBalloonManager.Instance.ModifyNoticeBalloonText("충돌중:" + newPosition.x + "/" + newPosition.y);
-            Debug.Log("충돌중!");
-        }
-        else
-        {
-             NoticeBalloonManager.Instance.ModifyNoticeBalloonText("충돌XXXX:" + newPosition.x + "/" + newPosition.y);
-        }
+        // // Test코드
+        // // 충돌 감지
+        // Vector2 newPosition = rectTransform.anchoredPosition;
+        // if (WindowCollisionManager.Instance.IsCollisionWithWindowsRect(newPosition))
+        // {
+        //     NoticeBalloonManager.Instance.ModifyNoticeBalloonText("충돌중:" + newPosition.x + "/" + newPosition.y);
+        //     Debug.Log("충돌중!");
+        // }
+        // else
+        // {
+        //      NoticeBalloonManager.Instance.ModifyNoticeBalloonText("충돌XXXX:" + newPosition.x + "/" + newPosition.y);
+        // }
 
         if (subStatusManager.isPicking 
         || subStatusManager.isFalling 

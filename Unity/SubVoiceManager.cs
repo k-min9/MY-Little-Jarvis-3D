@@ -56,6 +56,21 @@ public class SubVoiceManager : MonoBehaviour
         }
     }
 
+    public void PlayWavAudioFromPath(string audioPath)
+    {
+        try
+        {
+            string fullPath = Path.Combine(Application.streamingAssetsPath, audioPath);
+            StartCoroutine(LoadAudioWav(fullPath));
+        }
+        catch
+        {
+            // 예외 처리
+            Debug.Log("AudioWav Play Error");
+        }
+
+    }
+
     // 오디오 파일을 로드하는 코루틴
     private IEnumerator LoadAudioOGG(string audioPath)
     {
@@ -90,6 +105,43 @@ public class SubVoiceManager : MonoBehaviour
                     Debug.Log("오디오 볼륨 변경 오류");
                 }
 
+                availableSource.Play(); // 오디오 재생
+            }
+        }
+    }
+
+    // 오디오 파일을 로드하는 코루틴. 늘어나면 변수화
+    private IEnumerator LoadAudioWav(string audioPath)
+    {
+        // 사용 가능한 AudioSource를 찾기
+        AudioSource availableSource = GetAvailableAudioSource();
+        if (availableSource == null)
+        {
+            Debug.LogWarning("모든 AudioSource가 사용 중입니다.");
+            yield break;
+        }
+
+        using (UnityWebRequest uwr = UnityWebRequestMultimedia.GetAudioClip(audioPath, AudioType.WAV))
+        {
+            yield return uwr.SendWebRequest(); // 요청 전송
+
+            if (uwr.result == UnityWebRequest.Result.ConnectionError || uwr.result == UnityWebRequest.Result.ProtocolError)
+            {
+                Debug.LogError("오디오 로드 실패: " + uwr.error);
+            }
+            else
+            {
+                AudioClip clip = DownloadHandlerAudioClip.GetContent(uwr); // 오디오 클립 가져오기
+                availableSource.clip = clip;
+                availableSource.volume = 1f; // 100%
+                try
+                {
+                    availableSource.volume = SettingManager.Instance.settings.sound_volumeMaster / 100;
+                }
+                catch
+                {
+                    Debug.Log("wav volume change error");
+                }
                 availableSource.Play(); // 오디오 재생
             }
         }
