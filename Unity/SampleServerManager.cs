@@ -23,10 +23,21 @@ public class SampleServerManager : MonoBehaviour
     private const int ServerPort = 5000;
     private Process jarvisProcess;  // 실행된 서버 프로세스를 저장할 변수
 
-    private void Awake()
+    private void Start()
     {
+        UnityEngine.Debug.Log("[Jarvis_Sample] SampleServerManager initialized");
+        // 자동 시작 제거 - InstallStatusManager에서 수동으로 호출
+    }
+
+    /// <summary>
+    /// InstallStatusManager에서 호출할 초기화 함수
+    /// </summary>
+    public void InitializeForSample()
+    {
+        UnityEngine.Debug.Log("[Jarvis_Sample] SettingManager Fixed");
         SettingManager.Instance.settings.server_type_idx = 2;
-        UnityEngine.Debug.Log("[Jarvis_Sample] Awake() called");
+        SettingManager.Instance.settings.isShowChatBoxOnClick = true;
+        UnityEngine.Debug.Log("[Jarvis_Sample] InitializeForSample() called");
         RunJarvisServerWithCheck();
     }
 

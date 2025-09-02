@@ -25,11 +25,22 @@ public class JarvisServerManager : MonoBehaviour
 
     private void Awake()
     {
-        UnityEngine.Debug.Log("[Jarvis] Awake() called");
+        UnityEngine.Debug.Log("[Jarvis] JarvisServerManager initialized");
+        // 자동 시작 제거 - InstallStatusManager에서 수동으로 호출
+    }
+
+    /// <summary>
+    /// InstallStatusManager에서 호출할 초기화 함수
+    /// </summary>
+    public void InitializeForLiteOrFull()
+    {
+#if !UNITY_EDITOR
+        UnityEngine.Debug.Log("[Jarvis] InitializeForLiteOrFull() called");
         if (SettingManager.Instance.settings.isStartServerOnInit)
         {
             RunJarvisServerWithCheck();
         }
+#endif
     }
 
     public void RunJarvisServerWithCheck()
