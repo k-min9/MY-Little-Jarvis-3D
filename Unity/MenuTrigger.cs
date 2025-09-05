@@ -133,7 +133,7 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         string targetLang = SettingManager.Instance.settings.ui_language; // 0 : ko, 1 : jp, 2: en 
         bool isSampleVer = SettingManager.Instance.GetInstallStatus() == 0;  // 0이면 sample ver
 #if UNITY_EDITOR
-        isSampleVer = true;
+        isSampleVer = false;
 #endif
 
         // setting

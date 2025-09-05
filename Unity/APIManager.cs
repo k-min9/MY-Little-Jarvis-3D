@@ -434,6 +434,19 @@ public class APIManager : MonoBehaviour
         }
         // 애니메이션 재생 초기화
         AnimationManager.Instance.Idle();
+
+
+        // server_type이 2 (Free Gemini)인 경우 Gemini 전용 함수 호출
+#if !UNITY_EDITOR
+        int server_type_idx = SettingManager.Instance.settings.server_type_idx;  // 0: Auto, 1: Server, 2: Free(Gemini), 3: Free(OpenRouter), 4: Paid(Gemini)
+        if (server_type_idx == 2)
+        {
+            await CallConversationStreamGemini(query, chatIdx, ai_lang_in);
+            return;
+        }
+#endif
+
+
         // API 호출을 위한 URL 구성
         string baseUrl = ServerManager.Instance.GetBaseUrl();
         string streamUrl = baseUrl + "/conversation_stream";
@@ -460,6 +473,7 @@ public class APIManager : MonoBehaviour
         var memory = MemoryManager.Instance.GetAllConversationMemory();
         string memoryJson = JsonConvert.SerializeObject(memory);
         string guidelineJson = UIUserCardManager.Instance.GetGuidelineListJson();
+        string situationJson = UIChatSituationManager.Instance.GetCurUIChatSituationInfoJson();
         string server_type = SettingManager.Instance.settings.server_type ?? "Auto";  // 0: Auto, 1: Server, 2: Free(Gemini), 3: Free(OpenRouter), 4: Paid(Gemini)
 
         // 요청 데이터 구성
@@ -476,7 +490,8 @@ public class APIManager : MonoBehaviour
             { "api_key_OpenRouter", ""},
             { "api_key_ChatGPT", ""},
             { "memory", memoryJson },
-            { "guideline_list", guidelineJson }, // ← 추가됨
+            { "guideline_list", guidelineJson },
+            { "situation", situationJson} ,
             { "chatIdx", chatIdx},
             { "intent_web", ai_web_search},  // off, on, force
             { "intent_image", intent_image},  // on, off, force
@@ -485,6 +500,54 @@ public class APIManager : MonoBehaviour
             { "intent_confirm_answer", ""},  // true, false : 의도행동확인에 대한 답변[재생성시 확인 없이 적용하기 위해]
             { "regenerate_count", GameManager.Instance.chatIdxRegenerateCount.ToString()},
             { "server_type", server_type},
+        };
+
+        await FetchStreamingData(streamUrl, requestData);
+    }
+
+    // Gemini 전용 대화 스트림 호출 함수
+    public async Task CallConversationStreamGemini(string query, string chatIdx = "-1", string ai_lang_in = "")
+    {
+        // 공용변수 최신화
+        if (chatIdx != "-1")
+        {
+            GameManager.Instance.chatIdxSuccess = chatIdx;
+        }
+        // 애니메이션 재생 초기화
+        AnimationManager.Instance.Idle();
+
+        // Gemini 서버 URL 구성 (포트 5001 사용)
+        string baseUrl = ServerManager.Instance.GetBaseUrl();
+        string streamUrl = baseUrl + "/conversation_stream_gemini";
+        Debug.Log("Gemini streamUrl : " + streamUrl);
+
+        // 닉네임 가져오기
+        string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
+        string player_name = SettingManager.Instance.settings.player_name;
+        string ai_language = SettingManager.Instance.settings.ai_language ?? "";
+        string ai_language_in = ai_lang_in;  // stt 에서 가져온 언어 있으면 사용
+        string ai_language_out = SettingManager.Instance.settings.ai_language_out ?? "";
+
+        var memory = MemoryManager.Instance.GetAllConversationMemory();
+        string memoryJson = JsonConvert.SerializeObject(memory);
+        string guidelineJson = UIUserCardManager.Instance.GetGuidelineListJson();
+        string situationJson = UIChatSituationManager.Instance.GetCurUIChatSituationInfoJson();
+
+        // Gemini 전용 요청 데이터 구성 (간소화된 파라미터)
+        var requestData = new Dictionary<string, string>
+        {
+            { "query", query },
+            { "player", player_name },
+            { "char", nickname },
+            { "ai_language", ai_language },
+            { "ai_language_in", ai_language_in },
+            { "ai_language_out", ai_language_out },
+            { "api_key_Gemini", "" },
+            { "memory", memoryJson },
+            { "guideline_list", guidelineJson },
+            { "situation", situationJson },
+            { "chatIdx", chatIdx },
+            { "regenerate_count", GameManager.Instance.chatIdxRegenerateCount.ToString() }
         };
 
         await FetchStreamingData(streamUrl, requestData);
@@ -571,20 +634,34 @@ public class APIManager : MonoBehaviour
     {
         // API 호출을 위한 URL 구성
         string baseUrl = ServerManager.Instance.GetBaseUrl();
-        Debug.Log("SettingManager.Instance.GetInstallStatus() : " + SettingManager.Instance.GetInstallStatus());
-#if !UNITY_EDITOR
-        if (SettingManager.Instance.GetInstallStatus() < 2) // no install, lite
+
+        // dev_voice 사용 여부
+        int server_type_idx = SettingManager.Instance.settings.server_type_idx;
+        bool shouldUseDevServer = SettingManager.Instance.GetInstallStatus() < 2 ||  // no install, lite,
+                                 (server_type_idx == 2);// && string.IsNullOrEmpty(baseUrl));  // Gemini with empty baseUrl
+        if (shouldUseDevServer)
         {
-            ServerManager.Instance.GetServerUrlFromServerId("sound_dev", (url) =>
+            // TaskCompletionSource를 사용하여 콜백을 async/await로 변환
+            var tcs = new TaskCompletionSource<string>();
+            
+            ServerManager.Instance.GetServerUrlFromServerId("dev_voice", (url) =>
             {
-                if (!string.IsNullOrEmpty(url))
-                {
-                    Debug.Log("sound_dev 서버 URL: " + url);
-                    baseUrl = url;
-                }
+                tcs.SetResult(url);
             });
+            
+            // dev_voice 서버 URL을 기다림
+            string devVoiceUrl = await tcs.Task;
+            
+            if (!string.IsNullOrEmpty(devVoiceUrl))
+            {
+                Debug.Log("dev_voice 서버 URL: " + devVoiceUrl);
+                baseUrl = devVoiceUrl;
+            }
+            else
+            {
+                Debug.LogWarning("dev_voice 서버 URL을 가져올 수 없습니다. 기본 URL을 사용합니다.");
+            }
         }
-#endif
 
         string url = baseUrl + "/getSound/jp"; // GET + Uri.EscapeDataString(text);
 
@@ -748,11 +825,11 @@ public class APIManager : MonoBehaviour
         // Debug.Log("wavDuration : " + wavDuration);
 
         // 10초를 초과하면 저장/재생하지 않음
-        if (wavDuration > 10f)
-        {
-            Debug.LogWarning("WAV file is longer than 10 seconds. File will not be saved.");
-            return;
-        }
+        // if (wavDuration > 10f)
+        // {
+        //     Debug.LogWarning("WAV file is longer than 10 seconds. File will not be saved.");
+        //     return;
+        // }
 
         string filePath = Path.Combine(Application.persistentDataPath, "response.wav");
         try
