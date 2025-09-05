@@ -92,8 +92,30 @@ public class BackgroundService : MonoBehaviour
         pluginClass.CallStatic("ReceiveFilePath", file_path);
         Debug.Log("InitializePlugin Send file_path finish : " + file_path);
 
-        pluginClass.CallStatic("StartService");
-        Debug.Log("StartService");
+        // server_type_idx 전송 (server 분기 처리용)
+        String server_type_idx = SettingManager.Instance.settings.server_type_idx.ToString();
+        pluginClass.CallStatic("ReceiveServerTypeIdx", server_type_idx);
+        Debug.Log("InitializePlugin Send server_type_idx finish : " + server_type_idx);
+
+        // dev_voice URL 전송 (server_type_idx=2일 때 TTS용)
+        // Unity에서 ServerManager를 통해 dev_voice URL 가져오기
+        ServerManager.Instance.GetServerUrlFromServerId("dev_voice", (devVoiceUrl) =>
+        {
+            if (!string.IsNullOrEmpty(devVoiceUrl))
+            {
+                pluginClass.CallStatic("ReceiveDevVoiceUrl", devVoiceUrl);
+                Debug.Log("InitializePlugin Send dev_voice_url finish : " + devVoiceUrl);
+            }
+            else
+            {
+                pluginClass.CallStatic("ReceiveDevVoiceUrl", "");
+                Debug.Log("InitializePlugin Send dev_voice_url finish : (empty)");
+            }
+            
+            // dev_voice URL 설정 완료 후 서비스 시작
+            pluginClass.CallStatic("StartService");
+            Debug.Log("StartService");
+        });
 #endif
 
     }
