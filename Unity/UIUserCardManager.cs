@@ -55,11 +55,12 @@ public class UIUserCardManager : MonoBehaviour
         uiUserCardSlotSample.SetActive(false);
         SetSaveButtonState(false);  // 초기화 시 버튼 비활성화
 
-        // 카드 정보 로드
-        LoadUserCardInfo();
-
         // Test 코드 (기존 UI 제거있으니 별도 운용할 것)
         // TestUserCard();
+        // InitUserCard();
+
+        // 카드 정보 로드
+        LoadUserCardInfo();
     }
 
     // 테스트 Debug 로그
@@ -111,6 +112,34 @@ public class UIUserCardManager : MonoBehaviour
         SetSaveButtonState(false);  // 새로고침 시 저장버튼 off
         // 하단으로 스크롤
         ScrollToBottom();
+    }
+
+    // 최초 기동 시 기본 지침 초기화
+    public void InitUserCard()
+    {
+        // 기존 리스트 초기화
+        userCardList.Clear();
+
+        // 초기화
+        string targetLang = SettingManager.Instance.settings.ui_language; // 0 : ko, 1 : jp, 2: en 
+        
+        // 활성화 지침
+        userCardList.Add(new UserCardInfo { userCardText = LanguageData.Translate("답변은 반드시 3~4문장 정도 길이로만 짧게 답변.", targetLang), isActive = true });
+        userCardList.Add(new UserCardInfo { userCardText = LanguageData.Translate("반드시 답변에 괄호를 넣거나 동작을 묘사하지 않음", targetLang), isActive = true });
+        
+        // 비활성화 지침
+        userCardList.Add(new UserCardInfo { userCardText = LanguageData.Translate("모든 문장 끝에 \"~다냥\" 어미 사용", targetLang), isActive = false });
+        userCardList.Add(new UserCardInfo { userCardText = LanguageData.Translate("답변할 때마다 관련된 고사성어나 속담 인용", targetLang), isActive = false });
+        userCardList.Add(new UserCardInfo { userCardText = LanguageData.Translate("답변 시작을 항상 \"흠... 그렇다면\"으로 시작", targetLang), isActive = false });
+        userCardList.Add(new UserCardInfo { userCardText = LanguageData.Translate("어떠한 경우에도 한국어를 유지해야 함", targetLang), isActive = false });
+        
+        // 인덱스 설정
+        nextCardIndex = userCardList.Count;
+        
+        // JSON으로 저장
+        SaveUserCardInfosToJson();
+        
+        Debug.Log("InitUserCard completed with " + userCardList.Count + " cards");
     }
 
     // Slot UI를 하나 불러오기

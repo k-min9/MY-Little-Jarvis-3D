@@ -86,9 +86,20 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
 
     private void HandleLeftClick()
     {
+#if UNITY_EDITOR
+        // 에디터고 내용이 없으면, baseUrl 부여
+        if (string.IsNullOrEmpty(ServerManager.Instance.baseUrl))
+        { 
+            ServerManager.Instance.baseUrl = "http://127.0.0.1:5000";
+        }
+#endif
+
         // 환경세팅/튜토리얼 시작 조건 확인 : 우선 baseUrl 값이 ""
+        
         if (string.IsNullOrEmpty(ServerManager.Instance.baseUrl))
         {
+            // 앱 실행 후 15초가 지나야만 실행 ((Sample)Server 실행중일 수 있음)
+            if (Time.time <= 15f) return;
             // 기존 시나리오 실행중일 경우 return 
             if (StatusManager.Instance.isScenario) return;
 
@@ -103,6 +114,7 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
             else if (SettingManager.Instance.settings.isShowTutorialOnChat
                 && !SettingManager.Instance.settings.isTutorialCompleted)  // 시나리오 튜토리얼 실행명령 + 튜토리얼 종료되지 않음
             {
+                //TODO : 다른 스마트한 방법 찾기
                 ScenarioTutorialManager.Instance.StartTutorial();  // 시나리오 - 튜토리얼
                 return;
             }

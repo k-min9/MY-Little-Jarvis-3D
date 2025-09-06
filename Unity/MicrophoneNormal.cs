@@ -175,8 +175,19 @@ public class MicrophoneNormal : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         }
         Debug.Log($"WAV file saved at: {filePath}");
 
-        // wav 전송 API 호출
-        StartCoroutine(SendWavFile(filePath, "ko", "normal"));
+        // STT 처리 - server_type_idx에 따라 분기
+        if (SettingManager.Instance.settings.server_type_idx == 2)
+        {
+            // 내부 Whisper STT 사용
+            Debug.Log("Using internal Whisper STT...");
+            StartCoroutine(WhisperSTTManager.Instance.ProcessSTTFromWavData(wavData));
+        }
+        else
+        {
+            // 기존 외부 서버 STT 사용(wav 전송 API 호출)
+            Debug.Log("Using external server STT...");
+            StartCoroutine(SendWavFile(filePath, "ko", "normal"));
+        }
     }
 
     private byte[] ConvertToWav(float[] samples, int channels, int sampleRate)
@@ -302,8 +313,14 @@ public IEnumerator SendWavFile(string filePath, string sttLang, string sttLevel)
             // 대화 시작
             APIManager.Instance.CallConversationStream(query, responseJson.chatIdx, responseJson.lang);
 
+            // dev : 발언 음성 재생
+            if (query != "" && SettingManager.Instance.settings.isDevHowling)
+            { 
+                APIManager.Instance.GetHowlingFromAPI(query);
+            }
+
             // 기존 음성 중지 및 초기화
-            VoiceManager.Instance.ResetAudio();
+                VoiceManager.Instance.ResetAudio();
         }
         catch (Exception ex)
         {
