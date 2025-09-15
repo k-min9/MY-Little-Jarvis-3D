@@ -71,9 +71,11 @@ public class ChatBalloonManager : MonoBehaviour
         StatusManager.Instance.IsChatting = true; // StatusManager 상태 업데이트
         UpdateChatBalloonPosition();  // chatBalloon 위치 조정하기
 
-        // InputField 포커스 설정
+        // InputField 포커스 설정 (Android 제외 - 렉 방지)
+#if !UNITY_ANDROID
         inputField.Select();
         inputField.ActivateInputField();
+#endif
 
         // 기존 애니메이션 중지 및 isChatting 애니메이션 
         AnimationManager.Instance.Listen();
