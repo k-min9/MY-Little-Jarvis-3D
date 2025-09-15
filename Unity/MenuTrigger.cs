@@ -19,6 +19,11 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     private bool isLeftClickHeld = false; // 좌클릭 상태
     private float leftClickHoldTime = 0f; // 좌클릭 누른 시간
 
+    // 더블클릭 감지용 변수들
+    private float lastClickTime = 0f;
+    private int clickCount = 0;
+    private const float doubleClickTime = 0.3f; // 더블클릭 판정 시간
+
     private RadialMenu m_RadialMenuAction;
 
     // Start is called before the first frame update
@@ -64,6 +69,12 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
             }
         }
 
+        // 더블클릭 타이머 관리
+        if (clickCount > 0 && Time.time - lastClickTime > doubleClickTime)
+        {
+            clickCount = 0; // 더블클릭 시간 초과 시 리셋
+        }
+
         // Radial Menu Action이 보이는 중
         if (m_RadialMenuAction.IsVisible)  // 자체제공함수
         {
@@ -79,6 +90,18 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         }
         else if (eventData.button == PointerEventData.InputButton.Left)
         {
+            // 더블클릭 감지 로직
+            if (Time.time - lastClickTime < doubleClickTime && clickCount == 1)
+            {
+                OnDoubleClick();
+                clickCount = 0; // 더블클릭 처리 후 리셋
+            }
+            else
+            {
+                clickCount = 1;
+                lastClickTime = Time.time;
+            }
+
             isLeftClickHeld = true;
             leftClickHoldTime = 0f; // 타이머 초기화
         }
@@ -146,7 +169,8 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Character", targetLang), new List<(string, UnityAction)>
         {
             (LanguageData.Translate("Action", targetLang), delegate { OnPointerDownRadialMenuAction(); }),
-            (LanguageData.Translate("Change Char", targetLang), isSampleVer ? null : delegate { UIManager.Instance.ShowCharChange();}),
+            // (LanguageData.Translate("Change Char", targetLang), isSampleVer ? null : delegate { UIManager.Instance.ShowCharChange();}),
+            (LanguageData.Translate("Change Char", targetLang), delegate { UIManager.Instance.ShowCharChange();}),
             (LanguageData.Translate("Summon Char", targetLang), delegate { UIManager.Instance.ShowCharSummon(); }),
             (LanguageData.Translate("Change Clothes", targetLang),
                 (_charAttributes.toggleClothes != null || _charAttributes.changeClothes != null)
@@ -224,18 +248,20 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 
         // Dev
 #if UNITY_EDITOR
-        m_ContextMenu.AddMenuItem(LanguageData.Translate("Debug", targetLang), delegate {
+        m_ContextMenu.AddMenuItem(LanguageData.Translate("Debug", targetLang), delegate
+        {
             // EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), 10.0f);
 
             // AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
             // AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Testing...");
             // StartCoroutine(ScenarioCommonManager.Instance.Scenario_C02_AskToStartServer());
             // CharManager.Instance.ChangeCharacterFromCharCode("ch0139");
+            EmotionManager.Instance.NextEmotion();
         });
         m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Dev", targetLang), new List<(string, UnityAction)>
         {
             (LanguageData.Translate("Test", targetLang), delegate {
-                Debug.Log("Test 실행");
+                UIChatSituationManager.Instance.ResetScrollPosition();
             }),
             (LanguageData.Translate("Test2", targetLang), delegate { Debug.Log("Test2 실행"); }),
             (LanguageData.Translate("Test3", targetLang), delegate { Debug.Log("Test3 실행"); })
@@ -260,6 +286,12 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 
         chkTimer = 1f;
         itemChkFlag = true;
+    }
+
+    // 더블클릭 시 호출되는 메서드 (현재는 메뉴를 띄우지만, 나중에 다른 기능으로 변경될 수 있음)
+    private void OnDoubleClick()
+    {
+        TriggerMenu();
     }
 
     // Sub - RadialMenu를 위한 전용 함수들
