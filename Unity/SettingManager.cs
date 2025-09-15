@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 
 
 public class SettingManager : MonoBehaviour
@@ -12,9 +13,9 @@ public class SettingManager : MonoBehaviour
     private string current_platform; // "Editor", "Standalone", "Android" 등
 
     [Header("General")]
-    [SerializeField] private TMP_InputField playerNameInputField;
-    [SerializeField] private Dropdown platformInfoDropdown;
     [SerializeField] private Dropdown uiLangDropdown;
+    [SerializeField] private Dropdown platformInfoDropdown;
+    [SerializeField] private Dropdown editionDropdown;
     [SerializeField] private Toggle isAlwaysOnTopToggle;
     [SerializeField] private Toggle isShowChatBoxOnClickToggle;
     [SerializeField] private Toggle isShowTutorialOnChatToggle;
@@ -34,7 +35,7 @@ public class SettingManager : MonoBehaviour
     [SerializeField] private Slider soundVolumeMasterSlider;  // 현재는 마스터 볼륨만 있으면
     [SerializeField] private Slider soundSpeedMasterSlider;  // 현재는 마스터 볼륨만 있으면
 
-    [Header("Server")]
+    [Header("Server")]  // 구 Server Field. 변수도 관련 변수로 설정되어있음.
     [SerializeField] private Dropdown serverTypeDropdown;
     [SerializeField] private Dropdown serverModelTypeDropdown;
     [SerializeField] private Image serverModelTypeDropdownImage;
@@ -51,13 +52,15 @@ public class SettingManager : MonoBehaviour
     [SerializeField] private GameObject serverOpenRouterApiKeyInputFieldGameObject;
     [SerializeField] private GameObject keyTestGameObject;
     [SerializeField] private Text keyTestResultText;
+    [SerializeField] private Toggle isAskedTurnOnServerToggle;  // Lite, Full 일때 활성화 되는 무언가. 그냥 문답무용으로 키는 방향으로 진행했을때의 영향도도 파악 필요.
 
-    [Header("AI")]
-    [SerializeField] private Dropdown aiServerStatusDropdown;
+    [Header("Conversation")]  // 구 AI Field. 변수도 관련 변수로 설정되어있음.
+    [SerializeField] private TMP_InputField playerNameInputField;
     [SerializeField] private Dropdown aiWebSearchDropdown;
     [SerializeField] private Dropdown aiAskIntentDropdown;
     [SerializeField] private Dropdown aiLangDropdown;
-    [SerializeField] private Toggle isAskedTurnOnServerToggle;
+    [SerializeField] private Dropdown aiEmotionDropdown;
+    [SerializeField] private Dropdown aiVoiceFilterDropdown;
     [SerializeField] private Toggle isAPITestToggle;
     [SerializeField] private Toggle confirmUserIntentToggle;
 
@@ -88,6 +91,7 @@ public class SettingManager : MonoBehaviour
         public int ai_language_idx;  // 0 : ko, 1 : jp, 2: en
         public string ai_language_in;
         public string ai_language_out;
+        public int ai_voice_filter_idx;  // 0 : None, 1 : Skip AI Voice, 2 : User Voice Only
         public bool isAlwaysOnTop;
         public bool isShowChatBoxOnClick;
         public bool isShowTutorialOnChat;
@@ -119,6 +123,8 @@ public class SettingManager : MonoBehaviour
         public string ai_web_search;
         public int ai_ask_intent_idx;  // 0 : off, 1 : on
         public string ai_ask_intent;
+        public int ai_emotion_idx;  // 0 : off, 1 : on
+        public string ai_emotion;
         public string ai_language;
         public bool isAskedTurnOnServer;
         public bool isAPITest;
@@ -150,7 +156,7 @@ public class SettingManager : MonoBehaviour
 
     // setter
     public void SetPlayerName(string value) { settings.player_name = value; SaveSettings(); }
-    public void SetUiLanguage() { int value=uiLangDropdown.value; Debug.Log("SetUiLanguage" + uiLangDropdown.value); settings.ui_language_idx = value; settings.ui_language=getLangFromIdx(value); LanguageManager.Instance.SetUILanguage(); SaveSettings(); }
+    public void SetUiLanguage() { int value=uiLangDropdown.value; settings.ui_language_idx = value; settings.ui_language=getLangFromIdx(value); LanguageManager.Instance.SetUILanguage(); SaveSettings(); }
     public void SetAiLanguageIn(string value) { settings.ai_language_in = value; SaveSettings(); }
     public void SetAiLanguageOut(string value) { settings.ai_language_out = value; SaveSettings(); }
     public void SetIsAlwaysOnTop(bool value) { 
@@ -184,12 +190,14 @@ public class SettingManager : MonoBehaviour
     public void SetAPIKeyOpenRouter(string value) { settings.api_key_openRouter = value; SaveSettings(); }
     public void SetServerModelType() { int value = serverModelTypeDropdown.value; string displayName = serverModelTypeDropdown.options[value].text; settings.model_type = ServerModelData.GetIdByDisplayName(displayName); SetServerUIFromServerModel(ServerModelData.GetFileNameByDisplayName(displayName)); SaveSettings(); }
 
-    public void SetAIWebSearch() { int value = aiWebSearchDropdown.value; settings.ai_web_search_idx = value; settings.ai_web_search = getONOFFTypeFromIdx(value); SaveSettings(); }
+    public void SetAIWebSearch() { int value=aiWebSearchDropdown.value; value = getAiWebSearchFilterScenario(value); aiWebSearchDropdown.value = value; settings.ai_web_search_idx = value; settings.ai_web_search = getONOFFTypeFromIdx(value); SaveSettings(); }
     public void SetAIAskIntent() { int value=aiAskIntentDropdown.value; settings.ai_ask_intent_idx = value; settings.server_type=getONOFFTypeFromIdx(value); SaveSettings(); }
     public void SetIsAskedTurnOnServer(bool value) { settings.isAskedTurnOnServer = value; SaveSettings(); }
     public void SetIsAPITest(bool value) { settings.isAPITest = value; SaveSettings(); }
     public void SetConfirmUserIntent(bool value) { settings.confirmUserIntent = value; SaveSettings(); }  // SetAIAskIntent Toggle 버전
     public void SetAiLanguage() { int value=aiLangDropdown.value; settings.ai_language_idx = value; settings.ai_language=getAiLangFromIdx(value); SaveSettings(); }
+    public void SetAIEmotion() { int value=aiEmotionDropdown.value; value = getAiEmotionFilterScenario(value); aiEmotionDropdown.value = value; settings.ai_emotion_idx = value; settings.ai_emotion = getONOFFTypeFromIdx(value); SaveSettings(); }
+    public void SetAiVoiceFilter() { int value=aiVoiceFilterDropdown.value; value = getAiVoiceFilterScenario(value); aiVoiceFilterDropdown.value = value; settings.ai_voice_filter_idx = value; SaveSettings(); }
 
     public void SetIsDevHowlingToggle(bool value) { settings.isDevHowling = value; SaveSettings(); }  
 
@@ -234,6 +242,7 @@ public class SettingManager : MonoBehaviour
         SetServerModelDropdownOptions();
 
         // 서버 상태 세팅
+        InstallStatusManager.Instance.LoadInstallStatus();
         SetInstallStatus();
 
         // 로딩후 UI
@@ -262,60 +271,37 @@ public class SettingManager : MonoBehaviour
         #endif
     }
     
-    [Serializable]
-    public class InstallStatusData
-    {
-        public string version;  // "lite" or "full"
-    }
+
 
     public void SetInstallStatus()
     {
-        try
+        // InstallStatusManager를 통해 설치 상태를 확인하고 UI에 반영
+        int installStatusIndex = InstallStatusManager.Instance.GetInstallStatusIndex();
+        
+        switch (installStatusIndex)
         {
-            // 실행 파일 기준 ../config/install_status.json
-            string executablePath = Application.dataPath;
-            string installStatusPath = Path.Combine(Path.GetDirectoryName(executablePath), "config/install_status.json");
-            // string installStatusPath = Path.Combine(Application.dataPath, "../config/install_status.json");
-            if (!File.Exists(installStatusPath))
-            {
-                Debug.LogWarning("설치 상태 파일이 존재하지 않습니다.");
-                return;
-            }
-
-            string json = File.ReadAllText(installStatusPath);
-            InstallStatusData installStatus = JsonUtility.FromJson<InstallStatusData>(json);
-
-            if (installStatus == null || string.IsNullOrEmpty(installStatus.version))
-            {
-                Debug.LogWarning("설치 상태를 읽을 수 없습니다.");
-                return;
-            }
-
-            if (installStatus.version == "lite")
-            {
-                Debug.Log("Lite 버전으로 설치됨");
-                // 필요한 UI 제한 또는 정보 표기 가능
-                aiServerStatusDropdown.value = 1;  // Lite
-            }
-            else if (installStatus.version == "full")
-            {
-                Debug.Log("Full 버전으로 설치됨");
-                aiServerStatusDropdown.value = 2;  // Full
-            }
-            else
-            {
-                Debug.LogWarning("알 수 없는 설치 버전: " + installStatus.version);
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError("설치 상태 확인 중 오류 발생: " + ex.Message);
+            case 0: // sample
+                editionDropdown.value = 0;
+                Debug.Log("Sample 버전으로 설정됨");
+                break;
+            case 1: // lite
+                editionDropdown.value = 1;
+                Debug.Log("Lite 버전으로 설정됨");
+                break;
+            case 2: // full
+                editionDropdown.value = 2;
+                Debug.Log("Full 버전으로 설정됨");
+                break;
+            default:
+                editionDropdown.value = 0;
+                Debug.LogWarning("알 수 없는 설치 상태, 기본값으로 설정");
+                break;
         }
     }
 
     public int GetInstallStatus()
     {
-        return aiServerStatusDropdown.value;
+        return InstallStatusManager.Instance.GetInstallStatusIndex();
     }
 
             
@@ -400,6 +386,52 @@ public class SettingManager : MonoBehaviour
         return lang;
     }
 
+    private int getAiEmotionFilterScenario(int value)
+    {
+        // Emotion 기능 키려는데 현재 Sample 버전일 경우 버전업 요구
+        if (value == 1)
+        {
+            bool chk = InstallStatusManager.Instance.CheckAndOperateFull();
+            if (!chk) 
+            {
+                // 안내했을 경우, 0으로 반환
+                return 0;
+            }
+        }
+
+        return value;
+    }
+
+    private int getAiWebSearchFilterScenario(int value)
+    {
+        // WebSearch 기능 키려는데 현재 Sample 버전일 경우 버전업 요구
+        if (value >= 1)  // 1: on, 2: force 둘 다 체크
+        {
+            bool chk = InstallStatusManager.Instance.CheckAndOperateFull();
+            if (!chk) 
+            {
+                // 안내했을 경우, 0으로 반환
+                return 0;
+            }
+        }
+
+        return value;
+    }
+
+    private int getAiVoiceFilterScenario(int value)
+    {
+        if (value == 2)
+        {
+            // TODO : User Only Voice 관련 통신해서 내용있나 확인 또는 갱신 시나리오
+
+            // 현재는 아직 준비 안되었다고 돌려보내기
+            StartCoroutine(ScenarioCommonManager.Instance.Run_C99_NotReady());
+
+            return 1;
+        }
+        return value;
+    }
+
     // idx를 서버타입으로 변환; 0: Auto, 1: Server, 2: Free(Gemini), 3: Free(OpenRouter), 4: Paid(Gemini)
     private string getServerTypeFromIdx(int idx)
     {
@@ -424,6 +456,143 @@ public class SettingManager : MonoBehaviour
             lang = "force";
         }
         return lang;
+    }
+
+    // 시스템 언어 자동 감지 (ko, jp, 그외 en)
+    private string GetSystemLanguage()
+    {
+        string detectedLanguage = "en"; // 기본값
+
+        try
+        {
+            // Unity 기본 시스템 언어 감지 시도
+            try
+            {
+                SystemLanguage systemLang = Application.systemLanguage;
+                Debug.Log($"Unity System Language: {systemLang}");
+                
+                switch (systemLang)
+                {
+                    case SystemLanguage.Korean:
+                        detectedLanguage = "ko";
+                        Debug.Log("Detected Korean from Unity SystemLanguage");
+                        return detectedLanguage;
+                    
+                    case SystemLanguage.Japanese:
+                        detectedLanguage = "jp";
+                        Debug.Log("Detected Japanese from Unity SystemLanguage");
+                        return detectedLanguage;
+                    
+                    default:
+                        detectedLanguage = "en";
+                        Debug.Log($"Detected other language ({systemLang}) from Unity SystemLanguage, using English");
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"Unity SystemLanguage detection failed: {ex.Message}");
+            }
+
+            // .NET CultureInfo를 이용한 추가 감지 시도
+            try
+            {
+                CultureInfo currentCulture = CultureInfo.CurrentCulture;
+                Debug.Log($"Current Culture: {currentCulture.Name}");
+                
+                string cultureName = currentCulture.Name.ToLower();
+                
+                if (cultureName.StartsWith("ko") || cultureName.Contains("korea"))
+                {
+                    detectedLanguage = "ko";
+                    Debug.Log("Detected Korean from CultureInfo");
+                    return detectedLanguage;
+                }
+                else if (cultureName.StartsWith("ja") || cultureName.Contains("japan"))
+                {
+                    detectedLanguage = "jp";
+                    Debug.Log("Detected Japanese from CultureInfo");
+                    return detectedLanguage;
+                }
+                else
+                {
+                    detectedLanguage = "en";
+                    Debug.Log($"Detected other culture ({cultureName}), using English");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"CultureInfo detection failed: {ex.Message}");
+            }
+
+            // UI Culture를 이용한 추가 감지 시도
+            try
+            {
+                CultureInfo uiCulture = CultureInfo.CurrentUICulture;
+                Debug.Log($"Current UI Culture: {uiCulture.Name}");
+                
+                string uiCultureName = uiCulture.Name.ToLower();
+                
+                if (uiCultureName.StartsWith("ko") || uiCultureName.Contains("korea"))
+                {
+                    detectedLanguage = "ko";
+                    Debug.Log("Detected Korean from UI CultureInfo");
+                    return detectedLanguage;
+                }
+                else if (uiCultureName.StartsWith("ja") || uiCultureName.Contains("japan"))
+                {
+                    detectedLanguage = "jp";
+                    Debug.Log("Detected Japanese from UI CultureInfo");
+                    return detectedLanguage;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"UI CultureInfo detection failed: {ex.Message}");
+            }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+            // Android 전용 추가 감지 시도
+            try
+            {
+                using (AndroidJavaClass localeClass = new AndroidJavaClass("java.util.Locale"))
+                {
+                    using (AndroidJavaObject defaultLocale = localeClass.CallStatic<AndroidJavaObject>("getDefault"))
+                    {
+                        string language = defaultLocale.Call<string>("getLanguage");
+                        string country = defaultLocale.Call<string>("getCountry");
+                        
+                        Debug.Log($"Android Locale - Language: {language}, Country: {country}");
+                        
+                        if (language.ToLower().Equals("ko") || country.ToLower().Equals("kr"))
+                        {
+                            detectedLanguage = "ko";
+                            Debug.Log("Detected Korean from Android Locale");
+                            return detectedLanguage;
+                        }
+                        else if (language.ToLower().Equals("ja") || country.ToLower().Equals("jp"))
+                        {
+                            detectedLanguage = "jp";
+                            Debug.Log("Detected Japanese from Android Locale");
+                            return detectedLanguage;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"Android Locale detection failed: {ex.Message}");
+            }
+#endif
+
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Critical error in GetSystemLanguage: {ex.Message}");
+        }
+
+        Debug.Log($"Final detected language: {detectedLanguage}");
+        return detectedLanguage;
     }
 
 
@@ -459,10 +628,8 @@ public class SettingManager : MonoBehaviour
     // UI 세팅 적용
     private void SetUIAfterLoading()
     {
-        Debug.Log("SetUIAfterLoading" + settings.ui_language_idx);
         playerNameInputField.text = settings.player_name;
         uiLangDropdown.value = settings.ui_language_idx;
-        aiLangDropdown.value = settings.ai_language_idx;
         isAlwaysOnTopToggle.isOn = settings.isAlwaysOnTop;
         isShowChatBoxOnClickToggle.isOn = settings.isShowChatBoxOnClick;
         isShowTutorialOnChatToggle.isOn = settings.isShowTutorialOnChat;
@@ -489,6 +656,9 @@ public class SettingManager : MonoBehaviour
         isAskedTurnOnServerToggle.isOn = settings.isAskedTurnOnServer;
         isAPITestToggle.isOn = settings.isAPITest;
         confirmUserIntentToggle.isOn = settings.confirmUserIntent;
+        aiLangDropdown.value = settings.ai_language_idx;
+        aiEmotionDropdown.value = settings.ai_emotion_idx;
+        aiVoiceFilterDropdown.value = settings.ai_voice_filter_idx;
 
         devHowlingToggle.isOn = settings.isDevHowling;
 
@@ -605,14 +775,32 @@ public class SettingManager : MonoBehaviour
     {
         Debug.Log("SetDefaultValues");
         settings.player_name = "Sensei";
-        settings.ui_language_idx = 0;
-        settings.ui_language = "ko";
+        
+        // 시스템 언어 자동 감지
+        string systemLang = GetSystemLanguage();
+        settings.ui_language = systemLang;
+        
+        // 언어에 따른 인덱스 설정
+        switch (systemLang)
+        {
+            case "ko":
+                settings.ui_language_idx = 0;
+                break;
+            case "jp":
+                settings.ui_language_idx = 1;
+                break;
+            case "en":
+            default:
+                settings.ui_language_idx = 2;
+                break;
+        }
         settings.ai_language_idx = 2;
         settings.ai_language = "en";
-        settings.ai_language_in = "ko";
-        settings.ai_language_out = "ko";
+        settings.ai_language_in = systemLang;  // 시스템 언어에 맞춰 설정
+        settings.ai_language_out = systemLang;  // 시스템 언어에 맞춰 설정
+        settings.ai_voice_filter_idx = 1;  // Skip AI Voice
         settings.isAlwaysOnTop = false;
-        settings.isShowChatBoxOnClick = false;
+        settings.isShowChatBoxOnClick = true;
         settings.isShowTutorialOnChat = true;
         settings.isTutorialCompleted = false;
         settings.isStartServerOnInit = true;
@@ -626,6 +814,7 @@ public class SettingManager : MonoBehaviour
         settings.isStartWithLastChar = true;
         settings.isRememberCharOutfits = false;
 
+        // 사운드 언어는 기본값으로 일본어 음성 사용 (가장 품질이 좋음)
         settings.sound_language_idx = 1;  // jp
         settings.sound_language = "jp";
         settings.sound_volumeMaster = 70;
@@ -640,6 +829,8 @@ public class SettingManager : MonoBehaviour
         settings.ai_web_search = "OFF";
         settings.ai_ask_intent_idx = 0;  // 0 : off, 1 : on
         settings.ai_ask_intent = "OFF";
+        settings.ai_emotion_idx = 0;  // 0 : off, 1 : on
+        settings.ai_emotion = "OFF";
         settings.isAskedTurnOnServer = true;
         settings.isAPITest = false;
         settings.confirmUserIntent = false;
