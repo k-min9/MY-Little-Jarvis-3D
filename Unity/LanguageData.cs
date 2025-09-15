@@ -209,6 +209,23 @@ public static class LanguageData
         new Dictionary<string, string> { { "ko", "네! 서버를 기동할게요." }, { "jp", "はい！サーバーを起動しますね。" }, { "en", "Okay! I'll start the server now, Sensei!" } },
         new Dictionary<string, string> { { "ko", "마음이 바뀌시면 언제든지 다시 말 걸어주세요, 선생님!" }, { "jp", "気が変わったら、いつでもまた話しかけてくださいね、先生！" }, { "en", "If you change your mind, feel free to talk to me anytime, Sensei!" } },
 
+        // C90 - 일반 안내
+        new Dictionary<string, string> { { "ko", "현재 버전에서는 사용할 수 없는 설정이에요." }, { "jp", "このバージョンでは利用できない設定です。" }, { "en", "This setting is not available in the current version." } },
+        new Dictionary<string, string> { { "ko", "Lite 이상의 Edition을 설치하시면 이용하실 수 있어요, 선생님." }, { "jp", "Lite以上のエディションをインストールすればご利用いただけますよ、先生。" }, { "en", "You can use this by installing the Lite edition or higher, Sensei." } },
+        new Dictionary<string, string> { { "ko", "Full 이상의 Edition을 설치하시면 이용하실 수 있어요, 선생님." }, { "jp", "Full以上のエディションをインストールすればご利用いただけますよ、先生。" }, { "en", "You can use this by installing the Full edition or higher, Sensei." } },
+
+        // C91 - API/Quota/모델 안내
+        new Dictionary<string, string> { { "ko", "구글에서 개발자에게 제공된 일일 무료 사용량이 이미 모두 소진된 것 같아요." }, { "jp", "Googleが開発者に提供している1日あたりの無料利用枠はすでに使い切られたようです。" }, { "en", "The daily free usage quota provided by Google to developers seems to have already been used up." } },
+        new Dictionary<string, string> { { "ko", "API 키를 발급받아 입력하시면 무료 또는 유료 서버와 연결하실 수 있어요." }, { "jp", "APIキーを発行して入力すれば、無料または有料のサーバーに接続できますよ。" }, { "en", "If you obtain and enter an API key, you can connect to either free or paid servers." } },
+        new Dictionary<string, string> { { "ko", "구글에서 더 이상 해당 무료 AI 모델을 이용할 수 없는 것 같아요." }, { "jp", "Googleではその無料AIモデルはもう利用できないようです。" }, { "en", "It seems that this free AI model is no longer available from Google." } },
+
+        // C99 - 준비/안내
+        new Dictionary<string, string> { { "ko", "선생님, 죄송해요 아직 준비가 되지 않았어요..." }, { "jp", "先生、ごめんなさい。まだ準備ができていません..." }, { "en", "Sorry, Sensei... I'm not ready yet." } },
+        new Dictionary<string, string> { { "ko", "곧 지원할 예정이에요. 기다려주세요 선생님!" }, { "jp", "まもなく対応予定です。待っていてください、先生！" }, { "en", "Support will be available soon. Please wait, Sensei!" } },
+        new Dictionary<string, string> { { "ko", "관련 안내가 필요하실까요, 선생님?" }, { "jp", "ご案内が必要ですか、先生？" }, { "en", "Would you like me to guide you, Sensei?" } },
+
+
+        // 단어 정보
 
         new Dictionary<string, string> { { "ko", "다운로드" }, { "jp", "ダウンロード" }, { "en", "Download" } },
         new Dictionary<string, string> { { "ko", "보유중" }, { "jp", "所持済" }, { "en", "Owned" } },
@@ -363,7 +380,15 @@ public static class LanguageData
         new Dictionary<string, string> { { "ko", "현재 채팅" }, { "jp", "現在チャット" }, { "en", "Current Chat" } },
         new Dictionary<string, string> { { "ko", "새 채팅" }, { "jp", "新規チャット" }, { "en", "New Chat" } },
         new Dictionary<string, string> { { "ko", "대화 내역에서 학습할 정보를 분석합니다." }, { "jp", "会話履歴から学習する情報を分析します。" }, { "en", "Analyze the information to learn from the conversation history." } },
-        new Dictionary<string, string> { { "ko", "대화 내역에서 제목 후보를 추천합니다." }, { "jp", "会話履歴からタイトル候補を推薦します。" }, { "en", "Suggest title suggestions from conversation history." } }
+        new Dictionary<string, string> { { "ko", "대화 내역에서 제목 후보를 추천합니다." }, { "jp", "会話履歴からタイトル候補を推薦します。" }, { "en", "Suggest title suggestions from conversation history." } },
+
+        // UserCard 관련 다국어 지원
+        new Dictionary<string, string> { { "ko", "답변은 반드시 3~4문장 정도 길이로만 짧게 답변." }, { "jp", "回答は必ず3〜4文程度の長さで短く回答する。" }, { "en", "Answer must be short, only about 3-4 sentences long." } },
+        new Dictionary<string, string> { { "ko", "반드시 답변에 괄호를 넣거나 동작을 묘사하지 않음" }, { "jp", "回答に必ず括弧を入れたり動作を描写しない" }, { "en", "Never use parentheses or describe actions in answers" } },
+        new Dictionary<string, string> { { "ko", "모든 문장 끝에 \"~다냥\" 어미 사용" }, { "jp", "すべての文の終わりに\"〜だにゃ\"語尾を使用" }, { "en", "Use \"~danya\" ending at the end of every sentence" } },
+        new Dictionary<string, string> { { "ko", "답변할 때마다 관련된 고사성어나 속담 인용" }, { "jp", "回答するたびに関連する四字熟語やことわざを引用" }, { "en", "Quote related idioms or proverbs in every answer" } },
+        new Dictionary<string, string> { { "ko", "답변 시작을 항상 \"흠... 그렇다면\"으로 시작" }, { "jp", "回答の開始を常に\"うーん...それなら\"で始める" }, { "en", "Always start answers with \"Hmm... then\"" } },
+        new Dictionary<string, string> { { "ko", "어떠한 경우에도 한국어를 유지해야 함" }, { "jp", "いかなる場合でも韓国語を維持しなければならない" }, { "en", "Must maintain Korean language in any case" } }
     };
 
 
