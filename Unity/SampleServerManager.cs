@@ -73,10 +73,13 @@ public class SampleServerManager : MonoBehaviour
 
         if (isAlive)
         {
+            StatusManager.Instance.IsServerConnected = true;
+            UnityEngine.Debug.Log("[Jarvis_Sample] 서버 연결 성공 - StatusManager 업데이트");
             StartCoroutine(ScenarioCommonManager.Instance.Run_C01_ServerStarted());
         }
         else
         {
+            StatusManager.Instance.IsServerConnected = false;
             UnityEngine.Debug.LogWarning("[Jarvis_Sample] 서버 응답 없음 - C01 호출 안됨");
         }
     }
@@ -183,7 +186,8 @@ public class SampleServerManager : MonoBehaviour
             try
             {
                 jarvisProcess.Kill();
-                UnityEngine.Debug.Log("[Jarvis_Sample] Server process killed.");
+                StatusManager.Instance.IsServerConnected = false;
+                UnityEngine.Debug.Log("[Jarvis_Sample] Server process killed - StatusManager 업데이트");
             }
             catch
             {
