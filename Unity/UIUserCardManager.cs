@@ -101,6 +101,10 @@ public class UIUserCardManager : MonoBehaviour
 
         // Memory 가져와서 Slot에 내용 추가
         userCardList = GetUserCardInfos();
+        
+        // userCardList가 비어있으면 자동으로 초기화
+        InitUserCard();
+        
         nextCardIndex = userCardList.Count;
         Debug.Log("GetUserCardInfos end : " + nextCardIndex);
 
@@ -114,11 +118,17 @@ public class UIUserCardManager : MonoBehaviour
         ScrollToBottom();
     }
 
-    // 최초 기동 시 기본 지침 초기화
+    // 최초 기동 시 기본 지침 초기화 (리스트가 비어있을 때만)
     public void InitUserCard()
     {
-        // 기존 리스트 초기화
-        userCardList.Clear();
+        // userCardList가 이미 있으면 초기화하지 않음
+        if (userCardList.Count > 0)
+        {
+            Debug.Log("UserCardList already has " + userCardList.Count + " cards, skipping initialization");
+            return;
+        }
+
+        Debug.Log("UserCardList is empty, initializing default cards...");
 
         // 초기화
         string targetLang = SettingManager.Instance.settings.ui_language; // 0 : ko, 1 : jp, 2: en 
