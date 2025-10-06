@@ -110,6 +110,9 @@ public class UIManager : MonoBehaviour
             guideLine.GetComponent<RectTransform>().position = position;
         }
 
+        // 값이 없으면 초기값 선언하게 선언
+        UIUserCardManager.Instance.InitUserCard();
+
         uIWidget.Show();
     }
 
@@ -131,6 +134,9 @@ public class UIManager : MonoBehaviour
         }
 
         uIWidget.Show();
+
+        // 스크롤 강제 초기화
+        UIChatSituationManager.Instance.ResetScrollPosition();
     }
 
 
@@ -154,25 +160,34 @@ public class UIManager : MonoBehaviour
     // version-UIWidget의 Show 작동
     public void ShowVersion()
     {
-        version.SetActive(true);
         UIWidget uIWidget = version.GetComponent<UIWidget>();
-        uIWidget.Show();
 
         // Special Thanks 문자
         string answerLanguage = SettingManager.Instance.settings.ui_language; // 표시 언어 초기화[ko, en, jp]
         // 언어에 따른 텍스트 설정
         if (answerLanguage == "ko")
         {
-            versionThanksContent.text="이 프로그램은 무료로 사용할 수 있으며\n많은 기부자들의 후원으로 제작되고 있습니다.";
+            versionThanksContent.text = "이 프로그램은 무료로 사용할 수 있으며\n많은 기부자들의 후원으로 제작되고 있습니다.";
         }
         else if (answerLanguage == "jp")
         {
-            versionThanksContent.text="このプログラムは無料で利用することができ、\n多くのパトロンの後援で制作されています。";
+            versionThanksContent.text = "このプログラムは無料で利用することができ、\n多くのパトロンの後援で制作されています。";
         }
         else
         {
-            versionThanksContent.text="This program is FREE TO USE\nand is supported by many generous donors.";
+            versionThanksContent.text = "This program is FREE TO USE\nand is supported by many generous donors.";
         }
+
+        // 이미 활성화되어 있지 않은 경우라면 위치 조정
+        if (!version.activeSelf)
+        {
+            // Vector3 position = UIPositionManager.Instance.GetCanvasPositionRight();
+            Vector3 position = UIPositionManager.Instance.GetMenuPosition("version");
+            Debug.Log(position);
+            version.GetComponent<RectTransform>().position = position;
+        }
+    
+        uIWidget.Show();
     }
 
     // charChange-UIWidget의 Show 작동
