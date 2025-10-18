@@ -22,6 +22,7 @@ isOnTop - 최상위 여부
 isMinimize - 최소화 여부
 isAiUsing = 서버를 키거나 그렇게 하도록 명령을 내린 대화 가능 상태
 isMouthMoving -  입이 현재 움직이는 중인지 여부(Flag로 전환 관리)
+isServerConnected - 현재 서버가 연결되어 있는지 여부
 
 characterTransform - 메인캐릭터 transform : 메뉴 등의 위치 설정에 사용
 */
@@ -64,6 +65,7 @@ public class StatusManager : MonoBehaviour
     public bool isAiUsing;
     public bool isMouthActive = false; // 입이 현재 움직이는 중인지 여부
     public bool isScenario = false;  // 튜토리얼 등의 시나리오는 여러가지가 동시에 진행될 수 없음
+    public bool isServerConnected = false; // 현재 서버가 연결되어 있는지 여부
 
     // 그 외
     public RectTransform characterTransform;
@@ -161,6 +163,12 @@ public class StatusManager : MonoBehaviour
         set { isAiUsing = value; }
     }
 
+    public bool IsServerConnected
+    {
+        get { return isServerConnected; }
+        set { isServerConnected = value; }
+    }
+
     public bool IsConversationing
     {
         get { return isAsking|| isChatting|| isListening || isThinking || isAnswering || isAnsweringSimple; }
@@ -205,17 +213,23 @@ public class StatusManager : MonoBehaviour
         // 변수 그때 그때 세팅 (TODO : CharChange, InitChange에서 최적화 가능)
         FaceTextureChanger faceTextureChanger;
         faceTextureChanger = CharManager.Instance.GetCurrentCharacter().GetComponentInChildren<FaceTextureChanger>();
-        if (faceTextureChanger==null) return;     
+        if (faceTextureChanger==null) return;
 
-        // 2초에 한번 입모양 변경
+        // 120프레임(약 2초)에 도달했을 때만 입모양 변경
         faceTextureChanger.mouthIndex += 1;
-        if (faceTextureChanger.mouthIndex < 120) return;
-        faceTextureChanger.mouthIndex = 0;
+        if (faceTextureChanger.mouthIndex >= 120)
+        {
+            faceTextureChanger.mouthIndex = 0;  // 카운터 리셋
 
-        if (faceTextureChanger.mouthStatus == 5) {
-            faceTextureChanger.SetMouth(6);
-        } else {
-            faceTextureChanger.SetMouth(5);
+            // 입모양 토글 (5 ↔ 6)
+            if (faceTextureChanger.mouthStatus == 5)
+            {
+                faceTextureChanger.SetMouth(6);
+            }
+            else
+            {
+                faceTextureChanger.SetMouth(5);
+            }
         }
     }
 

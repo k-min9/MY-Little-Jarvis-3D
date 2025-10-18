@@ -56,29 +56,26 @@ public class ServerManager : MonoBehaviour
         }
     }
 
-    public string GetBaseUrl()
+    public void GetBaseUrl(Action<string> callback)
     {
-        if (isConnected)
+        // 이미 연결되어 있고 값이 있으면 즉시 반환
+        if (isConnected && !string.IsNullOrEmpty(baseUrl))
         {
-            return baseUrl;  // 재세팅하는건 다른 곳에서
+            callback?.Invoke(baseUrl);
+            return;
         }
 
+        // 값이 없으면 코루틴으로 조회 후 콜백 호출
+        StartCoroutine(GetBaseUrlCoroutine(callback));
+    }
 
-        // SetBaseUrl()을 직접 실행하고 완료될 때까지 대기
-        int maxAttempts = 500; // 최대 500프레임 (약 5초)
-
-        IEnumerator setBaseUrlCoroutine = SetBaseUrl();
-        while (setBaseUrlCoroutine.MoveNext() && maxAttempts > 0)
-        {
-            maxAttempts--;
-        }
-        if (maxAttempts == 0)
-        {
-            Debug.LogError("SetBaseUrl timeout!");
-            return ""; // 실패 시 빈 문자열 반환
-        }
-
-        return baseUrl;
+    private IEnumerator GetBaseUrlCoroutine(Action<string> callback)
+    {
+        // SetBaseUrl 실행하고 완료 대기
+        yield return StartCoroutine(SetBaseUrl());
+        
+        // 완료 후 결과 반환
+        callback?.Invoke(baseUrl);
     }
 
     public string SetBaseUrlToDevServer()

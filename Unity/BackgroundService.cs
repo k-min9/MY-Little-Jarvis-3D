@@ -62,10 +62,11 @@ public class BackgroundService : MonoBehaviour
             return;
         }
 
-        string baseUrl = ServerManager.Instance.GetBaseUrl();
-
+        // baseUrl을 비동기로 가져오기
+        ServerManager.Instance.GetBaseUrl((baseUrl) =>
+        {
 #if UNITY_ANDROID && !UNITY_EDITOR  // 안드로이드
-        pluginClass.CallStatic("ReceiveBaseUrl", baseUrl);
+            pluginClass.CallStatic("ReceiveBaseUrl", baseUrl);
         Debug.Log("InitializePlugin Send baseUrl finish : " + baseUrl);
 
         String nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
@@ -117,7 +118,7 @@ public class BackgroundService : MonoBehaviour
             Debug.Log("StartService");
         });
 #endif
-
+        }); // GetBaseUrl 콜백 종료
     }
 
     /// 서비스 정지 메서드

@@ -496,7 +496,11 @@ public class APIAroPlaManager : MonoBehaviour
     // 아로프라 스트리밍 API 호출
     private async Task<AroplaConversationResponse> CallAroplaAPI(Dictionary<string, string> requestData)
     {
-        string baseUrl = ServerManager.Instance.GetBaseUrl();
+        // baseUrl을 비동기로 가져오기
+        var tcs = new TaskCompletionSource<string>();
+        ServerManager.Instance.GetBaseUrl((url) => tcs.SetResult(url));
+        string baseUrl = await tcs.Task;
+        
         string apiUrl = baseUrl + "/aropla/conversation";
         
         AroplaLog("=== Streaming API Request ===");
