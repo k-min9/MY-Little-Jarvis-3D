@@ -76,9 +76,471 @@ public class APIManager : MonoBehaviour
         // #endif    
     }
 
+    // Small Talk 호출
+    public async void CallSmallTalkStream(string purpose = "잡담", string currentSpeaker = null, string chatIdx = "-1", string aiLanguage = null)
+    {
+        // baseUrl을 비동기로 가져오기
+        var tcs = new TaskCompletionSource<string>();
+        ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
+        string baseUrl = await tcs.Task;
+        
+        string url = baseUrl + "/conversation/small_talk";
+
+        // parameter(currentSpeake, chatIdx, aiLanguage)있으면 사용, 없으면 보완
+        string resolvedSpeaker = currentSpeaker;
+        if (string.IsNullOrEmpty(resolvedSpeaker))
+        {
+            try
+            {
+                resolvedSpeaker = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
+            }
+            catch
+            {
+                resolvedSpeaker = "arona"; // fallback
+            }
+        }
+
+        string resolvedAiLanguage = aiLanguage;
+        if (string.IsNullOrEmpty(resolvedAiLanguage))
+        {
+            try
+            {
+                resolvedAiLanguage = SettingManager.Instance.settings.ai_language ?? "ko";
+            }
+            catch
+            {
+                resolvedAiLanguage = "ko";
+            }
+        }
+
+        string resolvedChatIdx = (!string.IsNullOrEmpty(chatIdx) && chatIdx != "-1")
+            ? chatIdx
+            : (GameManager.Instance.chatIdxSuccess ?? "-1");
+
+        try
+        {
+            // 요청전 초기화
+            isCompleted = false;
+            isResponsedStarted = false;
+            isAnswerStarted = false;
+
+            string boundary = "----WebKitFormBoundary" + DateTime.Now.Ticks.ToString("x");
+            string contentType = "multipart/form-data; boundary=" + boundary;
+
+            // 요청 준비
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+            request.Method = "POST";
+            request.ContentType = contentType;
+
+            using (MemoryStream memStream = new MemoryStream())
+            using (StreamWriter writer = new StreamWriter(memStream, Encoding.UTF8, 1024, true))
+            {
+                // 폼 필드 작성
+                void WriteField(string key, string value)
+                {
+                    writer.WriteLine($"--{boundary}");
+                    writer.WriteLine($"Content-Disposition: form-data; name=\"{key}\"");
+                    writer.WriteLine();
+                    writer.WriteLine(value ?? string.Empty);
+                }
+
+                WriteField("query", purpose);
+                WriteField("purpose", purpose);
+                WriteField("current_speaker", resolvedSpeaker);
+                WriteField("ai_language", resolvedAiLanguage);
+                WriteField("chatIdx", resolvedChatIdx);
+                WriteField("intent_smalltalk", "on");
+
+                // 마지막 boundary
+                writer.WriteLine($"--{boundary}--");
+                writer.Flush();
+
+                // 본문 전송
+                request.ContentLength = memStream.Length;
+                using (Stream requestStream = await request.GetRequestStreamAsync())
+                {
+                    memStream.Seek(0, SeekOrigin.Begin);
+                    await memStream.CopyToAsync(requestStream);
+                }
+            }
+
+            using (WebResponse response = await request.GetResponseAsync())
+            using (Stream responseStream = response.GetResponseStream())
+            using (StreamReader reader = new StreamReader(responseStream))
+            {
+                string line;
+                int curChatIdxNum = int.TryParse(resolvedChatIdx, out var tmpIdx) ? tmpIdx : -1;
+                while ((line = await reader.ReadLineAsync()) != null)
+                {
+                    if (string.IsNullOrEmpty(line)) continue;
+                    try
+                    {
+                        // 풍선기준 최신대화여야 함
+                        if (curChatIdxNum >= GameManager.Instance.chatIdxBalloon)
+                        {
+                            // 최신화 하면서 기존 음성 queue 내용 지워버리기
+                            if (GameManager.Instance.chatIdxBalloon != curChatIdxNum)
+                            {
+                                GameManager.Instance.chatIdxBalloon = curChatIdxNum;
+                                VoiceManager.Instance.ResetAudio();
+                            }
+
+                            var jsonObject = JObject.Parse(line);
+                            Debug.Log("jsonObject Start");
+                            Debug.Log(jsonObject.ToString());
+                            Debug.Log("jsonObject End");
+
+                            // 생각중 등등의 답변타입체크
+                            string replyType = jsonObject["type"]?.ToString() ?? "reply";
+                            if (replyType == "thinking")
+                            {
+                                NoticeManager.Instance.Notice("thinking");
+                            }
+                            else if (replyType == "webSearch")
+                            {
+                                NoticeManager.Instance.Notice("webSearch");
+                            }
+                            else // reply
+                            {
+                                if (!isResponsedStarted)
+                                {
+                                    // 생각 중 말풍선 숨기기
+                                    AnswerBalloonSimpleManager.Instance.HideAnswerBalloonSimple();
+
+                                    // 안내 말풍선 숨기기
+                                    NoticeManager.Instance.DeleteNoticeBalloonInstance();
+
+                                    AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
+                                    AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();
+                                    isResponsedStarted = true;
+
+                                    // query 정보 저장
+                                    try
+                                    {
+                                        query_origin = jsonObject["query"]["origin"].ToString();
+                                        query_trans = jsonObject["query"]["text"].ToString();
+                                    }
+                                    catch { }
+
+                                    // AI Info 갱신 시도
+                                    try
+                                    {
+                                        string ai_info_server_type = jsonObject["ai_info"]["server_type"].ToString();
+                                        string ai_info_model = jsonObject["ai_info"]["model"].ToString();
+                                        string ai_info_prompt = jsonObject["ai_info"]["prompt"].ToString();
+                                        string ai_info_lang_used = jsonObject["ai_info"]["lang_used"].ToString();
+                                        string ai_info_translator = jsonObject["ai_info"]["translator"].ToString();
+                                        string ai_info_time = jsonObject["ai_info"]["time"].ToString();
+                                        string ai_info_intent = jsonObject["ai_info"]["time"].ToString();
+                                        SettingManager.Instance.RefreshAIInfoText(ai_info_server_type, ai_info_model, ai_info_prompt, ai_info_lang_used, ai_info_translator, ai_info_time, ai_info_intent);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Debug.Log(ex);
+                                    }
+
+                                    // 표정 갱신 시도
+                                    try
+                                    {
+                                        string ai_info_emotion = jsonObject["ai_info"]["emotion"].ToString();
+                                        Debug.Log("### emotion : " + ai_info_emotion);
+                                        EmotionManager.Instance.ShowEmotionFromEmotion(ai_info_emotion);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Debug.Log(ex);
+                                    }
+
+                                    // Intent 관련 초기화
+                                    AnswerBalloonManager.Instance.HideWebImage();
+                                    try
+                                    {
+                                        string intent_info_is_intent_web = jsonObject["intent_info"]["is_intent_web"].ToString();
+                                        if (intent_info_is_intent_web == "on") AnswerBalloonManager.Instance.ShowWebImage();
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Debug.Log(ex);
+                                    }
+                                }
+
+                                // 각 JSON 응답을 기존 로직으로 처리
+                                ProcessReply(jsonObject);
+                            }
+                        }
+                        else
+                        {
+                            Debug.Log("과거대화 : " + curChatIdxNum.ToString() + "/" + GameManager.Instance.chatIdxBalloon.ToString());
+                        }
+                    }
+                    catch (JsonReaderException e)
+                    {
+                        Debug.Log($"JSON decode error: {e.Message}");
+                    }
+                }
+
+                if (resolvedChatIdx == GameManager.Instance.chatIdxSuccess)
+                {
+                    OnFinalResponseReceived();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.Log($"SmallTalkStream Exception: {ex.Message}");
+        }
+    }
+
     public void CallFetchNgrokJsonData()
     {
         StartCoroutine(FetchNgrokJsonData());
+    }
+
+    // 스무고개 게임 호출
+    public async void CallMiniGame20QStream(
+        string query,
+        string secret,
+        string themeKey,
+        int questionCount,
+        int maxQuestions,
+        List<Dictionary<string, string>> history,
+        List<Dictionary<string, string>> historyQuestion,
+        List<string> historySecretList,
+        string gameStatus,
+        string gameResult,
+        string waitingFor,
+        string aiLanguage,
+        string charName,
+        string chatIdx,
+        string serverType)
+    {
+        // baseUrl을 비동기로 가져오기
+        var tcs = new TaskCompletionSource<string>();
+        ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
+        string baseUrl = await tcs.Task;
+        
+        string url = baseUrl + "/game/20q/process";
+
+        Debug.Log($"[20Q API] URL: {url}");
+        Debug.Log($"[20Q API] Query: {query}, Secret: {secret}, QuestionCount: {questionCount}");
+
+        try
+        {
+            // 요청전 초기화
+            isCompleted = false;
+            isResponsedStarted = false;
+            isAnswerStarted = false;
+
+            string boundary = "----WebKitFormBoundary" + DateTime.Now.Ticks.ToString("x");
+            string contentType = "multipart/form-data; boundary=" + boundary;
+
+            // history를 JSON 문자열로 변환
+            string historyJson = JsonConvert.SerializeObject(history);
+            string historyQuestionJson = JsonConvert.SerializeObject(historyQuestion);
+            string historySecretListJson = JsonConvert.SerializeObject(historySecretList);
+
+            // 요청 준비
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+            request.Method = "POST";
+            request.ContentType = contentType;
+
+            using (MemoryStream memStream = new MemoryStream())
+            using (StreamWriter writer = new StreamWriter(memStream, Encoding.UTF8, 1024, true))
+            {
+                // 폼 필드 작성
+                void WriteField(string key, string value)
+                {
+                    writer.WriteLine($"--{boundary}");
+                    writer.WriteLine($"Content-Disposition: form-data; name=\"{key}\"");
+                    writer.WriteLine();
+                    writer.WriteLine(value ?? string.Empty);
+                }
+
+                WriteField("query", query);
+                WriteField("secret", secret);
+                WriteField("theme_key", themeKey);
+                WriteField("question_count", questionCount.ToString());
+                WriteField("max_questions", maxQuestions.ToString());
+                WriteField("history", historyJson);
+                WriteField("history_question", historyQuestionJson);
+                WriteField("history_secret_list", historySecretListJson);
+                WriteField("game_status", gameStatus);
+                WriteField("game_result", gameResult);
+                WriteField("waiting_for", waitingFor);
+                WriteField("ai_language", aiLanguage);
+                WriteField("char", charName);
+                WriteField("server_type", serverType);
+                WriteField("api_key_Gemini", "");
+                WriteField("chatIdx", chatIdx);
+                WriteField("show_debug", "false");
+
+                // 마지막 boundary
+                writer.WriteLine($"--{boundary}--");
+                writer.Flush();
+
+                // 본문 전송
+                request.ContentLength = memStream.Length;
+                using (Stream requestStream = await request.GetRequestStreamAsync())
+                {
+                    memStream.Seek(0, SeekOrigin.Begin);
+                    await memStream.CopyToAsync(requestStream);
+                }
+            }
+
+            using (WebResponse response = await request.GetResponseAsync())
+            using (Stream responseStream = response.GetResponseStream())
+            using (StreamReader reader = new StreamReader(responseStream))
+            {
+                string line;
+                int curChatIdxNum = int.TryParse(chatIdx, out var tmpIdx) ? tmpIdx : -1;
+                
+                while ((line = await reader.ReadLineAsync()) != null)
+                {
+                    if (string.IsNullOrEmpty(line)) continue;
+                    
+                    try
+                    {
+                        // 풍선기준 최신대화여야 함
+                        if (curChatIdxNum >= GameManager.Instance.chatIdxBalloon)
+                        {
+                            // 최신화 하면서 기존 음성 queue 내용 지워버리기
+                            if (GameManager.Instance.chatIdxBalloon != curChatIdxNum)
+                            {
+                                GameManager.Instance.chatIdxBalloon = curChatIdxNum;
+                                VoiceManager.Instance.ResetAudio();
+                            }
+
+                            var jsonObject = JObject.Parse(line);
+                            Debug.Log("[20Q API] Response:");
+                            Debug.Log(jsonObject.ToString());
+
+                            // 응답 타입 확인 (서버 상태: thinking, reply)
+                            string replyType = jsonObject["type"]?.ToString() ?? "reply";
+                            
+                            if (replyType == "thinking")
+                            {
+                                // 서버가 생각중
+                                NoticeManager.Instance.Notice("thinking");
+                            }
+                            else if (replyType == "reply")
+                            {                                
+                                // 첫 응답 처리
+                                if (!isResponsedStarted)
+                                {
+                                    // 생각 중 말풍선 숨기기
+                                    AnswerBalloonSimpleManager.Instance.HideAnswerBalloonSimple();
+                                    NoticeManager.Instance.DeleteNoticeBalloonInstance();
+
+                                    AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
+                                    AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();
+                                    isResponsedStarted = true;
+
+                                    // AI Info 갱신
+                                    try
+                                    {
+                                        string ai_info_server_type = jsonObject["ai_info"]?["server_type"]?.ToString() ?? "";
+                                        string ai_info_model = jsonObject["ai_info"]?["model"]?.ToString() ?? "";
+                                        string ai_info_prompt = jsonObject["ai_info"]?["prompt"]?.ToString() ?? "";
+                                        string ai_info_lang_used = jsonObject["ai_info"]?["lang_used"]?.ToString() ?? "";
+                                        string ai_info_time = jsonObject["ai_info"]?["time"]?.ToString() ?? "";
+                                        SettingManager.Instance.RefreshAIInfoText(ai_info_server_type, ai_info_model, ai_info_prompt, ai_info_lang_used, "", ai_info_time, "20q_game");
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Debug.Log($"[20Q API] AI Info 갱신 실패: {ex.Message}");
+                                    }
+                                }
+
+                                // 답변 처리
+                                ProcessReply(jsonObject);
+                                
+                                // 게임 상태 업데이트 (모든 응답에서 공통 처리)
+                                if (MiniGame20QManager.Instance != null && MiniGame20QManager.Instance.Is20QMode())
+                                {
+                                    // 3-Field System
+                                    if (jsonObject["game_status"] != null)
+                                    {
+                                        MiniGame20QManager.Instance.SetGameStatus(jsonObject["game_status"].ToString());
+                                    }
+                                    if (jsonObject["game_result"] != null)
+                                    {
+                                        string result = jsonObject["game_result"].ToString();
+                                        // "null" 문자열이면 빈 문자열로 변환
+                                        if (result == "null" || result == "None")
+                                            result = "";
+                                        MiniGame20QManager.Instance.SetGameResult(result);
+                                    }
+                                    if (jsonObject["waiting_for"] != null)
+                                    {
+                                        string waiting = jsonObject["waiting_for"].ToString();
+                                        // "null" 문자열이면 빈 문자열로 변환
+                                        if (waiting == "null" || waiting == "None")
+                                            waiting = "";
+                                        MiniGame20QManager.Instance.SetWaitingFor(waiting);
+                                    }
+                                    
+                                    // 테마
+                                    if (jsonObject["theme_key"] != null)
+                                    {
+                                        MiniGame20QManager.Instance.SetThemeKey(jsonObject["theme_key"].ToString());
+                                    }
+                                    if (jsonObject["theme"] != null)
+                                    {
+                                        MiniGame20QManager.Instance.SetTheme(jsonObject["theme"].ToString());
+                                    }
+                                    
+                                    // 게임 데이터
+                                    if (jsonObject["secret"] != null)
+                                    {
+                                        MiniGame20QManager.Instance.SetSecret(jsonObject["secret"].ToString());
+                                    }
+                                    if (jsonObject["question_count"] != null)
+                                    {
+                                        MiniGame20QManager.Instance.SetQuestionCount(int.Parse(jsonObject["question_count"].ToString()));
+                                    }
+                                    if (jsonObject["max_questions"] != null)
+                                    {
+                                        MiniGame20QManager.Instance.SetMaxQuestions(int.Parse(jsonObject["max_questions"].ToString()));
+                                    }
+                                    if (jsonObject["history"] != null)
+                                    {
+                                        var historyList = JsonConvert.DeserializeObject<List<Dictionary<string, string>>>(jsonObject["history"].ToString());
+                                        MiniGame20QManager.Instance.SetHistory(historyList);
+                                    }
+                                    if (jsonObject["history_question"] != null)
+                                    {
+                                        var historyQuestionList = JsonConvert.DeserializeObject<List<Dictionary<string, string>>>(jsonObject["history_question"].ToString());
+                                        MiniGame20QManager.Instance.SetHistoryQuestion(historyQuestionList);
+                                    }
+                                    if (jsonObject["history_secret_list"] != null)
+                                    {
+                                        var historySecretListFromServer = JsonConvert.DeserializeObject<List<string>>(jsonObject["history_secret_list"].ToString());
+                                        MiniGame20QManager.Instance.SetHistorySecretList(historySecretListFromServer);
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            Debug.Log($"[20Q API] 과거대화: {curChatIdxNum}/{GameManager.Instance.chatIdxBalloon}");
+                        }
+                    }
+                    catch (JsonReaderException e)
+                    {
+                        Debug.Log($"[20Q API] JSON decode error: {e.Message}");
+                    }
+                }
+
+                if (chatIdx == GameManager.Instance.chatIdxSuccess)
+                {
+                    OnFinalResponseReceived();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.Log($"[20Q API] Exception: {ex.Message}");
+        }
     }
 
     // 로그 기록 메서드
@@ -104,8 +566,8 @@ public class APIManager : MonoBehaviour
 
         // 반환된 JSON 객체에서 "reply_list"를 가져오기
         JToken replyToken = jsonObject["reply_list"];
-        string chatIdx = jsonObject["chat_idx"].ToString();
-        ai_language_out = jsonObject["ai_language_out"].ToString();
+        string chatIdx = jsonObject["chat_idx"]?.ToString() ?? "-1";
+        ai_language_out = jsonObject["ai_language_out"]?.ToString() ?? "";
         // Debug.Log("ProcessReply chatIdx chk");
         // Debug.Log(chatIdx + "/" + GameManager.Instance.chatIdxSuccess.ToString());
 
@@ -188,28 +650,39 @@ public class APIManager : MonoBehaviour
         Debug.Log("All replies have been received.");
         LogToFile("ProcessReply completed."); // ProcessReply 완료 로그
 
+        // 다국어 답변 조립
+        string replyKo = string.Join(" ", replyListKo);
+        string replyJp = string.Join(" ", replyListJp);
+        string replyEn = string.Join(" ", replyListEn);
 
-        // 표시언어로 저장 : SettingManager.Instance.settings.ui_language
-        string reply = string.Join(" ", replyListEn);
+        // 표시언어에 따른 대표 메시지 선택
+        string reply = replyEn; // 기본값
+        if (SettingManager.Instance.settings.ui_language == "ja" || SettingManager.Instance.settings.ui_language == "jp")
+        {
+            reply = replyJp;
+        }
+        else if (SettingManager.Instance.settings.ui_language == "ko")
+        {
+            reply = replyKo;
+        }
 
         Debug.Log("Answer Finished : " + reply);
+        
         if (query_trans != "")  // 영어 번역이 필요한 LLM 사용시 번역기 답변
         {
-            MemoryManager.Instance.SaveConversationMemory("player", query_trans);
-            MemoryManager.Instance.SaveConversationMemory("character", reply);
+            // 사용자 메시지 저장 (번역된 영어 버전)
+            MemoryManager.Instance.SaveConversationMemory("player", "user", query_trans, query_trans, query_trans, query_trans);
+            
+            // 캐릭터 응답 저장 (다국어 포함)
+            MemoryManager.Instance.SaveConversationMemory("character", "assistant", reply, replyKo, replyJp, replyEn);
         }
         else
         {
-            MemoryManager.Instance.SaveConversationMemory("player", query_origin);
-            if (SettingManager.Instance.settings.ui_language == "ja" || SettingManager.Instance.settings.ui_language == "jp")
-            {
-                reply = string.Join(" ", replyListJp);
-            }
-            else if (SettingManager.Instance.settings.ui_language == "ko")
-            {
-                reply = string.Join(" ", replyListKo);
-            }
-            MemoryManager.Instance.SaveConversationMemory("character", reply);
+            // 사용자 메시지 저장 (원본)
+            MemoryManager.Instance.SaveConversationMemory("player", "user", query_origin, query_origin, query_origin, query_origin);
+            
+            // 캐릭터 응답 저장 (다국어 포함)
+            MemoryManager.Instance.SaveConversationMemory("character", "assistant", reply, replyKo, replyJp, replyEn);
         }
     }
 
@@ -435,20 +908,29 @@ public class APIManager : MonoBehaviour
         // 애니메이션 재생 초기화
         AnimationManager.Instance.Idle();
 
+        // 일단 안드로이드판은 server_type sample로...
+#if UNITY_ANDROID
+            await CallConversationStreamGemini(query, chatIdx, ai_lang_in);
+            return;
+#endif
 
         // server_type이 2 (Free Gemini)인 경우 Gemini 전용 함수 호출
-#if !UNITY_EDITOR
+        // #if !UNITY_EDITOR
         int server_type_idx = SettingManager.Instance.settings.server_type_idx;  // 0: Auto, 1: Server, 2: Free(Gemini), 3: Free(OpenRouter), 4: Paid(Gemini)
         if (server_type_idx == 2)
         {
             await CallConversationStreamGemini(query, chatIdx, ai_lang_in);
             return;
         }
-#endif
+// #endif
 
 
+        // baseUrl을 비동기로 가져오기
+        var tcs = new TaskCompletionSource<string>();
+        ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
+        string baseUrl = await tcs.Task;
+        
         // API 호출을 위한 URL 구성
-        string baseUrl = ServerManager.Instance.GetBaseUrl();
         string streamUrl = baseUrl + "/conversation_stream";
         Debug.Log("streamUrl : " + streamUrl);
 
@@ -460,6 +942,7 @@ public class APIManager : MonoBehaviour
         string ai_language_in = ai_lang_in;  // stt 에서 가져온 언어 있으면 사용(en, jp, ko 안에 포함되는지는 서버쪽에서 확인)
         string ai_language_out = SettingManager.Instance.settings.ai_language_out ?? "";
         string ai_web_search = SettingManager.Instance.settings.ai_web_search ?? "off";  // 0 : off, 1 : on, 2: force
+        string ai_emotion = SettingManager.Instance.settings.ai_emotion ?? "off";  // 0 : off, 1 : on
         if (GameManager.Instance.isWebSearchForced)  // 강제 검색 메뉴
         {
             GameManager.Instance.isWebSearchForced = false;
@@ -485,7 +968,7 @@ public class APIManager : MonoBehaviour
             { "ai_language", ai_language }, // 추론언어로 한입, 영입영출 등 조절(normal, prefer, ko, en, jp)
             { "ai_language_in", ai_language_in }, // 추론언어로 한입, 영입영출 등 조절(ko, en, jp)
             { "ai_language_out", ai_language_out }, // 추론언어로 한출, 영입영출 등 조절(ko, en, jp)
-            { "ai_emotion", "off"},
+            { "ai_emotion", ai_emotion},
             { "api_key_Gemini", ""},
             { "api_key_OpenRouter", ""},
             { "api_key_ChatGPT", ""},
@@ -516,8 +999,35 @@ public class APIManager : MonoBehaviour
         // 애니메이션 재생 초기화
         AnimationManager.Instance.Idle();
 
-        // Gemini 서버 URL 구성 (포트 5001 사용)
-        string baseUrl = ServerManager.Instance.GetBaseUrl();
+        // baseUrl을 비동기로 가져오기
+        var tcs = new TaskCompletionSource<string>();
+        ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
+        string baseUrl = await tcs.Task;
+
+        // 안드로이드인 경우 dev_voice 서버 사용
+#if UNITY_ANDROID
+        // TaskCompletionSource를 사용하여 콜백을 async/await로 변환
+        var tcsDevVoice = new TaskCompletionSource<string>();
+        
+        ServerManager.Instance.GetServerUrlFromServerId("dev_voice", (url) =>
+        {
+            tcsDevVoice.SetResult(url);
+        });
+        
+        // dev_voice 서버 URL을 기다림
+        string devVoiceUrl = await tcsDevVoice.Task;
+        
+        if (!string.IsNullOrEmpty(devVoiceUrl))
+        {
+            Debug.Log("dev_voice 서버 URL: " + devVoiceUrl);
+            baseUrl = devVoiceUrl;
+        }
+        else
+        {
+            Debug.LogWarning("dev_voice 서버 URL을 가져올 수 없습니다. 기본 URL을 사용합니다.");
+        }
+#endif
+
         string streamUrl = baseUrl + "/conversation_stream_gemini";
         Debug.Log("Gemini streamUrl : " + streamUrl);
 
@@ -553,14 +1063,21 @@ public class APIManager : MonoBehaviour
         await FetchStreamingData(streamUrl, requestData);
     }
 
-    public async void GetKoWavFromAPI(string text, string chatIdx)
+    public async void GetKoWavFromAPI(string text, string chatIdx, string nickname = null)
     {
+        // baseUrl을 비동기로 가져오기
+        var tcs = new TaskCompletionSource<string>();
+        ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
+        string baseUrl = await tcs.Task;
+        
         // API 호출을 위한 URL 구성
-        string baseUrl = ServerManager.Instance.GetBaseUrl();
         string url = baseUrl + "/getSound/ko"; // GET + Uri.EscapeDataString(text);
 
-        // 닉네임 가져오기
-        string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
+        // 닉네임 가져오기 (optional 파라미터가 있으면 사용, 없으면 현재 캐릭터)
+        if (string.IsNullOrEmpty(nickname))
+        {
+            nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
+        }
 
         // HttpWebRequest 객체 생성
         HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
@@ -630,10 +1147,12 @@ public class APIManager : MonoBehaviour
         }
     }
 
-    public async void GetJpWavFromAPI(string text, string chatIdx)
+    public async void GetJpWavFromAPI(string text, string chatIdx, string nickname = null)
     {
-        // API 호출을 위한 URL 구성
-        string baseUrl = ServerManager.Instance.GetBaseUrl();
+        // baseUrl을 비동기로 가져오기
+        var tcs = new TaskCompletionSource<string>();
+        ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
+        string baseUrl = await tcs.Task;
 
         // dev_voice 사용 여부
         int server_type_idx = SettingManager.Instance.settings.server_type_idx;
@@ -642,15 +1161,15 @@ public class APIManager : MonoBehaviour
         if (shouldUseDevServer)
         {
             // TaskCompletionSource를 사용하여 콜백을 async/await로 변환
-            var tcs = new TaskCompletionSource<string>();
+            var tcs2 = new TaskCompletionSource<string>();
             
             ServerManager.Instance.GetServerUrlFromServerId("dev_voice", (url) =>
             {
-                tcs.SetResult(url);
+                tcs2.SetResult(url);
             });
             
             // dev_voice 서버 URL을 기다림
-            string devVoiceUrl = await tcs.Task;
+            string devVoiceUrl = await tcs2.Task;
             
             if (!string.IsNullOrEmpty(devVoiceUrl))
             {
@@ -665,8 +1184,11 @@ public class APIManager : MonoBehaviour
 
         string url = baseUrl + "/getSound/jp"; // GET + Uri.EscapeDataString(text);
 
-        // 닉네임 가져오기
-        string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
+        // 닉네임 가져오기 (optional 파라미터가 있으면 사용, 없으면 현재 캐릭터)
+        if (string.IsNullOrEmpty(nickname))
+        {
+            nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
+        }
 
         // HttpWebRequest 객체 생성
         HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
