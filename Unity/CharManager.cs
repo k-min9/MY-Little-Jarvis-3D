@@ -258,6 +258,16 @@ public class CharManager : MonoBehaviour
             return;
         }
 
+        // 아로나, 프라나 외의 캐릭터는 Lite 이상부터 가능
+        if (index > 2)
+        {
+            bool chk = InstallStatusManager.Instance.CheckAndOperateLite();
+            if (!chk)
+            {
+                return;
+            }
+        }
+
         // 캐릭터 복장 기억 설정이 켜져 있으면 char_code 기반으로 idx 교체 시도
         if (SettingManager.Instance.settings.isRememberCharOutfits)
         {
