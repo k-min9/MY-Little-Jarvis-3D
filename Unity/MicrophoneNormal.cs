@@ -175,19 +175,20 @@ public class MicrophoneNormal : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         }
         Debug.Log($"WAV file saved at: {filePath}");
 
-        // STT 처리 - server_type_idx에 따라 분기
-        if (SettingManager.Instance.settings.server_type_idx == 2)
-        {
-            // 내부 Whisper STT 사용
-            Debug.Log("Using internal Whisper STT...");
-            StartCoroutine(WhisperSTTManager.Instance.ProcessSTTFromWavData(wavData));
-        }
-        else
-        {
-            // 기존 외부 서버 STT 사용(wav 전송 API 호출)
-            Debug.Log("Using external server STT...");
-            StartCoroutine(SendWavFile(filePath, "ko", "normal"));
-        }
+        // // TODO : internal STT 분기 처리 - server_type_idx에 따라 분기, try error시 분기
+        // if (SettingManager.Instance.settings.server_type_idx == 2)
+        // {
+        //     // 내부 Whisper STT 사용
+        //     Debug.Log("Using internal Whisper STT...");
+        //     StartCoroutine(WhisperSTTManager.Instance.ProcessSTTFromWavData(wavData));
+        // }
+        // else
+        // {
+        //     // 기존 외부 서버 STT 사용(wav 전송 API 호출)
+        //     Debug.Log("Using external server STT...");
+        //     StartCoroutine(STTUtil.SendWavFileToSTT(this, wavData, "ko", "normal", true));
+        // }
+        StartCoroutine(STTUtil.SendWavFileToSTT(this, wavData, "ko", "normal", true));
     }
 
     private byte[] ConvertToWav(float[] samples, int channels, int sampleRate)
@@ -228,105 +229,5 @@ public class MicrophoneNormal : MonoBehaviour, IPointerDownHandler, IPointerUpHa
             return stream.ToArray();
         }
     }
-
-// 반환 타입
-[System.Serializable]
-public class SttResponse
-{
-    public string text;
-    public string lang;
-    public string chatIdx;
-}
-
-// 변수 세개 다 현재 안쓰임
-public IEnumerator SendWavFile(string filePath, string sttLang, string sttLevel)
-{
-
-// 직접 wavdata 구성시 사용
-// #if UNITY_ANDROID && !UNITY_EDITOR
-//     // Android에서는 UnityWebRequest로 파일 읽기
-//     string uri = "file://" + filePath;
-//     using (UnityWebRequest fileRequest = UnityWebRequest.Get(uri))
-//     {
-//         yield return fileRequest.SendWebRequest();
-
-//         if (fileRequest.result != UnityWebRequest.Result.Success)
-//         {
-//             Debug.LogError($"Error reading WAV file on Android: {fileRequest.error}");
-//             yield break;
-//         }
-//         wavData = fileRequest.downloadHandler.data;
-//     }
-// #else
-//     // 다른 플랫폼에서는 File.ReadAllBytes 사용
-//     if (!File.Exists(filePath))
-//     {
-//         Debug.LogError($"File not found: {filePath}");
-//         yield break;
-//     }
-//     wavData = File.ReadAllBytes(filePath);
-// #endif
-
-    // UnityWebRequest로 서버에 데이터 업로드
-    // API 호출을 위한 URL 구성
-    string baseUrl = ServerManager.Instance.GetBaseUrl();
-    string url = baseUrl+"/stt"; // http://localhost:5000/stt
-    Debug.Log("url : " + url);
-
-    GameManager.Instance.chatIdx += 1;
-    GameManager.Instance.chatIdxRegenerateCount = 0;
-
-    WWWForm formData = new WWWForm();
-    // formData.AddBinaryData("file", wavData, Path.GetFileName(filePath), "audio/wav");
-    formData.AddBinaryData("file", wavData, "stt.wav", "audio/wav");
-    formData.AddField("lang", "ko");
-    formData.AddField("level", "small");
-    formData.AddField("chatIdx", GameManager.Instance.chatIdx);
-
-    UnityWebRequest request = UnityWebRequest.Post(url, formData);
- 
-    // 요청 전송
-    yield return request.SendWebRequest();
-
-    // 결과 처리
-    if (request.result != UnityWebRequest.Result.Success)
-    {
-        Debug.LogError($"Error uploading WAV file: {request.error}");
-    }
-    else
-    {
-        // Debug.Log($"Upload successful! Response: {request.downloadHandler.text}");
-        try
-        {
-            // JSON 응답 파싱
-            string responseText = request.downloadHandler.text;
-
-            var responseJson = JsonUtility.FromJson<SttResponse>(responseText);
-            // Debug.Log($"STT Text: {responseJson.text}");
-            // Debug.Log($"Detected Language: {responseJson.lang}");  // ja, ko, en
-            // Debug.Log($"ChatIdx: {responseJson.chatIdx}");
-
-            string query = responseJson.text ?? "";
-
-            NoticeBalloonManager.Instance.ModifyNoticeBalloonText(query);
-
-            // 대화 시작
-            APIManager.Instance.CallConversationStream(query, responseJson.chatIdx, responseJson.lang);
-
-            // dev : 발언 음성 재생
-            if (query != "" && SettingManager.Instance.settings.isDevHowling)
-            { 
-                APIManager.Instance.GetHowlingFromAPI(query);
-            }
-
-            // 기존 음성 중지 및 초기화
-                VoiceManager.Instance.ResetAudio();
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"Error parsing JSON response: {ex.Message}");
-        }
-    }
-}
 
 }
