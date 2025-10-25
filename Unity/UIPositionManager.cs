@@ -93,7 +93,9 @@ public class UIPositionManager : MonoBehaviour
             case "charChange":
                 return canvas.transform.TransformPoint(new Vector3(700f, 150f, 0f));
             case "charSummon":
-                return canvas.transform.TransformPoint(new Vector3(1000f, 50f, 0f));
+                return canvas.transform.TransformPoint(new Vector3(400f, -100f, 0f));
+            case "chatHistory":
+                return canvas.transform.TransformPoint(new Vector3(300f, -100f, 0f));
             case "settings":
                 return canvas.transform.TransformPoint(new Vector3(250f, -50f, 0f));
             case "version":
