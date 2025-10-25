@@ -55,6 +55,17 @@ public class DebugBalloonManager : MonoBehaviour
         }
     }
 
+    // hide, show 전환
+    public void ToggleDebugBalloon()
+    {
+        if (debugBalloon.activeSelf)
+        {
+            HideDebugBalloon();
+        } else {
+            ShowDebugBalloon();
+        }
+    }
+
     // DebugBalloon을 보이고 텍스트를 초기화하는 함수
     public void ShowDebugBalloon()
     {
@@ -88,7 +99,7 @@ public class DebugBalloonManager : MonoBehaviour
         UpdateDebugBalloonText();
         
         // Balloon 보이기
-        ShowDebugBalloon();
+        // ShowDebugBalloon();
         
         // 자동 숨김 활성화된 경우 타이머 시작
         if (autoHide)

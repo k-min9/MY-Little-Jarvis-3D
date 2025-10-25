@@ -19,7 +19,23 @@ public class ChatHandler : MonoBehaviour
             GameManager.Instance.chatIdx += 1;
             GameManager.Instance.chatIdxRegenerateCount = 0;
             Debug.Log("입력된 텍스트 ("+GameManager.Instance.chatIdx.ToString()+") : " + input);
-            APIManager.Instance.CallConversationStream(input, GameManager.Instance.chatIdx.ToString());
+
+            // 게임 모드 체크하여 적절한 API 호출
+            if (MiniGame20QManager.Instance != null && MiniGame20QManager.Instance.Is20QMode())
+            {
+                // 스무고개 게임 모드
+                MiniGame20QManager.Instance.SendQuestion(input);
+            }
+            else if (APIAroPlaManager.ShouldUseAroplaManager())
+            {
+                // 아로프라 채널 모드 - 3자 대화
+                APIAroPlaManager.Instance.SendUserMessage(input);
+            }
+            else
+            {
+                // 기존 1:1 대화 모드
+                APIManager.Instance.CallConversationStream(input, GameManager.Instance.chatIdx.ToString());
+            }
 
             // 말풍선 없애기
             ChatBalloonManager.Instance.HideChatBalloon();
@@ -33,7 +49,23 @@ public class ChatHandler : MonoBehaviour
         GameManager.Instance.chatIdx += 1;
         GameManager.Instance.chatIdxRegenerateCount = 0;
         Debug.Log("입력된 텍스트 (" + GameManager.Instance.chatIdx.ToString() + ") : " + input);
-        APIManager.Instance.CallConversationStream(input, GameManager.Instance.chatIdx.ToString());
+
+        // 게임 모드 체크하여 적절한 API 호출
+        if (MiniGame20QManager.Instance != null && MiniGame20QManager.Instance.Is20QMode())
+        {
+            // 스무고개 게임 모드
+            MiniGame20QManager.Instance.SendQuestion(input);
+        }
+        else if (APIAroPlaManager.ShouldUseAroplaManager())
+        {
+            // 아로프라 채널 모드 - 3자 대화
+            APIAroPlaManager.Instance.SendUserMessage(input);
+        }
+        else
+        {
+            // 기존 1:1 대화 모드
+            APIManager.Instance.CallConversationStream(input, GameManager.Instance.chatIdx.ToString());
+        }
 
         // 말풍선 없애기
         ChatBalloonManager.Instance.HideChatBalloon();
@@ -46,8 +78,26 @@ public class ChatHandler : MonoBehaviour
         GameManager.Instance.chatIdx += 1;
         GameManager.Instance.chatIdxRegenerateCount = 0;
         Debug.Log("입력된 텍스트-web (" + GameManager.Instance.chatIdx.ToString() + ") : " + input);
-        GameManager.Instance.isWebSearchForced = true;  // Web강제 1회
-        APIManager.Instance.CallConversationStream(input, GameManager.Instance.chatIdx.ToString());
+
+        // 게임 모드 체크하여 적절한 API 호출
+        if (MiniGame20QManager.Instance != null && MiniGame20QManager.Instance.Is20QMode())
+        {
+            // 스무고개 게임 모드에서는 웹 검색 강제 기능 미지원 (일반 게임 모드로 처리)
+            Debug.LogWarning("스무고개 게임에서는 웹 검색 강제 기능이 지원되지 않습니다. 일반 질문으로 처리됩니다.");
+            MiniGame20QManager.Instance.SendQuestion(input);
+        }
+        else if (APIAroPlaManager.ShouldUseAroplaManager())
+        {
+            // 아로프라 채널 모드에서는 웹 검색 강제 기능 미지원 (일반 모드로 처리)
+            Debug.LogWarning("아로프라 채널에서는 웹 검색 강제 기능이 지원되지 않습니다. 일반 모드로 처리됩니다.");
+            APIAroPlaManager.Instance.SendUserMessage(input);
+        }
+        else
+        {
+            // 기존 1:1 대화 모드 - 웹 검색 강제
+            GameManager.Instance.isWebSearchForced = true;  // Web강제 1회
+            APIManager.Instance.CallConversationStream(input, GameManager.Instance.chatIdx.ToString());
+        }
         
         // 말풍선 없애기
         ChatBalloonManager.Instance.HideChatBalloon();
