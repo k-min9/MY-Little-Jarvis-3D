@@ -57,6 +57,7 @@ public class UIChatSituationManager : MonoBehaviour
     public Transform container;
     public GameObject itemSlotSample;
     public GameObject infoRowSample;
+    public Scrollbar horizontalScrollbar;
 
     private string currentSituationKey = "default";
     private List<GameObject> allSlots = new();
@@ -168,6 +169,9 @@ public class UIChatSituationManager : MonoBehaviour
         }
 
         UpdateVisualStateForAllSlots(); // 초기 색상 반영
+
+        // 스크롤을 맨 왼쪽으로 이동
+        ResetScrollPosition();
     }
 
     private void UpdateVisualStateForAllSlots()
@@ -254,6 +258,17 @@ public class UIChatSituationManager : MonoBehaviour
     public string GetCurrentSituationKey()
     {
         return currentSituationKey;
+    }
+
+    public void ResetScrollPosition()
+    {
+        Debug.Log("ResetScrollPosition Strart");
+        // 인스펙터에서 연결된 horizontalScrollbar를 사용
+        if (horizontalScrollbar != null)
+        {
+            horizontalScrollbar.value = 0f; // 맨 왼쪽으로 이동
+        }
+        Debug.Log("ResetScrollPosition End");
     }
 
     public string GetCurUIChatSituationInfoJson()
