@@ -8,9 +8,16 @@ using Newtonsoft.Json;
 [Serializable]
 public class Conversation
 {
-    public string speaker;
-    public string message;
-    public string message_trans;
+    public string speaker;      // 캐릭터이름 (sensei, arona, plana, system, player, character)
+    public string message;      // 대표메시지 (UI 언어에 따른 메시지)
+    public string message_trans; // 기존 호환성 유지용 필드
+    
+    // 새로운 확장 필드들
+    public string role;         // 역할 (user, assistant, system) - 새로운 구조에서만 사용
+    public string messageKo;    // 한국어 메시지
+    public string messageJp;    // 일본어 메시지  
+    public string messageEn;    // 영어 메시지
+    public string timestamp;    // 타임스탬프
 }
 
 public class MemoryManager : MonoBehaviour
@@ -56,15 +63,16 @@ public class MemoryManager : MonoBehaviour
         return Path.Combine(Application.persistentDataPath, filename);
     }
 
-    // 대화 저장
-    public void SaveConversationMemory(string speaker, string message, string messageTrans = "")
+    // 대화 저장 (기존 호환성 유지)
+    public void SaveConversationMemory(string speaker, string message, string messageTrans = "", string filename = null)
     {
         if (string.IsNullOrEmpty(messageTrans))
         {
             messageTrans = message;
         }
 
-        List<Conversation> data = GetAllConversationMemory();
+        string targetFile = string.IsNullOrEmpty(filename) ? GetFileName() : filename;
+        List<Conversation> data = GetAllConversationMemory(filename);
 
         data.Add(new Conversation
         {
@@ -74,13 +82,35 @@ public class MemoryManager : MonoBehaviour
         });
 
         string json = JsonConvert.SerializeObject(data, Formatting.Indented);
-        File.WriteAllText(GetFileName(), json);
+        File.WriteAllText(targetFile, json);
+    }
+    
+    // 확장된 대화 저장 (새로운 구조)
+    public void SaveConversationMemory(string speaker, string role, string message, string messageKo, string messageJp, string messageEn, string filename = null)
+    {
+        string targetFile = string.IsNullOrEmpty(filename) ? GetFileName() : filename;
+        List<Conversation> data = GetAllConversationMemory(filename);
+
+        data.Add(new Conversation
+        {
+            speaker = speaker,
+            role = role,
+            message = message,
+            message_trans = message, // 기존 호환성
+            messageKo = messageKo,
+            messageJp = messageJp,
+            messageEn = messageEn,
+            timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+        });
+
+        string json = JsonConvert.SerializeObject(data, Formatting.Indented);
+        File.WriteAllText(targetFile, json);
     }
 
     // 모든 대화 불러오기
-    public List<Conversation> GetAllConversationMemory()
+    public List<Conversation> GetAllConversationMemory(string filename = null)
     {
-        string fileName = GetFileName();
+        string fileName = string.IsNullOrEmpty(filename) ? GetFileName() : filename;
         if (!File.Exists(fileName))
         {
             return new List<Conversation>();
@@ -91,25 +121,26 @@ public class MemoryManager : MonoBehaviour
     }
 
     // 최신 대화 가져오기
-    public List<Conversation> GetLatestConversationMemory(int conversationMemoryNumber)
+    public List<Conversation> GetLatestConversationMemory(int conversationMemoryNumber, string filename = null)
     {
-        List<Conversation> data = GetAllConversationMemory();
+        List<Conversation> data = GetAllConversationMemory(filename);
         return data.Skip(Mathf.Max(0, data.Count - conversationMemoryNumber)).ToList();
     }
 
     // 대화 초기화
-    public void ResetConversationMemory()
+    public void ResetConversationMemory(string filename = null)
     {
-        File.WriteAllText(GetFileName(), JsonConvert.SerializeObject(new List<Conversation>(), Formatting.Indented));
+        string targetFile = string.IsNullOrEmpty(filename) ? GetFileName() : filename;
+        File.WriteAllText(targetFile, JsonConvert.SerializeObject(new List<Conversation>(), Formatting.Indented));
     }
 
     // 최대 길이만큼의 대화 가져오기
-    public (List<Conversation>, int, int) GetTruncatedConversationMemory(int maxLen = 2048)
+    public (List<Conversation>, int, int) GetTruncatedConversationMemory(int maxLen = 2048, string filename = null)
     {
         var (greetingList, greetingLen) = GetGreetingDialogue();
         maxLen -= greetingLen;
 
-        List<Conversation> conversationMemory = GetAllConversationMemory();
+        List<Conversation> conversationMemory = GetAllConversationMemory(filename);
         List<Conversation> truncatedMemory = new List<Conversation>();
 
         int memoryLen = 0;
@@ -155,15 +186,57 @@ public class MemoryManager : MonoBehaviour
     }
 
     // 마지막 대화 삭제
-    public void DeleteRecentDialogue()
+    public void DeleteRecentDialogue(string filename = null)
     {
-        List<Conversation> data = GetAllConversationMemory();
+        string targetFile = string.IsNullOrEmpty(filename) ? GetFileName() : filename;
+        List<Conversation> data = GetAllConversationMemory(filename);
         if (data.Count > 0)
         {
             data.RemoveAt(data.Count - 1);
         }
 
         string json = JsonConvert.SerializeObject(data, Formatting.Indented);
-        File.WriteAllText(GetFileName(), json);
+        File.WriteAllText(targetFile, json);
+    }
+    
+    // 특정 언어로 메시지 가져오기
+    public List<Conversation> GetMessagesInLanguage(string language, string filename = null)
+    {
+        var memories = GetAllConversationMemory(filename);
+        return memories.Where(m => 
+        {
+            return language switch
+            {
+                "ko" => !string.IsNullOrEmpty(m.messageKo),
+                "jp" => !string.IsNullOrEmpty(m.messageJp),
+                "en" => !string.IsNullOrEmpty(m.messageEn),
+                _ => !string.IsNullOrEmpty(m.message)
+            };
+        }).ToList();
+    }
+    
+    // 특정 발화자의 메시지만 가져오기
+    public List<Conversation> GetMessagesBySpeaker(string speaker, string filename = null)
+    {
+        var memories = GetAllConversationMemory(filename);
+        return memories.Where(m => m.speaker == speaker).ToList();
+    }
+    
+    // 특정 역할의 메시지만 가져오기
+    public List<Conversation> GetMessagesByRole(string role, string filename = null)
+    {
+        var memories = GetAllConversationMemory(filename);
+        return memories.Where(m => !string.IsNullOrEmpty(m.role) && m.role == role).ToList();
+    }
+    
+    // 메모리 통계 정보
+    public (int user, int assistant, int system, int total) GetMemoryStats(string filename = null)
+    {
+        var memories = GetAllConversationMemory(filename);
+        int userCount = memories.Count(m => !string.IsNullOrEmpty(m.role) && m.role == "user");
+        int assistantCount = memories.Count(m => !string.IsNullOrEmpty(m.role) && m.role == "assistant");
+        int systemCount = memories.Count(m => !string.IsNullOrEmpty(m.role) && m.role == "system");
+        
+        return (userCount, assistantCount, systemCount, memories.Count);
     }
 }
