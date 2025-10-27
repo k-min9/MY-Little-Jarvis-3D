@@ -14,6 +14,7 @@ public class SettingManager : MonoBehaviour
 
     [Header("General")]
     [SerializeField] private Dropdown uiLangDropdown;
+    [SerializeField] private Dropdown operatorTypeDropdown;
     [SerializeField] private Dropdown platformInfoDropdown;
     [SerializeField] private Dropdown editionDropdown;
     [SerializeField] private Toggle isAlwaysOnTopToggle;
@@ -74,9 +75,11 @@ public class SettingManager : MonoBehaviour
     [SerializeField] private Text aiInfoIntent;
 
     [Header("Dev")]
+    [SerializeField] private Toggle devModeToggle;
     [SerializeField] private Toggle devHowlingToggle;
 
     // 기타 표시용 UI
+    [Header("Extra UI")]
     public Text soundSpeedMasterText;
     public Text serverInfoText;
     public Text charSizeText;
@@ -88,6 +91,8 @@ public class SettingManager : MonoBehaviour
         public string player_name;
         public int ui_language_idx;  // 0 : ko, 1 : jp, 2: en
         public string ui_language;
+        public int operator_type_idx;  // 0 : ARONA, 1: Plana
+        public string operator_type;
         public int ai_language_idx;  // 0 : ko, 1 : jp, 2: en
         public string ai_language_in;
         public string ai_language_out;
@@ -131,6 +136,7 @@ public class SettingManager : MonoBehaviour
         public bool confirmUserIntent;
 
         // Dev용 데이터
+        public bool isDevMode;
         public bool isDevHowling;  
 
         // UI외 데이터
@@ -157,6 +163,7 @@ public class SettingManager : MonoBehaviour
     // setter
     public void SetPlayerName(string value) { settings.player_name = value; SaveSettings(); }
     public void SetUiLanguage() { int value=uiLangDropdown.value; settings.ui_language_idx = value; settings.ui_language=getLangFromIdx(value); LanguageManager.Instance.SetUILanguage(); SaveSettings(); }
+    public void SetOperatorType() { int value=operatorTypeDropdown.value; value = getOperatorTypeFilterScenario(value); operatorTypeDropdown.value = value;  settings.operator_type_idx = value; settings.operator_type=getOperatorTypeFromIdx(value); SaveSettings(); }
     public void SetAiLanguageIn(string value) { settings.ai_language_in = value; SaveSettings(); }
     public void SetAiLanguageOut(string value) { settings.ai_language_out = value; SaveSettings(); }
     public void SetIsAlwaysOnTop(bool value) { 
@@ -199,8 +206,9 @@ public class SettingManager : MonoBehaviour
     public void SetAIEmotion() { int value=aiEmotionDropdown.value; value = getAiEmotionFilterScenario(value); aiEmotionDropdown.value = value; settings.ai_emotion_idx = value; settings.ai_emotion = getONOFFTypeFromIdx(value); SaveSettings(); }
     public void SetAiVoiceFilter() { int value=aiVoiceFilterDropdown.value; value = getAiVoiceFilterScenario(value); aiVoiceFilterDropdown.value = value; settings.ai_voice_filter_idx = value; SaveSettings(); }
 
+    public void SetIsDevModeToggle(bool value) { settings.isDevMode = value; DevManager.Instance.SetInteractableDev(value);}
     public void SetIsDevHowlingToggle(bool value) { settings.isDevHowling = value; SaveSettings(); }  
-
+    
     // 표시용
     public void SetServerInfoText(string text) { serverInfoText.text = text; }
     public void RefreshAIInfoText(string ai_info_server_type, string ai_info_model, string ai_info_prompt, string ai_info_lang_used, string ai_info_translator, string ai_info_time, string ai_info_intent) {
@@ -217,6 +225,9 @@ public class SettingManager : MonoBehaviour
 
     void Awake()
     {
+        // Devmode 초기화
+        devModeToggle.isOn = false;
+        
         // 저장 경로를 Application.persistentDataPath로 설정
         string directoryPath = Path.Combine(Application.persistentDataPath, "config");
         configFilePath = Path.Combine(directoryPath, "settings.json");
@@ -367,20 +378,36 @@ public class SettingManager : MonoBehaviour
         }
         return lang;
     }
+
+    // idx를 오퍼레이터 타입으로 변경
+    private string getOperatorTypeFromIdx(int idx)
+    { 
+        string operatorType = "ARONA";
+        if (idx == 1)
+        {
+            operatorType = "Plana";
+        }
+        return operatorType;
+    }
     
     // idx를 추론설정이름으로 변환; 0 : normal, 1 : prefer, 2 : ko, 3 : jp, 4 : en
-    private string getAiLangFromIdx(int idx) {
+    private string getAiLangFromIdx(int idx)
+    {
         string lang = "normal";
-        if (idx ==  1) {
+        if (idx == 1)
+        {
             lang = "prefer";
         }
-        if (idx ==  2) {
+        if (idx == 2)
+        {
             lang = "ko";
         }
-        if (idx ==  3) {
+        if (idx == 3)
+        {
             lang = "jp";
         }
-        if (idx ==  4) {
+        if (idx == 4)
+        {
             lang = "en";
         }
         return lang;
@@ -388,6 +415,13 @@ public class SettingManager : MonoBehaviour
 
     private int getAiEmotionFilterScenario(int value)
     {
+        // DEV MODE 일경우 로그 출력 후 value return
+        if (settings.isDevMode)
+        {   
+            Debug.Log($"[SettingManager] getAiEmotionFilterScenario - DEV MODE로 통과");
+            return value;
+        }
+
         // Emotion 기능 키려는데 현재 Sample 버전일 경우 버전업 요구
         if (value == 1)
         {
@@ -402,8 +436,34 @@ public class SettingManager : MonoBehaviour
         return value;
     }
 
+    private int getOperatorTypeFilterScenario(int value)
+    {
+        // DEV MODE 일경우 로그 출력 후 value return
+        if (settings.isDevMode)
+        {   
+            Debug.Log($"[SettingManager] getOperatorTypeFilterScenario - DEV MODE로 통과");
+            return value;
+        }
+
+        // 현재는 아직 준비 안되었다고 돌려보내기
+        if (value == 1)
+        {
+            StartCoroutine(ScenarioCommonManager.Instance.Run_C99_NotReady());
+
+            return 0;
+        }
+        return value;
+    }
+
     private int getAiWebSearchFilterScenario(int value)
     {
+        // DEV MODE 일경우 로그 출력 후 value return
+        if (settings.isDevMode)
+        {   
+            Debug.Log($"[SettingManager] getAiWebSearchFilterScenario - DEV MODE로 통과");
+            return value;
+        }
+
         // WebSearch 기능 키려는데 현재 Sample 버전일 경우 버전업 요구
         if (value >= 1)  // 1: on, 2: force 둘 다 체크
         {
@@ -420,6 +480,13 @@ public class SettingManager : MonoBehaviour
 
     private int getAiVoiceFilterScenario(int value)
     {
+        // DEV MODE 일경우 로그 출력 후 value return
+        if (settings.isDevMode)
+        {   
+            Debug.Log($"[SettingManager] getAiVoiceFilterFilterScenario - DEV MODE로 통과");
+            return value;
+        }
+
         if (value == 2)
         {
             // TODO : User Only Voice 관련 통신해서 내용있나 확인 또는 갱신 시나리오
@@ -622,7 +689,9 @@ public class SettingManager : MonoBehaviour
             SaveSettings();
         }
         Debug.Log("LoadSettings End");
-        Debug.Log(settings.ui_language);
+
+        // 로딩 후 Dev 값 초기화
+        settings.isDevMode = false;
     }
 
     // UI 세팅 적용
@@ -630,6 +699,7 @@ public class SettingManager : MonoBehaviour
     {
         playerNameInputField.text = settings.player_name;
         uiLangDropdown.value = settings.ui_language_idx;
+        operatorTypeDropdown.value = settings.operator_type_idx;
         isAlwaysOnTopToggle.isOn = settings.isAlwaysOnTop;
         isShowChatBoxOnClickToggle.isOn = settings.isShowChatBoxOnClick;
         isShowTutorialOnChatToggle.isOn = settings.isShowTutorialOnChat;
@@ -661,6 +731,7 @@ public class SettingManager : MonoBehaviour
         aiVoiceFilterDropdown.value = settings.ai_voice_filter_idx;
 
         devHowlingToggle.isOn = settings.isDevHowling;
+        devModeToggle.isOn = false; // DevMode는 저장과 무관하게 항상 false
 
         // Text 계열
         soundSpeedMasterText.text = "Speed (" + (int)settings.sound_speedMaster + "%)";
@@ -794,6 +865,8 @@ public class SettingManager : MonoBehaviour
                 settings.ui_language_idx = 2;
                 break;
         }
+        settings.operator_type_idx = 0;
+        settings.operator_type = "ARONA";
         settings.ai_language_idx = 2;
         settings.ai_language = "en";
         settings.ai_language_in = systemLang;  // 시스템 언어에 맞춰 설정
@@ -838,5 +911,43 @@ public class SettingManager : MonoBehaviour
         settings.isDevHowling = false;
 
         settings.wantFreeServer = false;  // 무료서버연결의향
+    }
+
+    public void AskReturnToDefaultValues()
+    { 
+        StartCoroutine(ScenarioCommonManager.Instance.Run_C98_confirm_return_to_default_proceed());
+    }
+
+    // 기본값으로 변경 (Sample 기준)
+    public void ReturnToDefaultValues()
+    {
+        // InstallStatusManager를 통해 설치 상태를 확인하고 UI에 반영
+        int installStatusIndex = InstallStatusManager.Instance.GetInstallStatusIndex();
+
+        switch (installStatusIndex)
+        {
+            case 0: // sample
+                    // SetDefaultValues();
+            case 1: // lite
+                    // SetDefaultValues();
+            case 2: // full
+                    // SetDefaultValues();
+            default:
+                SetDefaultValues();
+
+                // 변경 내용 저장
+                SaveSettings();
+
+                // 로딩후 UI
+                SetUIAfterLoading();
+
+                // 변동 UI 갱신
+                SetServerType();
+                SetServerModelType();
+
+                // 안내 : 설정 완료되었습니다.
+                StartCoroutine(ScenarioCommonManager.Instance.Scenario_C98_1_Approve_ReturnToDefault());
+                break;
+        }
     }
 }
