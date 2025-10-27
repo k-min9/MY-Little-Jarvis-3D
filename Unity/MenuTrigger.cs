@@ -190,6 +190,12 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
                 MemoryManager.Instance.ResetConversationMemory();
                 AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
                 AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Memory Erased");
+                // 채팅 시간 리셋 및 스몰톡 타이머 초기화
+                if (GlobalTimeVariableManager.Instance != null)
+                {
+                    GlobalTimeVariableManager.Instance.StartNewChat();
+                    GlobalTimeVariableManager.Instance.ResetSmallTalkTimer();
+                }
             }),
             (LanguageData.Translate("Chat History", targetLang), delegate { UIManager.Instance.ShowChatHistory(); }),
         });
@@ -236,14 +242,58 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Talk", targetLang), new List<(string, UnityAction)>
         {
             (LanguageData.Translate("Show Tutorial", targetLang), isSampleVer ? null : delegate { ScenarioTutorialManager.Instance.StartTutorial(); }),
-            (LanguageData.Translate("Idle Talk", targetLang), true ? null : delegate { Debug.Log("Idle Talk 시작"); }) // 구현 예정
+            (LanguageData.Translate("Idle Talk", targetLang), isSampleVer ? null : delegate { 
+                string purpose = "잡담"; // 기본 목적
+                APIManager.Instance.CallSmallTalkStream(purpose);
+            }), // 잡담
+            (LanguageData.Translate("AROPLA CHANNEL", targetLang), delegate {
+                // 아로프라 채널 모드 토글
+                if (APIAroPlaManager.Instance != null)
+                {
+                    APIAroPlaManager.Instance.ToggleAroplaMode();
+                    string status = APIAroPlaManager.Instance.IsAroplaMode() ? "활성화" : "비활성화";
+                    Debug.Log($"아로프라 채널 모드 {status}");
+                    
+                    // 상태 표시
+                    AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+                    AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText($"아로프라 채널 {status}됨");
+                }
+                else
+                {
+                    Debug.LogError("APIAroPlaManager 인스턴스를 찾을 수 없습니다.");
+                }
+             }),
         });
 
         // Util
-        m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Util", targetLang), new List<(string, UnityAction)>
+        m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Experiment", targetLang), new List<(string, UnityAction)>
         {
-            (LanguageData.Translate("Alarm", targetLang), true ? null : delegate { Debug.Log("[Alarm] 알람 기능 호출됨"); }),
-            (LanguageData.Translate("Minigame1", targetLang), true ? null : delegate { Debug.Log("[Minigame] 미니게임1 호출됨"); })
+            // (LanguageData.Translate("Alarm", targetLang), true ? null : delegate { Debug.Log("[Alarm] 알람 기능 호출됨"); }),
+            (LanguageData.Translate("20 Questions Game", targetLang), delegate {
+                // 스무고개 게임 모드 토글
+                MiniGame20QManager.Instance.Toggle20QMode();
+                string status = MiniGame20QManager.Instance.Is20QMode() ? "활성화" : "비활성화";
+                Debug.Log($"[20Q] 스무고개 게임 모드 {status}");
+                
+                // 상태 표시
+                if (MiniGame20QManager.Instance.Is20QMode())
+                {
+                    // 게임 시작 메시지는 서버에서 오므로 여기서는 표시만
+                    // AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+                    // AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("스무고개 게임 시작...");
+
+                    // Panel 표시
+                    UIGame20QPanelManager.Instance.ShowPanel();
+                }
+                else
+                {
+                    AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+                    AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("스무고개 게임 종료됨");
+
+                    // Panel 숨기기
+                    UIGame20QPanelManager.Instance.HidePanel();
+                }
+             })
         });
 
         // Dev
@@ -257,13 +307,30 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
             // StartCoroutine(ScenarioCommonManager.Instance.Scenario_C02_AskToStartServer());
             // CharManager.Instance.ChangeCharacterFromCharCode("ch0139");
             EmotionManager.Instance.NextEmotion();
+            DebugBalloonManager.Instance.ToggleDebugBalloon();
         });
         m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Dev", targetLang), new List<(string, UnityAction)>
         {
             (LanguageData.Translate("Test", targetLang), delegate {
                 UIChatSituationManager.Instance.ResetScrollPosition();
             }),
-            (LanguageData.Translate("Test2", targetLang), delegate { Debug.Log("Test2 실행"); }),
+            (LanguageData.Translate("Test2", targetLang), delegate { 
+                // 아로프라 채널 모드 토글
+                if (APIAroPlaManager.Instance != null)
+                {
+                    APIAroPlaManager.Instance.ToggleAroplaMode();
+                    string status = APIAroPlaManager.Instance.IsAroplaMode() ? "활성화" : "비활성화";
+                    Debug.Log($"아로프라 채널 모드 {status}");
+                    
+                    // 상태 표시
+                    AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+                    AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText($"아로프라 채널 {status}됨");
+                }
+                else
+                {
+                    Debug.LogError("APIAroPlaManager 인스턴스를 찾을 수 없습니다.");
+                }
+            }),
             (LanguageData.Translate("Test3", targetLang), delegate { Debug.Log("Test3 실행"); })
         });
 #endif
