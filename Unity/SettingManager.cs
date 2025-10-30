@@ -21,6 +21,8 @@ public class SettingManager : MonoBehaviour
     [SerializeField] private Toggle isShowChatBoxOnClickToggle;
     [SerializeField] private Toggle isShowTutorialOnChatToggle;
     [SerializeField] private Toggle isStartServerOnInitToggle;
+    [SerializeField] private Toggle isSTTServerToggle;
+    [SerializeField] private Toggle enableEditionUpdateSuggestionToggle;
 
     [Header("Character")]
     [SerializeField] private Slider charSizeSlider;
@@ -38,31 +40,36 @@ public class SettingManager : MonoBehaviour
 
     [Header("Server")]  // 구 Server Field. 변수도 관련 변수로 설정되어있음.
     [SerializeField] private Dropdown serverTypeDropdown;
-    [SerializeField] private Dropdown serverModelTypeDropdown;
-    [SerializeField] private Image serverModelTypeDropdownImage;
-    [SerializeField] private GameObject serverModelTypeDropdownGameObject;
+    [SerializeField] private Dropdown serverLocalModeTypeDropdown;
+    [SerializeField] private Dropdown serverLocalModelTypeDropdown;
+    [SerializeField] private Image serverLocalDownloadIconImage;
+    [SerializeField] private Button serverLocalLoadButton;
+    [SerializeField] private Button serverLocalReleaseButton;
     [SerializeField] private Dropdown geminiModelTypeDropdown;
-    [SerializeField] private GameObject geminiModelTypeDropdownGameObject;
-    [SerializeField] private Dropdown openRouterModelTypeDropdown;
-    [SerializeField] private GameObject openRouterModelTypeDropdownGameObject;
-    [SerializeField] private TMP_InputField serverIdInputField;
-    [SerializeField] private GameObject serverIdInputGameObject;
     [SerializeField] private TMP_InputField serverGeminiApiKeyInputField;
-    [SerializeField] private GameObject serverGeminiApiKeyInputFieldGameObject;
+    [SerializeField] public Text serverGeminikeyTestResultText;
+    [SerializeField] private Dropdown serverOpenRouterRecommendedDropdown;
+    [SerializeField] private TMP_InputField serverOpenRouterModelNameInputField;
     [SerializeField] private TMP_InputField serverOpenRouterApiKeyInputField;
-    [SerializeField] private GameObject serverOpenRouterApiKeyInputFieldGameObject;
-    [SerializeField] private GameObject keyTestGameObject;
-    [SerializeField] private Text keyTestResultText;
+    [SerializeField] public Text serverOpenRouterkeyTestResultText;
+    [SerializeField] private Toggle isAPITestToggle;
+    [SerializeField] private TMP_InputField serverIdInputField;
+
+    // 서버 타입별 통합 UI GameObject
+    [SerializeField] private GameObject serverUIAutoGameObject;
+    [SerializeField] private GameObject serverUILocalGameObject;
+    [SerializeField] private GameObject serverUIGoogleGameObject;
+    [SerializeField] private GameObject serverUIOpenRouterGameObject;
+    [SerializeField] private GameObject serverUIChatGPTGameObject;
     [SerializeField] private Toggle isAskedTurnOnServerToggle;  // Lite, Full 일때 활성화 되는 무언가. 그냥 문답무용으로 키는 방향으로 진행했을때의 영향도도 파악 필요.
 
     [Header("Conversation")]  // 구 AI Field. 변수도 관련 변수로 설정되어있음.
     [SerializeField] private TMP_InputField playerNameInputField;
+    [SerializeField] private Dropdown aiLangDropdown;
     [SerializeField] private Dropdown aiWebSearchDropdown;
     [SerializeField] private Dropdown aiAskIntentDropdown;
-    [SerializeField] private Dropdown aiLangDropdown;
     [SerializeField] private Dropdown aiEmotionDropdown;
     [SerializeField] private Dropdown aiVoiceFilterDropdown;
-    [SerializeField] private Toggle isAPITestToggle;
     [SerializeField] private Toggle confirmUserIntentToggle;
 
     [Header("Dialogue Info")]
@@ -81,7 +88,7 @@ public class SettingManager : MonoBehaviour
     // 기타 표시용 UI
     [Header("Extra UI")]
     public Text soundSpeedMasterText;
-    public Text serverInfoText;
+    public Text serverInfoText;  // Auto용??
     public Text charSizeText;
 
     // 설정 데이터 클래스
@@ -102,6 +109,8 @@ public class SettingManager : MonoBehaviour
         public bool isShowTutorialOnChat;
         public bool isTutorialCompleted;
         public bool isStartServerOnInit;
+        public bool isSTTServer;
+        public bool enableEditionUpdateSuggestion;
 
         public string char_lastUsed;
         public float char_size;
@@ -117,12 +126,19 @@ public class SettingManager : MonoBehaviour
         public float sound_volumeMaster;
         public float sound_speedMaster;
 
-        public int server_type_idx;  // 0: Auto, 1: Server, 2: Free(Gemini), 3: Free(OpenRouter), 4: Paid(Gemini)
+        public int server_type_idx;  // 0: Auto, 1: Local, 2: Google, 3: OpenRouter
         public string server_type;
         public string server_id;
         public string api_key_gemini;
         public string api_key_openRouter;
-        public string model_type;  // qwen-14b 등
+        
+        // 서비스별 모델명
+        public int server_local_mode_idx;    // 0: CPU, 1: GPU
+        public string server_local_mode;     // "GPU" or "CPU"
+        public string model_name_Local;      // Local 서버 모델 (예: "qwen-14b")
+        public string model_name_Gemini;     // Gemini 모델 (예: "gemini-1.5-flash")
+        public string model_name_OpenRouter; // OpenRouter 모델 (예: "google/gemini-flash-1.5")
+        public string model_name_ChatGPT;    // ChatGPT 모델 (예: "gpt-4-turbo") - 미래 대비
         
         public int ai_web_search_idx;  // 0 : off, 1 : on, 2: force
         public string ai_web_search;
@@ -176,6 +192,8 @@ public class SettingManager : MonoBehaviour
     public void SetIsShowChatBoxOnClick(bool value) {settings.isShowChatBoxOnClick = value; SaveSettings(); }
     public void SetIsShowTutorialOnChat(bool value) {settings.isShowTutorialOnChat = value; settings.isTutorialCompleted = !value; SaveSettings(); }
     public void SetIsisStartServerOnInit(bool value) {settings.isStartServerOnInit = value; SaveSettings(); }
+    public void SetIsSTTServer(bool value) { value = getIsSTTServerFilterScenario(value); isSTTServerToggle.isOn = value; settings.isSTTServer = value; SaveSettings(); }
+    public void SetEnableEditionUpdateSuggestion(bool value) { settings.enableEditionUpdateSuggestion = value; SaveSettings(); }
 
     public void SetCharLastUsed(string value) { settings.char_lastUsed = value; SaveSettings(); }
     public void SetCharSize(float value) { settings.char_size = value; CharManager.Instance.setCharSize(); SaveSettings(); charSizeText.text="Size ("+(int)settings.char_size+")";}
@@ -195,7 +213,38 @@ public class SettingManager : MonoBehaviour
     public void SetServerID(string value) { settings.server_id = value; SaveSettings(); }
     public void SetAPIKeyGemini(string value) { settings.api_key_gemini = value; SaveSettings(); }
     public void SetAPIKeyOpenRouter(string value) { settings.api_key_openRouter = value; SaveSettings(); }
-    public void SetServerModelType() { int value = serverModelTypeDropdown.value; string displayName = serverModelTypeDropdown.options[value].text; settings.model_type = ServerModelData.GetIdByDisplayName(displayName); SetServerUIFromServerModel(ServerModelData.GetFileNameByDisplayName(displayName)); SaveSettings(); }
+    public void SetServerLocalMode() { int value = serverLocalModeTypeDropdown.value; settings.server_local_mode_idx = value; settings.server_local_mode = getLocalServerModeFromIdx(value); SaveSettings(); }
+    public void SetServerModelType() { int value = serverLocalModelTypeDropdown.value; string displayName = serverLocalModelTypeDropdown.options[value].text; settings.model_name_Local = ModelDataLocal.GetIdByDisplayName(displayName); SetServerUIFromServerModel(ModelDataLocal.GetFileNameByDisplayName(displayName)); SaveSettings(); }
+    public void SetGeminiModelType() { int value = geminiModelTypeDropdown.value; if (value >= 0 && value < ModelDataGemini.ModelOptions.Count) { settings.model_name_Gemini = ModelDataGemini.ModelOptions[value].Id; } SaveSettings(); }
+    public void SetOpenRouterRecommendedModel() { int value = serverOpenRouterRecommendedDropdown.value; if (value >= 0 && value < ModelDataOpenRouter.ModelOptions.Count) { string modelId = ModelDataOpenRouter.ModelOptions[value].Id; settings.model_name_OpenRouter = modelId; Debug.Log(modelId); serverOpenRouterModelNameInputField.text = modelId; } SaveSettings(); }
+    public void SetOpenRouterModelName(string value) { settings.model_name_OpenRouter = value; SaveSettings(); }
+    
+    // 버튼용 래핑 함수 (5초간 버튼 비활성화)
+    public void CallReleaseLocalModel() 
+    { 
+        if (serverLocalReleaseButton != null)
+        {
+            APIManager.Instance.CallReleaseModel();
+            StartCoroutine(DisableButtonTemporarily(serverLocalReleaseButton, 5f));
+        }
+    }
+    
+    public void CallLoadLocalModel() 
+    { 
+        if (serverLocalLoadButton != null)
+        {
+            APIManager.Instance.CallLoadModel();
+            StartCoroutine(DisableButtonTemporarily(serverLocalLoadButton, 5f));
+        }
+    }
+
+    // 버튼을 일정 시간 동안 비활성화하는 Coroutine
+    private IEnumerator DisableButtonTemporarily(Button button, float duration)
+    {
+        button.interactable = false;
+        yield return new WaitForSeconds(duration);
+        button.interactable = true;
+    }
 
     public void SetAIWebSearch() { int value=aiWebSearchDropdown.value; value = getAiWebSearchFilterScenario(value); aiWebSearchDropdown.value = value; settings.ai_web_search_idx = value; settings.ai_web_search = getONOFFTypeFromIdx(value); SaveSettings(); }
     public void SetAIAskIntent() { int value=aiAskIntentDropdown.value; settings.ai_ask_intent_idx = value; settings.server_type=getONOFFTypeFromIdx(value); SaveSettings(); }
@@ -251,6 +300,8 @@ public class SettingManager : MonoBehaviour
         // 현재 플랫폼 세팅
         SetPlatformInfoDropdown();
         SetServerModelDropdownOptions();
+        SetGeminiModelDropdownOptions();
+        SetOpenRouterModelDropdownOptions();
 
         // 서버 상태 세팅
         InstallStatusManager.Instance.LoadInstallStatus();
@@ -262,6 +313,7 @@ public class SettingManager : MonoBehaviour
         // 변동 UI 갱신
         SetServerType();
         SetServerModelType();
+        SetGeminiModelType();
 
 
         // 최상위에 두는지 확인하고 세팅
@@ -334,33 +386,93 @@ public class SettingManager : MonoBehaviour
 
     private void SetServerModelDropdownOptions()
     {
-        serverModelTypeDropdown.ClearOptions();
+        serverLocalModelTypeDropdown.ClearOptions();
 
         List<string> optionNames = new List<string>();
-        foreach (var model in ServerModelData.ModelOptions)
+        foreach (var model in ModelDataLocal.ModelOptions)
         {
             optionNames.Add(model.DisplayName);
         }
 
-        serverModelTypeDropdown.AddOptions(optionNames);
+        serverLocalModelTypeDropdown.AddOptions(optionNames);
 
         // 저장된 모델 ID를 기반으로 선택 인덱스를 설정
-        int selectedIndex = ServerModelData.ModelOptions.FindIndex(m => m.Id == settings.model_type);
+        int selectedIndex = ModelDataLocal.ModelOptions.FindIndex(m => m.Id == settings.model_name_Local);
         if (selectedIndex >= 0)
         {
-            serverModelTypeDropdown.value = selectedIndex;
+            serverLocalModelTypeDropdown.value = selectedIndex;
 
             // 다운로드 UI 갱신
-            // int value = serverModelTypeDropdown.value;
-            // string displayName = serverModelTypeDropdown.options[value].text;
-            // string modelFileName = ServerModelData.GetFileNameByDisplayName(displayName);
+            // int value = serverLocalModelTypeDropdown.value;
+            // string displayName = serverLocalModelTypeDropdown.options[value].text;
+            // string modelFileName = ModelDataLocal.GetFileNameByDisplayName(displayName);
             // SetServerUIFromServerModel(modelFileName);
             // SaveSettings();
         }
         else
         {
-            serverModelTypeDropdown.value = 0;
-            settings.model_type = ServerModelData.ModelOptions[0].Id;
+            serverLocalModelTypeDropdown.value = 0;
+            settings.model_name_Local = ModelDataLocal.ModelOptions[0].Id;
+        }
+    }
+    
+    private void SetGeminiModelDropdownOptions()
+    {
+        geminiModelTypeDropdown.ClearOptions();
+
+        List<string> optionNames = new List<string>();
+        foreach (var model in ModelDataGemini.ModelOptions)
+        {
+            // Paid일 경우만 (P) 표시
+            string displayText = model.PriceType == "Paid" ? $"{model.DisplayName} (P)" : model.DisplayName;
+            optionNames.Add(displayText);
+        }
+
+        geminiModelTypeDropdown.AddOptions(optionNames);
+
+        // 저장된 모델 ID를 기반으로 선택 인덱스를 설정
+        int selectedIndex = ModelDataGemini.ModelOptions.FindIndex(m => m.Id == settings.model_name_Gemini);
+        if (selectedIndex >= 0)
+        {
+            geminiModelTypeDropdown.value = selectedIndex;
+        }
+        else
+        {
+            geminiModelTypeDropdown.value = 0;
+            settings.model_name_Gemini = ModelDataGemini.ModelOptions[0].Id;
+        }
+    }
+    
+    private void SetOpenRouterModelDropdownOptions()
+    {
+        serverOpenRouterRecommendedDropdown.ClearOptions();
+
+        List<string> optionNames = new List<string>();
+        foreach (var model in ModelDataOpenRouter.ModelOptions)
+        {
+            // Paid일 경우만 (P) 표시
+            string displayText = model.PriceType == "Paid" ? $"{model.DisplayName} (P)" : model.DisplayName;
+            optionNames.Add(displayText);
+        }
+
+        serverOpenRouterRecommendedDropdown.AddOptions(optionNames);
+
+        // 저장된 모델명이 추천 목록에 있는지 확인
+        int selectedIndex = ModelDataOpenRouter.ModelOptions.FindIndex(m => m.Id == settings.model_name_OpenRouter);
+        if (selectedIndex >= 0)
+        {
+            serverOpenRouterRecommendedDropdown.value = selectedIndex;
+            // InputField에도 모델 ID 반영
+            serverOpenRouterModelNameInputField.text = ModelDataOpenRouter.ModelOptions[selectedIndex].Id;
+        }
+        else
+        {
+            serverOpenRouterRecommendedDropdown.value = 0;
+            // 기본값 InputField에 반영
+            if (ModelDataOpenRouter.ModelOptions.Count > 0)
+            {
+                serverOpenRouterModelNameInputField.text = ModelDataOpenRouter.ModelOptions[0].Id;
+            }
         }
     }
     
@@ -499,17 +611,38 @@ public class SettingManager : MonoBehaviour
         return value;
     }
 
-    // idx를 서버타입으로 변환; 0: Auto, 1: Server, 2: Free(Gemini), 3: Free(OpenRouter), 4: Paid(Gemini)
+    // STT Server 설정 필터 (Lite 이상 필요)
+    private bool getIsSTTServerFilterScenario(bool value)
+    {
+        // STT Server 기능 키려는데 현재 Sample 버전일 경우 버전업 요구
+        if (!InstallStatusManager.Instance.CheckAndOperateLite())
+        {
+            return false;
+        }
+        return value;
+    }
+
+    // idx를 서버타입으로 변환; 0: Auto, 1: Local, 2: Google, 3: OpenRouter
     private string getServerTypeFromIdx(int idx)
     {
         switch (idx)
         {
             case 0: return "Auto";
-            case 1: return "Server";
-            case 2: return "Free_Gemini";
-            case 3: return "Free_OpenRouter";
-            case 4: return "Paid_Gemini";
+            case 1: return "Local";
+            case 2: return "Google";
+            case 3: return "OpenRouter";
             default: return "Auto";
+        }
+    }
+    
+    // idx를 로컬 서버 모드로 변환; 0: CPU, 1: GPU
+    private string getLocalServerModeFromIdx(int idx)
+    {
+        switch (idx)
+        {
+            case 0: return "CPU";
+            case 1: return "GPU";
+            default: return "CPU";
         }
     }
 
@@ -704,6 +837,8 @@ public class SettingManager : MonoBehaviour
         isShowChatBoxOnClickToggle.isOn = settings.isShowChatBoxOnClick;
         isShowTutorialOnChatToggle.isOn = settings.isShowTutorialOnChat;
         isStartServerOnInitToggle.isOn = settings.isStartServerOnInit;
+        isSTTServerToggle.isOn = settings.isSTTServer;
+        enableEditionUpdateSuggestionToggle.isOn = settings.enableEditionUpdateSuggestion;
 
         charSizeSlider.value = settings.char_size;
         charSpeedSlider.value = settings.char_speed;
@@ -718,9 +853,11 @@ public class SettingManager : MonoBehaviour
         soundSpeedMasterSlider.value = settings.sound_speedMaster;
 
         serverTypeDropdown.value = settings.server_type_idx;
+        serverLocalModeTypeDropdown.value = settings.server_local_mode_idx;
         serverIdInputField.text = settings.server_id;
         serverGeminiApiKeyInputField.text = settings.api_key_gemini;
         serverOpenRouterApiKeyInputField.text = settings.api_key_openRouter;
+        serverOpenRouterModelNameInputField.text = settings.model_name_OpenRouter;
         aiWebSearchDropdown.value = settings.ai_web_search_idx;
         aiAskIntentDropdown.value = settings.ai_ask_intent_idx;
         isAskedTurnOnServerToggle.isOn = settings.isAskedTurnOnServer;
@@ -774,40 +911,39 @@ public class SettingManager : MonoBehaviour
         }
     }
 
-    // idx를 서버타입으로 변환; 0: Auto, 1: Server, 2: Free(Gemini), 3: Free(OpenRouter), 4: Paid(Gemini)
+    // idx를 서버타입으로 변환; 0: Auto, 1: Local, 2: Google, 3: OpenRouter
     public void SetServerUIFromServerType(int idx)
     {
-        // 모든 UI 요소 비활성화
-        serverModelTypeDropdownGameObject.SetActive(false);
-        geminiModelTypeDropdownGameObject.SetActive(false);
-        openRouterModelTypeDropdownGameObject.SetActive(false);
-        serverIdInputGameObject.SetActive(false);
-        serverGeminiApiKeyInputFieldGameObject.SetActive(false);
-        serverOpenRouterApiKeyInputFieldGameObject.SetActive(false);
-        keyTestGameObject.SetActive(false);
-        keyTestResultText.text = "";
+        // 모든 서버 UI 비활성화
+        serverUIAutoGameObject.SetActive(false);
+        serverUILocalGameObject.SetActive(false);
+        serverUIGoogleGameObject.SetActive(false);
+        serverUIOpenRouterGameObject.SetActive(false);
+        serverUIChatGPTGameObject.SetActive(false);
+        serverGeminikeyTestResultText.text = "";
+        serverOpenRouterkeyTestResultText.text = "";
 
+        // 선택된 서버 타입의 UI만 활성화
         switch (idx)
         {
             case 0: // Auto
+                serverUIAutoGameObject.SetActive(true);
                 break;
 
-            case 1: // Server
-                serverModelTypeDropdownGameObject.SetActive(true);
-                serverIdInputGameObject.SetActive(true);
+            case 1: // Local
+                serverUILocalGameObject.SetActive(true);
                 break;
 
-            case 2: // Free_Gemini
-            case 4: // Paid_Gemini
-                geminiModelTypeDropdownGameObject.SetActive(true);
-                serverGeminiApiKeyInputFieldGameObject.SetActive(true);
-                keyTestGameObject.SetActive(true);
+            case 2: // Google
+                serverUIGoogleGameObject.SetActive(true);
                 break;
 
-            case 3: // Free_OpenRouter
-                openRouterModelTypeDropdownGameObject.SetActive(true);
-                serverOpenRouterApiKeyInputFieldGameObject.SetActive(true);
-                keyTestGameObject.SetActive(true);
+            case 3: // OpenRouter 
+                serverUIOpenRouterGameObject.SetActive(true);
+                break;
+
+            case 4: // ChatGPT 
+                serverUIChatGPTGameObject.SetActive(true);
                 break;
 
             default:
@@ -815,7 +951,7 @@ public class SettingManager : MonoBehaviour
         }
     }
 
-    // 서버 모델 보유시 아이콘 변경
+    // 서버 모델 보유시 아이콘 변경 및 버튼 활성화 제어
     public void SetServerUIFromServerModel(string modelFileName)
     {
         // Debug.Log(modelFileName);
@@ -823,22 +959,31 @@ public class SettingManager : MonoBehaviour
         // string streamingAssetsPath = Application.streamingAssetsPath;  // StreamingAssets 폴더 경로
         // string executablePath = Application.dataPath;  // Unity 실행 파일이 있는 폴더 경로
         // string jarvisServerPath = Path.Combine(Path.GetDirectoryName(executablePath), "jarvis_server_jp.exe");
-        string modelPath = Path.Combine(Application.streamingAssetsPath, "model", modelFileName);
+        string exeDirectory = Path.GetDirectoryName(Application.dataPath);
+        string modelPath = Path.Combine(exeDirectory, "model", modelFileName);
 
         Color notOwnedColor = new Color32(200, 200, 200, 255);
         Color ownedColor = new Color32(0, 0, 0, 255);
 
-        if (File.Exists(modelPath))
+        bool modelExists = File.Exists(modelPath);
+
+        if (modelExists)
         {
-            serverModelTypeDropdownImage.color = ownedColor;
+            serverLocalDownloadIconImage.color = ownedColor;
             LanguageManager.Instance.SetServerModelTypeDownloadTooltip(1);  // 0: Download 1: Owned
         }
         else
         {
-            serverModelTypeDropdownImage.color = notOwnedColor;
+            serverLocalDownloadIconImage.color = notOwnedColor;
             LanguageManager.Instance.SetServerModelTypeDownloadTooltip(0);  // 0: Download 1: Owned
         }
+
+        // 모델이 있을 때만 Release/Load 버튼 활성화
+        if (serverLocalReleaseButton != null)
+            serverLocalReleaseButton.interactable = modelExists;
         
+        if (serverLocalLoadButton != null)
+            serverLocalLoadButton.interactable = modelExists;
     }
 
     // 기본값 설정
@@ -877,6 +1022,8 @@ public class SettingManager : MonoBehaviour
         settings.isShowTutorialOnChat = true;
         settings.isTutorialCompleted = false;
         settings.isStartServerOnInit = true;
+        settings.isSTTServer = false;
+        settings.enableEditionUpdateSuggestion = true;
 
         settings.char_size = 100;
         settings.char_lastUsed = "mari";
@@ -893,11 +1040,17 @@ public class SettingManager : MonoBehaviour
         settings.sound_volumeMaster = 70;
         settings.sound_speedMaster = 100;
 
-        settings.server_type_idx = 2;  // 0: Auto, 1: Server, 2: Free(Gemini), 3: Free(OpenRouter), 4: Paid(Gemini)
+        settings.server_type_idx = 0;  // 0: Auto, 1: Local, 2: Google, 3: OpenRouter
         settings.server_type = "Auto";
         settings.server_id = "temp";
         settings.api_key_gemini = "";
         settings.api_key_openRouter = "";
+        settings.server_local_mode_idx = 0;  // 0: CPU, 1: GPU
+        settings.server_local_mode = "CPU";
+        settings.model_name_Local = "";
+        settings.model_name_Gemini = "gemini-1.5-flash";
+        settings.model_name_OpenRouter = "google/gemini-flash-1.5";
+        settings.model_name_ChatGPT = "";
         settings.ai_web_search_idx = 0;  // 0 : off, 1 : on, 2: force
         settings.ai_web_search = "OFF";
         settings.ai_ask_intent_idx = 0;  // 0 : off, 1 : on

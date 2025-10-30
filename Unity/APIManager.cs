@@ -914,15 +914,13 @@ public class APIManager : MonoBehaviour
             return;
 #endif
 
-        // server_type이 2 (Free Gemini)인 경우 Gemini 전용 함수 호출
-        // #if !UNITY_EDITOR
-        int server_type_idx = SettingManager.Instance.settings.server_type_idx;  // 0: Auto, 1: Server, 2: Free(Gemini), 3: Free(OpenRouter), 4: Paid(Gemini)
-        if (server_type_idx == 2)
+        // server_type이 2 (Google)인 경우 Gemini 전용 함수 호출
+        int server_type_idx = SettingManager.Instance.settings.server_type_idx;  // 0: Auto, 1: Local, 2: Google, 3: OpenRouter
+        if (server_type_idx == 2 || server_type_idx == 0)
         {
             await CallConversationStreamGemini(query, chatIdx, ai_lang_in);
             return;
         }
-// #endif
 
 
         // baseUrl을 비동기로 가져오기
@@ -957,7 +955,16 @@ public class APIManager : MonoBehaviour
         string memoryJson = JsonConvert.SerializeObject(memory);
         string guidelineJson = UIUserCardManager.Instance.GetGuidelineListJson();
         string situationJson = UIChatSituationManager.Instance.GetCurUIChatSituationInfoJson();
-        string server_type = SettingManager.Instance.settings.server_type ?? "Auto";  // 0: Auto, 1: Server, 2: Free(Gemini), 3: Free(OpenRouter), 4: Paid(Gemini)
+        string server_type = SettingManager.Instance.settings.server_type ?? "Auto";  // 0: Auto, 1: Local, 2: Google, 3: OpenRouter
+        
+        // 서비스별 모델명
+        // settings에서 model_name_Local (id)를 가져와서 FileName으로 변환
+        string modelId = SettingManager.Instance.settings.model_name_Local ?? "";
+        string modelFileName = ModelDataLocal.GetFileNameById(modelId);
+        string model_name_Local = modelFileName;
+        string model_name_Gemini = SettingManager.Instance.settings.model_name_Gemini ?? "";
+        string model_name_OpenRouter = SettingManager.Instance.settings.model_name_OpenRouter ?? "";
+        string model_name_ChatGPT = SettingManager.Instance.settings.model_name_ChatGPT ?? "";
 
         // 요청 데이터 구성
         var requestData = new Dictionary<string, string>
@@ -983,6 +990,10 @@ public class APIManager : MonoBehaviour
             { "intent_confirm_answer", ""},  // true, false : 의도행동확인에 대한 답변[재생성시 확인 없이 적용하기 위해]
             { "regenerate_count", GameManager.Instance.chatIdxRegenerateCount.ToString()},
             { "server_type", server_type},
+            { "model_name_Local", model_name_Local},
+            { "model_name_Gemini", model_name_Gemini},
+            { "model_name_OpenRouter", model_name_OpenRouter},
+            { "model_name_ChatGPT", model_name_ChatGPT},
         };
 
         await FetchStreamingData(streamUrl, requestData);
@@ -1061,6 +1072,110 @@ public class APIManager : MonoBehaviour
         };
 
         await FetchStreamingData(streamUrl, requestData);
+    }
+
+    // 로컬 서버 모델 Release 호출
+    public async void CallReleaseModel()
+    {
+        // baseUrl을 비동기로 가져오기
+        var tcs = new TaskCompletionSource<string>();
+        ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
+        string baseUrl = await tcs.Task;
+        
+        string url = baseUrl + "/model/release";
+        Debug.Log("CallReleaseModel URL: " + url);
+
+        try
+        {
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+            request.Method = "POST";
+            request.ContentType = "application/x-www-form-urlencoded";
+
+            // 요청 본문 (빈 내용)
+            byte[] byteArray = new byte[0];
+            request.ContentLength = byteArray.Length;
+
+            using (Stream dataStream = await request.GetRequestStreamAsync())
+            {
+                dataStream.Write(byteArray, 0, byteArray.Length);
+            }
+
+            using (HttpWebResponse response = (HttpWebResponse)await request.GetResponseAsync())
+            {
+                if (response.StatusCode == HttpStatusCode.OK)
+                {
+                    Debug.Log("Model released successfully");
+                }
+                else
+                {
+                    Debug.LogError($"Error releasing model: {response.StatusCode}");
+                }
+            }
+        }
+        catch (WebException ex)
+        {
+            Debug.LogError($"WebException in CallReleaseModel: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Exception in CallReleaseModel: {ex.Message}");
+        }
+    }
+
+    // 로컬 서버 모델 Load 호출
+    public async void CallLoadModel()
+    {
+        // baseUrl을 비동기로 가져오기
+        var tcs = new TaskCompletionSource<string>();
+        ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
+        string baseUrl = await tcs.Task;
+        
+        string url = baseUrl + "/model/load";
+        Debug.Log("CallLoadModel URL: " + url);
+
+        // settings에서 model_name_Local (id)를 가져와서 FileName으로 변환
+        string modelId = SettingManager.Instance.settings.model_name_Local ?? "";
+        string modelFileName = ModelDataLocal.GetFileNameById(modelId);
+        string serverLocalMode = SettingManager.Instance.settings.server_local_mode ?? "GPU";
+
+        Debug.Log($"Loading model: {modelFileName}, Mode: {serverLocalMode}");
+
+        try
+        {
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+            request.Method = "POST";
+            request.ContentType = "application/json";
+
+            var data = new { model_name_Local = modelFileName, server_local_mode = serverLocalMode };
+            string jsonData = JsonConvert.SerializeObject(data);
+            byte[] byteArray = Encoding.UTF8.GetBytes(jsonData);
+            request.ContentLength = byteArray.Length;
+
+            using (Stream dataStream = await request.GetRequestStreamAsync())
+            {
+                dataStream.Write(byteArray, 0, byteArray.Length);
+            }
+
+            using (HttpWebResponse response = (HttpWebResponse)await request.GetResponseAsync())
+            {
+                if (response.StatusCode == HttpStatusCode.OK)
+                {
+                    Debug.Log($"Model loaded successfully: {modelFileName} ({serverLocalMode})");
+                }
+                else
+                {
+                    Debug.LogError($"Error loading model: {response.StatusCode}");
+                }
+            }
+        }
+        catch (WebException ex)
+        {
+            Debug.LogError($"WebException in CallLoadModel: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Exception in CallLoadModel: {ex.Message}");
+        }
     }
 
     public async void GetKoWavFromAPI(string text, string chatIdx, string nickname = null)
@@ -1156,8 +1271,8 @@ public class APIManager : MonoBehaviour
 
         // dev_voice 사용 여부
         int server_type_idx = SettingManager.Instance.settings.server_type_idx;
-        bool shouldUseDevServer = SettingManager.Instance.GetInstallStatus() < 2 ||  // no install, lite,
-                                 (server_type_idx == 2);// && string.IsNullOrEmpty(baseUrl));  // Gemini with empty baseUrl
+        bool shouldUseDevServer = SettingManager.Instance.GetInstallStatus() < 2;   // no install, lite,
+                                // || (server_type_idx == 2);// && string.IsNullOrEmpty(baseUrl));  // Google(Gemini) with empty baseUrl
         if (shouldUseDevServer)
         {
             // TaskCompletionSource를 사용하여 콜백을 async/await로 변환
