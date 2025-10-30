@@ -114,11 +114,26 @@ public static class ChoiceData
             }
         },
         {
-            "I01_installer_server_type_check", new List<Dictionary<string, string>>
+            "C98_confirm_return_to_default_proceed_check", new List<Dictionary<string, string>>
             {
-                new Dictionary<string, string> { { "ko", "Lite (약 2GB)" }, { "jp", "ライト（約2GB）" }, { "en", "Lite (about 2GB)" } },
-                new Dictionary<string, string> { { "ko", "Full (약 16GB)" }, { "jp", "フル（約16GB）" }, { "en", "Full (about 16GB)" } },
-                new Dictionary<string, string> { { "ko", "각 버전에 대해 설명해줘" }, { "jp", "それぞれについて説明して" }, {"en", "Tell me about each version"} } ,
+                new Dictionary<string, string> { { "ko", "네" }, { "jp", "はい" }, { "en", "Yes" } },
+                new Dictionary<string, string> { { "ko", "아니오" }, { "jp", "いいえ" }, { "en", "No" } }
+            }
+        },
+        {
+            "I01_installer_server_type_check_lite", new List<Dictionary<string, string>>
+            {
+                new Dictionary<string, string> { { "ko", "Lite (약 2GB)" }, { "jp", "Lite（約2GB）" }, { "en", "Lite (about 2GB)" } },
+                new Dictionary<string, string> { { "ko", "Full (약 16GB)" }, { "jp", "Full（約16GB）" }, { "en", "Full (about 16GB)" } },
+                new Dictionary<string, string> { { "ko", "각 Edition에 대해 설명해줘" }, { "jp", "それぞれのEditionについて説明して" }, {"en", "Tell me about each edition"} } ,
+                new Dictionary<string, string> { { "ko", "나중에 설치할게" }, { "jp", "あとでインストールする" }, { "en", "I'll install it later" } }
+            }
+        },
+        {
+            "I01_installer_server_type_check_full", new List<Dictionary<string, string>>
+            {
+                new Dictionary<string, string> { { "ko", "Full (약 16GB)" }, { "jp", "Full（約16GB）" }, { "en", "Full (about 16GB)" } },
+                new Dictionary<string, string> { { "ko", "Full Edition에 대해 설명해줘" }, { "jp", "Full Editionついて説明して" }, {"en", "Tell me about the Full edition"} } ,
                 new Dictionary<string, string> { { "ko", "나중에 설치할게" }, { "jp", "あとでインストールする" }, { "en", "I'll install it later" } }
             }
         }

@@ -84,13 +84,13 @@ public class ChoiceInputManager : MonoBehaviour
         StartCoroutine(ScenarioTutorialManager.Instance.Scenario_A97_ConnectTest(currentApiTypeIdx));  // 선택한 대상 index 전달
     }
 
-    // Test 버튼으로 API 테스트
+    // Test 버튼으로 API 테스트 ;현재는 gemini only
     public void TestApiKey()
     {
         // Test 전 설정 체크
         SettingManager.Instance.settings.server_type_idx = 0;
 
-        ServerManager.Instance.CallValidateAPIKey();
+        ServerManager.Instance.CallValidateGeminiAPIKey();
     }
 
     // 현재 입력된 API Key를 가져옵니다.
