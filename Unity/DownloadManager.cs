@@ -148,6 +148,12 @@ public class DownloadManager : MonoBehaviour
     // 모델 다운로드 요청
     public void RequestDownload()
     {
+        // Full 버전 이상인지 확인
+        if (!InstallStatusManager.Instance.CheckAndOperateFull())
+        {
+            return;
+        }
+
         if (isDownloading)
         {
 #if UNITY_EDITOR
@@ -159,15 +165,16 @@ public class DownloadManager : MonoBehaviour
             return;
         }
 
-        string modelType = SettingManager.Instance.settings.model_type;
-        var model = ServerModelData.ModelOptions.Find(m => m.Id == modelType);
+        string modelType = SettingManager.Instance.settings.model_name_Local;
+        var model =ModelDataLocal.ModelOptions.Find(m => m.Id == modelType);
         if (model == null)
         {
             Debug.LogWarning($"[DownloadManager] Unknown model ID: {modelType}");
             return;
         }
 
-        string savePath = Path.Combine(Application.streamingAssetsPath, "model", model.FileName);
+        string exeDirectory = Path.GetDirectoryName(Application.dataPath);
+        string savePath = Path.Combine(exeDirectory, "model", model.FileName);
 
 #if UNITY_EDITOR
         bool proceed = UnityEditor.EditorUtility.DisplayDialog(
@@ -273,6 +280,10 @@ public class DownloadManager : MonoBehaviour
         float avgSpeedMBps = (totalSize / (1024f * 1024f)) / totalTimeSeconds;
 
         Debug.Log($"[DownloadManager] Download completed in {totalTimeSeconds:F1}s at {avgSpeedMBps:F1} MB/s");
+
+        // 다운로드 완료 후 버튼 활성화를 위해 UI 업데이트
+        string fileName = Path.GetFileName(savePath);
+        SettingManager.Instance.SetServerUIFromServerModel(fileName);
 
     #if UNITY_EDITOR
         UnityEditor.EditorUtility.DisplayDialog(
