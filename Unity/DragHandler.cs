@@ -25,6 +25,33 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
     private void Start()
     {
         charAttributes = FindObjectOfType<CharAttributes>();
+        
+        // 안전망: 필요한 컴포넌트들이 설정되지 않은 경우 자동으로 찾아서 설정
+        InitDragHandler();
+    }
+    
+    // 안전망 초기화 메서드
+    private void InitDragHandler()
+    {
+        // Canvas가 설정되지 않은 경우 찾아서 설정
+        if (_canvas == null)
+        {
+            _canvas = FindObjectOfType<Canvas>();
+            if (_canvas == null)
+            {
+                Debug.LogWarning($"DragHandler: Canvas를 찾을 수 없습니다. ({gameObject.name})");
+            }
+        }
+        
+        // Animator가 설정되지 않은 경우 부모에서 찾아서 설정
+        if (_animator == null)
+        {
+            _animator = transform.parent?.GetComponent<Animator>();
+            if (_animator == null)
+            {
+                Debug.LogWarning($"DragHandler: Animator를 찾을 수 없습니다. ({gameObject.name})");
+            }
+        }
     }
 
     public void OnDrag(PointerEventData eventData)
@@ -52,8 +79,11 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
         // 기존 애니메이션 정지
         PhysicsManager.Instance.animator.Play("idle", 0, 0);  // 현재 애니메이션 강제 중지;
 
-        // 기존 음성 초기화
-        VoiceManager.Instance.ResetAudio();
+        // 기존 음성 초기화 (메인 캐릭터일 때만)
+        if (IsCurrentMainCharacter())
+        {
+            VoiceManager.Instance.ResetAudio();
+        }
 
         // 쓰다듬기 모션이 있을 경우
         if (HasParameter(_animator, "isPat"))
@@ -90,9 +120,12 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
             }
         }
 
-        // Pick 상태 전환시의 음성 재생
-        Dialogue pick = DialogueManager.Instance.GetRandomPick();
-        VoiceManager.Instance.PlayAudioFromPath(pick.filePath);  // 음성 재생
+        // Pick 상태 전환시의 음성 재생 (메인 캐릭터일 때만)
+        if (IsCurrentMainCharacter())
+        {
+            Dialogue pick = DialogueManager.Instance.GetRandomPick();
+            VoiceManager.Instance.PlayAudioFromPath(pick.filePath);  // 음성 재생
+        }
         StatusManager.Instance.IsDragging = true;
 
         // Blend 애니메이션 체크
@@ -117,7 +150,11 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
     {
         if (eventData.button != PointerEventData.InputButton.Left) return; // 좌클릭이 아닐 경우 무시
 
-        VoiceManager.Instance.StopAudio();  // 음성 종료
+        // 음성 종료 (메인 캐릭터일 때만)
+        if (IsCurrentMainCharacter())
+        {
+            VoiceManager.Instance.StopAudio();
+        }
         StatusManager.Instance.IsDragging = false;
         _animator.SetBool("isPick", false);
 
@@ -182,9 +219,23 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
         // 얼굴 표정 정도 변경
         EmotionManager.Instance.ShowEmotion("><");
 
-        // 음성재생
-        Dialogue pat = DialogueManager.Instance.GetRandomPat();
-        VoiceManager.Instance.PlayAudioFromPath(pat.filePath);
+        // 음성재생 (메인 캐릭터일 때만)
+        if (IsCurrentMainCharacter())
+        {
+            Dialogue pat = DialogueManager.Instance.GetRandomPat();
+            VoiceManager.Instance.PlayAudioFromPath(pat.filePath);
+        }
+    }
+
+    // 현재 캐릭터가 메인 캐릭터인지 확인
+    private bool IsCurrentMainCharacter()
+    {
+        // 이 DragHandler가 속한 캐릭터가 현재 메인 캐릭터와 같은지 확인
+        GameObject currentMainCharacter = CharManager.Instance?.GetCurrentCharacter();
+        if (currentMainCharacter == null) return false;
+        
+        // transform.parent가 캐릭터 오브젝트
+        return transform.parent != null && transform.parent.gameObject == currentMainCharacter;
     }
 
     // animator의 유틸성 함수
