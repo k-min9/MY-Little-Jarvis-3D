@@ -51,6 +51,8 @@ public class LanguageManager : MonoBehaviour
     public Text settingsGeneralShowChatBoxOnClickLabel;
     public Text settingsGeneralShowTutorialOnChat;
     public Text settingsGeneralStartServerOnInit;
+    public Text settingsGeneralIsSTTServer;
+    public Text settingsGeneralEnableEditionUpdateNotice;
     public Text settingsCharApplyGravity;
     public Text settingsCharWindowsCollision;
     public Text settingsCharStartWithLastChar;
@@ -109,6 +111,8 @@ public class LanguageManager : MonoBehaviour
         settingsGeneralShowChatBoxOnClickLabel.text = LanguageData.Translate(settingsGeneralShowChatBoxOnClickLabel.text, targetLang);
         settingsGeneralShowTutorialOnChat.text = LanguageData.Translate(settingsGeneralShowTutorialOnChat.text, targetLang);
         settingsGeneralStartServerOnInit.text = LanguageData.Translate(settingsGeneralStartServerOnInit.text, targetLang);
+        settingsGeneralIsSTTServer.text = LanguageData.Translate(settingsGeneralIsSTTServer.text, targetLang);
+        settingsGeneralEnableEditionUpdateNotice.text = LanguageData.Translate(settingsGeneralEnableEditionUpdateNotice.text, targetLang);
         settingsCharApplyGravity.text = LanguageData.Translate(settingsCharApplyGravity.text, targetLang);
         settingsCharWindowsCollision.text = LanguageData.Translate(settingsCharWindowsCollision.text, targetLang);
         settingsCharStartWithLastChar.text = LanguageData.Translate(settingsCharStartWithLastChar.text, targetLang);
