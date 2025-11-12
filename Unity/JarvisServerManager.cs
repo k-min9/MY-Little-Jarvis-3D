@@ -22,6 +22,7 @@ public class JarvisServerManager : MonoBehaviour
 
     private const int ServerPort = 5000;
     private Process jarvisProcess;  // 실행된 서버 프로세스를 저장할 변수
+    private int llmProcessPid = -1;  // LLM 서버 프로세스 PID
 
     private void Awake()
     {
@@ -29,9 +30,7 @@ public class JarvisServerManager : MonoBehaviour
         // 자동 시작 제거 - InstallStatusManager에서 수동으로 호출
     }
 
-    /// <summary>
-    /// InstallStatusManager에서 호출할 초기화 함수
-    /// </summary>
+    // InstallStatusManager에서 호출할 초기화 함수
     public void InitializeForLiteOrFull()
     {
 #if !UNITY_EDITOR
@@ -177,28 +176,67 @@ public class JarvisServerManager : MonoBehaviour
         UnityEngine.Debug.Log("[Jarvis] CheckHealth() end");
     }
 
+    // 서버 로드 후 받아온 LLM PID 정보를 저장
+    public void SetProcessInfo(int llm_process_pid)
+    {
+        llmProcessPid = llm_process_pid;
+        UnityEngine.Debug.Log($"[Jarvis] Process info stored - LLM Process PID: {llmProcessPid}");
+    }
+
+    // PID로 프로세스를 종료하는 헬퍼 메서드
+    private void KillProcessByPid(int pid, string processName)
+    {
+        if (pid <= 0) return;
+
+        try
+        {
+            Process process = Process.GetProcessById(pid);
+            if (process != null && !process.HasExited)
+            {
+                process.Kill();
+                UnityEngine.Debug.Log($"[Jarvis] {processName} process (PID: {pid}) killed successfully");
+            }
+        }
+        catch (System.ArgumentException)
+        {
+            UnityEngine.Debug.Log($"[Jarvis] {processName} process (PID: {pid}) already terminated");
+        }
+        catch (System.Exception e)
+        {
+            UnityEngine.Debug.LogWarning($"[Jarvis] Failed to kill {processName} process (PID: {pid}): {e.Message}");
+        }
+    }
+
     // /shutdown 방식 vs Process 직접 종료에서 후자 선택
     public void ShutdownServer()
     {
         UnityEngine.Debug.Log("[Jarvis] ShutdownServer() start");
 
+        // 1. jarvisProcess 종료
         if (jarvisProcess != null && !jarvisProcess.HasExited)
         {
             try
             {
                 jarvisProcess.Kill();
-                StatusManager.Instance.IsServerConnected = false;
-                UnityEngine.Debug.Log("[Jarvis] Server process killed - StatusManager 업데이트");
+                UnityEngine.Debug.Log("[Jarvis] Main server process killed");
             }
-            catch
+            catch (System.Exception e)
             {
-                UnityEngine.Debug.LogWarning("[Jarvis] Failed to kill process.");
+                UnityEngine.Debug.LogWarning($"[Jarvis] Failed to kill main process: {e.Message}");
             }
         }
         else
         {
-            UnityEngine.Debug.Log("[Jarvis] No running server process to kill.");
+            UnityEngine.Debug.Log("[Jarvis] No running main server process to kill.");
         }
+
+        // 2. LLM 프로세스 종료
+        KillProcessByPid(llmProcessPid, "LLM");
+
+        // 3. StatusManager 업데이트 및 PID 초기화
+        StatusManager.Instance.IsServerConnected = false;
+        llmProcessPid = -1;
+        UnityEngine.Debug.Log("[Jarvis] All processes terminated - StatusManager 업데이트");
 
         UnityEngine.Debug.Log("[Jarvis] ShutdownServer() end");
     }
