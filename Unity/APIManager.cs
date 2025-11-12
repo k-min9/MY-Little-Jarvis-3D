@@ -965,6 +965,13 @@ public class APIManager : MonoBehaviour
         string model_name_Gemini = SettingManager.Instance.settings.model_name_Gemini ?? "";
         string model_name_OpenRouter = SettingManager.Instance.settings.model_name_OpenRouter ?? "";
         string model_name_ChatGPT = SettingManager.Instance.settings.model_name_ChatGPT ?? "";
+        
+        // Custom 모델명 (설정값 또는 현재 UI 상태 기반 조회)
+        // - 드롭다운 선택 시: ModelDataCustom.ModelOptions[index].Id
+        // - 직접 입력 시: InputField 텍스트
+        string model_name_Custom = SettingManager.Instance.GetCurrentCustomModelName();
+        
+        string server_local_mode = SettingManager.Instance.settings.server_local_mode ?? "GPU";
 
         // 요청 데이터 구성
         var requestData = new Dictionary<string, string>
@@ -994,6 +1001,8 @@ public class APIManager : MonoBehaviour
             { "model_name_Gemini", model_name_Gemini},
             { "model_name_OpenRouter", model_name_OpenRouter},
             { "model_name_ChatGPT", model_name_ChatGPT},
+            { "model_name_Custom", model_name_Custom},
+            { "server_local_mode", server_local_mode}
         };
 
         await FetchStreamingData(streamUrl, requestData);
@@ -1160,7 +1169,35 @@ public class APIManager : MonoBehaviour
             {
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
-                    Debug.Log($"Model loaded successfully: {modelFileName} ({serverLocalMode})");
+                    // 응답 본문 읽기
+                    using (Stream responseStream = response.GetResponseStream())
+                    using (StreamReader reader = new StreamReader(responseStream))
+                    {
+                        string responseText = await reader.ReadToEndAsync();
+                        Debug.Log($"Model loaded successfully: {modelFileName} ({serverLocalMode})");
+                        Debug.Log($"Response: {responseText}");
+
+                        try
+                        {
+                            // JSON 파싱하여 process_info 추출
+                            var jsonResponse = JObject.Parse(responseText);
+                            if (jsonResponse["process_info"] != null)
+                            {
+                                int llmProcessPid = jsonResponse["process_info"]["llm_process_pid"]?.ToObject<int>() ?? -1;
+                                
+                                // JarvisServerManager에 PID 정보 저장
+                                if (llmProcessPid > 0)
+                                {
+                                    JarvisServerManager.Instance.SetProcessInfo(llmProcessPid);
+                                    Debug.Log($"LLM Process PID saved: {llmProcessPid}");
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.LogWarning($"Failed to parse process_info: {ex.Message}");
+                        }
+                    }
                 }
                 else
                 {
