@@ -16,9 +16,10 @@
 ## Tab - Contents
 
 - General
-  - PlayerName : AI에 실제 사용하는 이름
-  - Platform(D) : PC / Android / Extra
   - Language(D) : 한국어 / 日本語 / English
+  - Platform(D) : PC / Android / Extra
+  - Edition(D) : Sample / Lite / Full
+    - TutorialBtn(B) : 
   - AlwaysOnTop(T) : 항상 위에 표시
   - ShowChatBoxOnClick(T) : 클릭시 채팅창 표시
   - ShowTutorialOnChat(T)
@@ -51,10 +52,15 @@
   - KeyTest(B)
   - ServerModeType(D) : CPU/GPU
     - Not Using
-- AI
+- Conversation
+  - PlayerName : AI에 실제 사용하는 이름
   - Check Server(B) : Fail / Local / Ngrok / LocalTunnel
-  - Status : Sample / Lite / Full
-  - AI Language : 
+  - Think Language(D) : Normal / Preference / 한국어 / 日本語 / English
+    - Normal : UI Language를 따라감
+    - Preference : AI model이나 상황별로 사용언어 설정(예를 들어 하위 모델은 영어, 상위, 글로벌 모델은 모국어)
+  - Web Search(D) : OFF / ON
+  - Voice Filter(D) : None / Skip AI Voice / User Voice Only
+  - Confirm User's Intent(T) : 유저가 해당의도를 가지고 질문했는지 확인하는 질문을 함
 - Dialogue Info : Debug Info For Last Dialog, Labels Only, Example
   - AI Source : Server
   - AI Model : Meta-Llama-3.1-8B
