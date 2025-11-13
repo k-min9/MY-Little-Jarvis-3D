@@ -10,6 +10,26 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
 
     [SerializeField] public Animator _animator; 
 
+    private void Start()
+    {
+        // 안전망: 필요한 컴포넌트들이 설정되지 않은 경우 자동으로 찾아서 설정
+        InitClickHandler();
+    }
+
+    // 안전망 초기화 메서드 (SubClickHandler 방식 참고)
+    private void InitClickHandler()
+    {
+        // Animator가 설정되지 않은 경우 부모에서 찾아서 설정
+        if (_animator == null)
+        {
+            _animator = this.gameObject.GetComponentInParent<Animator>();
+            if (_animator == null)
+            {
+                Debug.LogWarning($"ClickHandler: Animator를 찾을 수 없습니다. ({gameObject.name})");
+            }
+        }
+    }
+
     public void OnPointerClick(PointerEventData eventData)
     {
         // 드래그 중이나 옵션 설정중일 경우 return
@@ -103,26 +123,28 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
             // 기존 시나리오 실행중일 경우 return 
             if (StatusManager.Instance.isScenario) return;
 
-            // 서버 설치 여부 확인 + PC
-            RuntimePlatform platform = Application.platform;
-            if ((platform == RuntimePlatform.WindowsPlayer || platform == RuntimePlatform.WindowsEditor)
-                && !InstallerManager.Instance.IsJarvisServerInstalled())
-            {
-                ScenarioInstallerManager.Instance.StartInstaller();  //  시나리오 - 설치
-                return;
-            }
-            else if (SettingManager.Instance.settings.isShowTutorialOnChat
-                && !SettingManager.Instance.settings.isTutorialCompleted)  // 시나리오 튜토리얼 실행명령 + 튜토리얼 종료되지 않음
-            {
-                //TODO : 다른 스마트한 방법 찾기
-                ScenarioTutorialManager.Instance.StartTutorial();  // 시나리오 - 튜토리얼
-                return;
-            }
-            else if (!JarvisServerManager.Instance.IsJarvisServerRunning())  // 설치+환경+튜토리얼종료되어있는상태에서 서버가 켜져있지 않다면 기동
+            // // 서버 설치 여부 확인 + PC
+            // RuntimePlatform platform = Application.platform;
+            // if ((platform == RuntimePlatform.WindowsPlayer || platform == RuntimePlatform.WindowsEditor)
+            //     && !InstallerManager.Instance.IsJarvisServerInstalled())
+            // {
+            //     ScenarioInstallerManager.Instance.StartInstaller();  //  시나리오 - 설치
+            //     return;
+            // }
+            // else if (SettingManager.Instance.settings.isShowTutorialOnChat
+            //     && !SettingManager.Instance.settings.isTutorialCompleted)  // 시나리오 튜토리얼 실행명령 + 튜토리얼 종료되지 않음
+            // {
+            //     //TODO : 다른 스마트한 방법 찾기
+            //     ScenarioTutorialManager.Instance.StartTutorial();  // 시나리오 - 튜토리얼
+            //     return;
+            // }
+            else if (!InstallStatusManager.Instance.IsServerRunning())  // 설치+환경+튜토리얼종료되어있는상태에서 서버가 켜져있지 않다면 기동
             {
                 StartCoroutine(ScenarioCommonManager.Instance.Scenario_C02_AskToStartServer());
                 // JarvisServerManager.Instance.RunJarvisServerWithCheck();
             }
+
+            return; // 일단은 대기
         }
         else // 정상대화
         {

@@ -40,6 +40,18 @@ public class ScenarioCommonManager : MonoBehaviour
                     StartCoroutine(Scenario_C02_2_DeclineStart());
                 }
                 break;
+            case "C98_confirm_return_to_default_proceed_check":
+                // <네>
+                if (index == 0)
+                {
+                    SettingManager.Instance.ReturnToDefaultValues();
+                }
+                // <아니오>
+                else
+                {
+                    StartCoroutine(Scenario_C98_1_Decline_ReturnToDefault());
+                }
+                break;
             default:
                 Debug.LogWarning("정의되지 않은 시나리오 선택 분기");
                 break;
@@ -76,7 +88,7 @@ public class ScenarioCommonManager : MonoBehaviour
         ScenarioUtil.ShowEmotion("star");
         yield return new WaitForSeconds(d1);
 
-        JarvisServerManager.Instance.RunJarvisServerWithCheck();  // 서버 기동
+        InstallStatusManager.Instance.RunServerWithCheck();  // 서버 기동
     }
 
     // <아니오> 선택 시
@@ -98,6 +110,13 @@ public class ScenarioCommonManager : MonoBehaviour
         yield return new WaitForSeconds(d1);
     }
 
+    public IEnumerator Run_C90_unavailable_edition()
+    {
+        float d1 = ScenarioUtil.Narration("C90_unavailable_edition", "현재 에디션에서는 사용할 수 없는 설정이에요.");
+        ScenarioUtil.ShowEmotion("confused");
+        yield return new WaitForSeconds(d1);
+    }
+
     public IEnumerator Run_C90_recommend_lite()
     {
         float d1 = ScenarioUtil.Narration("C90_recommend_lite", "Lite 이상의 Edition을 설치하시면 이용하실 수 있어요, 선생님.");
@@ -110,6 +129,39 @@ public class ScenarioCommonManager : MonoBehaviour
         float d1 = ScenarioUtil.Narration("C90_recommend_full", "Full 이상의 Edition을 설치하시면 이용하실 수 있어요, 선생님.");
         ScenarioUtil.ShowEmotion("smile");
         yield return new WaitForSeconds(d1);
+    }
+
+    public IEnumerator Run_C90_offer_guide()
+    {
+        float d1 = ScenarioUtil.Narration("C90_offer_guide", "관련 정보가 있는 곳으로 안내해드릴까요, 선생님?");
+        ScenarioUtil.ShowEmotion("neutral");
+        yield return new WaitForSeconds(d1);
+    }
+
+    // 통합 : Run_C90_unavailable_edition + Run_C90_recommend_lite
+    public IEnumerator Run_C90_unavailable_edition_recommend_lite()
+    {
+        yield return Run_C90_unavailable_edition();
+        yield return Run_C90_recommend_lite();
+
+        // edition update suggestion 설정 확인 후 > 설치 manager 호출
+        if (SettingManager.Instance.settings.enableEditionUpdateSuggestion)
+        {
+            ScenarioInstallerManager.Instance.StartInstaller();
+        }
+    }
+
+    // 통합 : Run_C90_unavailable_edition + Run_C90_recommendfull
+    public IEnumerator Run_C90_unavailable_edition_recommend_full()
+    {
+        yield return Run_C90_unavailable_edition();
+        yield return Run_C90_recommend_full();
+
+        // edition update suggestion 설정 확인 후 > 설치 manager 호출
+        if (SettingManager.Instance.settings.enableEditionUpdateSuggestion)
+        {
+            ScenarioInstallerManager.Instance.StartInstaller();
+        }
     }
 
     // C91 - API/Quota/모델 안내
@@ -133,6 +185,34 @@ public class ScenarioCommonManager : MonoBehaviour
         ScenarioUtil.ShowEmotion("sad");
         yield return new WaitForSeconds(d1);
     }
+
+    // C98 - 진행 확인(설정 초기화, Return To Default)
+    public IEnumerator Run_C98_confirm_return_to_default_proceed()
+    {
+        // 첫 번째 멘트: 진행 여부 확인
+        float d1 = ScenarioUtil.Narration("C98_confirm_return_to_default_proceed", "정말 진행하시겠어요?");
+        ScenarioUtil.ShowEmotion("question");
+        yield return new WaitForSeconds(d1);
+
+        yield return new WaitForSeconds(0.2f);
+        ChoiceManager.Instance.ShowChoice(2, "C98_confirm_return_to_default_proceed_check");  // YES, NO
+    }
+
+    // <네> 선택 시 - ReturnToDefaultValues에서 호출됨
+    public IEnumerator Scenario_C98_1_Approve_ReturnToDefault()
+    {
+        float d1 = ScenarioUtil.Narration("A99_config_end_1", "설정이 완료되었어요, 선생님!");  // 기존 문장 사용
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
+        yield return new WaitForSeconds(d1);
+    }
+
+    // <아니오> 선택 시
+    public IEnumerator Scenario_C98_1_Decline_ReturnToDefault()
+    {
+        float d1 = ScenarioUtil.Narration("A98_config_cancel_2", "필요하실 땐 언제든지 다시 설정하실 수 있어요.");  // 기존 문장 사용
+        yield return new WaitForSeconds(d1);
+    }
+
 
     // C99 - 준비/안내
     public IEnumerator Run_C99_not_ready_1()
@@ -170,31 +250,4 @@ public class ScenarioCommonManager : MonoBehaviour
         yield return new WaitForSeconds(d2);
     }
 
-    // 통합 : Run_C90_unavailable_setting + Run_C90_recommend_lite
-    public IEnumerator Run_C90_unavailable_setting_recommend_lite()
-    {
-        float d1 = ScenarioUtil.Narration("C90_unavailable_setting", "현재 버전에서는 사용할 수 없는 설정이에요.");
-        ScenarioUtil.ShowEmotion("confused");
-        yield return new WaitForSeconds(d1);
-
-        float d2 = ScenarioUtil.Narration("C90_recommend_lite", "Lite 이상의 Edition을 설치하시면 이용하실 수 있어요, 선생님.");
-        ScenarioUtil.ShowEmotion("smile");
-        yield return new WaitForSeconds(d2);
-
-        // 이후 Lite 버전 설치 안내 시나리오 띄울지 고민
-    }
-
-    // 통합 : Run_C90_unavailable_setting + Run_C90_recommendfull
-    public IEnumerator Run_C90_unavailable_setting_recommend_full()
-    {
-        float d1 = ScenarioUtil.Narration("C90_unavailable_setting", "현재 버전에서는 사용할 수 없는 설정이에요.");
-        ScenarioUtil.ShowEmotion("confused");
-        yield return new WaitForSeconds(d1);
-
-        float d2 = ScenarioUtil.Narration("C90_recommend_full", "Full 이상의 Edition을 설치하시면 이용하실 수 있어요, 선생님.");
-        ScenarioUtil.ShowEmotion("smile");
-        yield return new WaitForSeconds(d2);
-
-        // 이후 Full 버전 설치 안내 시나리오 띄울지 고민
-    }
 }

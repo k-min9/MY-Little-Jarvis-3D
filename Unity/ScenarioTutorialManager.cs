@@ -212,13 +212,18 @@ public class ScenarioTutorialManager : MonoBehaviour
                 }
                 break;
             case "A04_2_api_key_input":
-                if (index >= 0 && index <= 2-1)  // 0: Gemini, 1: OpenRouter,  TODO :  2: ChatGPT
+                if (index >= 0 && index <= 2-2)  // 0: Gemini, TODO : 1: OpenRouter, 2: ChatGPT
                 {
                     // API 타입 문자열 매핑
                     string[] apiTypes = { "gemini", "openrouter", "chatgpt" };
                     string selectedApiType = apiTypes[index];
 
                     ChoiceInputManager.Instance.ShowInput(selectedApiType);
+                }
+                else if (index >= 0 && index <= 2-1)  // TODO : 1: OpenRouter, 2: ChatGPT
+                {
+                    // 다음 버전에 패치할게요.+ 모델을 골라주세요.
+                    StartCoroutine(Scenario_A04_2_APIKeyInput_NextVersion());
                 }
                 else
                 {
@@ -531,7 +536,7 @@ public class ScenarioTutorialManager : MonoBehaviour
     {
         // lite 버전이면 return
         
-
+        // TODO : 수정필요. Lite 이상이어야 Local 바꿈
         // servertype을 server로 변경
         SettingManager.Instance.SetServerTypeByValue(1);
 
@@ -683,6 +688,9 @@ public class ScenarioTutorialManager : MonoBehaviour
         // 무료서버의향 = true 저장
         SettingManager.Instance.settings.wantFreeServer = true;
         SettingManager.Instance.SaveSettings();
+
+        // 튜토리얼 종료        
+        EndTutorial();
     }
 
     public IEnumerator Scenario_A04_2_APIKeyInput()
@@ -693,6 +701,14 @@ public class ScenarioTutorialManager : MonoBehaviour
 
         yield return new WaitForSeconds(0.2f);
         ChoiceManager.Instance.ShowChoice(3, "A04_2_api_key_input");  // <Gemini>, <OpenRouter>, <전 선택지로>, //TODO : <ChatGPT>
+    }
+
+     // 다음 버전에 패치할게요.+ 모델을 골라주세요.
+    public IEnumerator Scenario_A04_2_APIKeyInput_NextVersion()
+    {
+        yield return StartCoroutine(ScenarioCommonManager.Instance.Run_C99_NotReady());
+        yield return StartCoroutine(Scenario_A04_2_APIKeyInput());
+
     }
     /////////////////////////////////// A97 ///////////////////////////////////////////////
     private int lastTriedIndex = -1;
