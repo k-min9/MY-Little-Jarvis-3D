@@ -121,6 +121,22 @@ public static class ChoiceData
             }
         },
         {
+            "S00_change_model", new List<Dictionary<string, string>>
+            {
+                new Dictionary<string, string> { { "ko", "멀티모달 모델로 변경" }, { "jp", "マルチモーダルモデルに変更" }, { "en", "Change to multimodal model" } },
+                new Dictionary<string, string> { { "ko", "이미지 없이 계속" }, { "jp", "画像なしで続ける" }, { "en", "Continue without image" } },
+                new Dictionary<string, string> { { "ko", "취소" }, { "jp", "キャンセル" }, { "en", "Cancel" } }
+            }
+        },
+        {
+            "S01_need_image", new List<Dictionary<string, string>>
+            {
+                new Dictionary<string, string> { { "ko", "예" }, { "jp", "はい" }, { "en", "Yes" } },
+                new Dictionary<string, string> { { "ko", "아니오" }, { "jp", "いいえ" }, { "en", "No" } },
+                new Dictionary<string, string> { { "ko", "이미지 설정을 OFF로 할게" }, { "jp", "画像設定をOFFにする" }, { "en", "Turn off image setting" } }
+            }
+        },
+        {
             "I01_installer_server_type_check_lite", new List<Dictionary<string, string>>
             {
                 new Dictionary<string, string> { { "ko", "Lite (약 2GB)" }, { "jp", "Lite（約2GB）" }, { "en", "Lite (about 2GB)" } },

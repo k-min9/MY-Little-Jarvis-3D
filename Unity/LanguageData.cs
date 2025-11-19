@@ -14,7 +14,8 @@ public static class LanguageData
         new Dictionary<string, string> { { "ko", "클릭 시 채팅창 표시" }, { "jp", "クリック時チャット画面表示" }, { "en", "Show Chatbox on Click" } },
         new Dictionary<string, string> { { "ko", "채팅 시 튜토리얼 표시" }, { "jp", "チャット時にチュートリアル表示" }, { "en", "Show Tutorial On Chat" } },
         new Dictionary<string, string> { { "ko", "기동 시 서버 실행" }, { "jp", "起動時にサーバー実行" }, { "en", "Start Server On Init" } },
-
+        new Dictionary<string, string> { { "ko", "서버 STT 사용(고품질)" }, { "jp", "サーバーSTT使用(高品質)" }, { "en", "Use Server STT(High Quality)" } },
+        new Dictionary<string, string> { { "ko", "에디션 업데이트 제안" }, { "jp", "エディションアップデート提案" }, { "en", "Suggest Edition update" } },
 
         new Dictionary<string, string> { { "ko", "중력 적용" }, { "jp", "重力を適用" }, { "en", "Apply Gravity" } },
         new Dictionary<string, string> { { "ko", "윈도우 충돌" }, { "jp", "ウィンドウ衝突" }, { "en", "Windows Collision" } },
@@ -59,12 +60,16 @@ public static class LanguageData
         new Dictionary<string, string> { { "ko", "스크린샷 결과 보기" }, { "jp", "スクショ結果表示" }, { "en", "Show Screenshot Result" } },
 
         // Talk submenu
-        new Dictionary<string, string> { { "ko", "튜토리얼 시작" }, { "jp", "チュートリアル開始" }, { "en", "Show Tutorial" } },
+        new Dictionary<string, string> { { "ko", "Edition 튜토리얼" }, { "jp", "Editionチュートリアル" }, { "en", "Edition Tutorial" } },
+        new Dictionary<string, string> { { "ko", "Setting 튜토리얼" }, { "jp", "Settingチュートリアル" }, { "en", "Setting Tutorial" } },
         new Dictionary<string, string> { { "ko", "잡담" }, { "jp", "フリートーク" }, { "en", "Idle Talk" } },
+        new Dictionary<string, string> { { "ko", "아로프라 채널" }, { "jp", "アロプラちゃんねる" }, { "en", "AROPLA CHANNEL" } },
 
         // Util submenu
         new Dictionary<string, string> { { "ko", "알람" }, { "jp", "アラーム" }, { "en", "Alarm" } },
         new Dictionary<string, string> { { "ko", "미니게임1" }, { "jp", "ミニゲーム1" }, { "en", "Minigame1" } },
+        new Dictionary<string, string> { { "ko", "실험" }, { "jp", "実験" }, { "en", "Experiment" } },
+        new Dictionary<string, string> { { "ko", "스무고개게임" }, { "jp", "20Qゲーム" }, { "en", "20 Questions Game" } },
 
         // Dev submenu
         new Dictionary<string, string> { { "ko", "디버그" }, { "jp", "デバッグ" }, { "en", "Debug" } },
@@ -76,7 +81,7 @@ public static class LanguageData
         // ToolTip Trigger
         new Dictionary<string, string> { { "ko", "답변에 이미지 사용" }, { "jp", "回答に画像を使用" }, { "en", "Use Image in Answer" } },
         new Dictionary<string, string> { { "ko", "Web에서 검색하기" }, { "jp", "Webで検索する" }, { "en", "Search the Web" } },
-        new Dictionary<string, string> { { "ko", "서버 튜토리얼 시작" }, { "jp", "サーバーチュートリアルを開始" }, { "en", "Start Tutorial For Server" } },
+        new Dictionary<string, string> { { "ko", "Edition 튜토리얼 시작" }, { "jp", "Editionチュートリアルを開始" }, { "en", "Start Tutorial For Edition" } },
 
 
         /// Scenario - Turoial
@@ -171,16 +176,34 @@ public static class LanguageData
         new Dictionary<string, string> { { "ko", "이제 준비가 끝났어요, 선생님. 앞으로 나눌 이야기들이 정말 기대돼요!" }, { "jp", "準備が整いました、先生。これからお話しする内容が本当に楽しみです！" }, { "en", "Now we're all set, Sensei. I'm really looking forward to the conversations we'll have!" } },
 
         /// Scenario - Installer
-        // I01 - 인스톨러 진입 조건
-        new Dictionary<string, string> { { "ko", "선생님. 대화를 위한 기본적인 파일이 설치되어 있지 않아요." }, { "jp", "先生。会話のための基本的なファイルがインストールされていません。" }, { "en", "Sensei. The basic files for conversation are not installed." } },
-        new Dictionary<string, string> { { "ko", "설치를 위한 프로그램을 구동해도 될까요?" }, { "jp", "インストール用のプログラムを起動してもよろしいですか？" }, { "en", "May I run the installation program?" } },
+        // I01 - 인스톨러 진입 조건 (구)
+        // new Dictionary<string, string> { { "ko", "선생님. 대화를 위한 기본적인 파일이 설치되어 있지 않아요." }, { "jp", "先生。会話のための基本的なファイルがインストールされていません。" }, { "en", "Sensei. The basic files for conversation are not installed." } },
+        // new Dictionary<string, string> { { "ko", "설치를 위한 프로그램을 구동해도 될까요?" }, { "jp", "インストール用のプログラムを起動してもよろしいですか？" }, { "en", "May I run the installation program?" } },
 
-        // I01_0 - 버전 설명
-        new Dictionary<string, string> { { "ko", "Lite 버전과 Full 버전 어느쪽으로 설치할까요?" }, { "jp", "LiteバージョンとFullバージョン、どちらをインストールしますか？" }, { "en", "Which version would you like to install: Lite or Full?" } },
-        new Dictionary<string, string> { { "ko", "Lite는 음성 인식 같은 기본 기능만 설치돼요. 연산은 외부 플랫폼에 맡기기 때문에 설치도 빠르고 용량도 가벼워요." }, { "jp", "Liteは音声認識などの基本機能のみをインストールします。演算は外部プラットフォームに任せるので、インストールが速く容量も軽いです。" }, { "en", "Lite only installs basic features like speech recognition. Since computation is handled by an external platform, it's quick to install and lightweight." } },
-        new Dictionary<string, string> { { "ko", "Full은 Lite의 기능이 제공되고, AI 연산도 선생님의 컴퓨터에서 직접 처리해요. 외부 서버 상태에 영향을 받지 않고 안정적인 품질을 기대하실 수 있어요." }, { "jp", "FullはLiteの機能を含み、AIの演算も先生のPCで直接行います。外部サーバーの状態に左右されず、安定した品質が期待できます。" }, { "en", "Full includes all the features of Lite and performs AI computation directly on your PC. You can expect stable quality without relying on external servers." } },
-        new Dictionary<string, string> { { "ko", "그만큼 용량도 크고, 컴퓨터 성능에 따라 답변 속도가 달라질 수 있어요." }, { "jp", "その分、容量が大きくなり、PCの性能によって応答速度が変わることがあります。" }, { "en", "It takes up more space, and response speed may vary depending on your PC's performance." } },
-        new Dictionary<string, string> { { "ko", "두 버전은 나중에 언제든지 바꾸실 수 있으니까, 편하게 골라주세요." }, { "jp", "どちらのバージョンも後からいつでも変更できますので、気軽に選んでくださいね。" }, { "en", "You can switch between versions anytime later, so feel free to choose the one you like." } },
+        // I01_0 - 버전 설명 (구)
+        // new Dictionary<string, string> { { "ko", "Lite 버전과 Full 버전 어느쪽으로 설치할까요?" }, { "jp", "LiteバージョンとFullバージョン、どちらをインストールしますか？" }, { "en", "Which version would you like to install: Lite or Full?" } },
+        // new Dictionary<string, string> { { "ko", "Lite는 음성 인식 같은 기본 기능만 설치돼요. 연산은 외부 플랫폼에 맡기기 때문에 설치도 빠르고 용량도 가벼워요." }, { "jp", "Liteは音声認識などの基本機能のみをインストールします。演算は外部プラットフォームに任せるので、インストールが速く容量も軽いです。" }, { "en", "Lite only installs basic features like speech recognition. Since computation is handled by an external platform, it's quick to install and lightweight." } },
+        // new Dictionary<string, string> { { "ko", "Full은 Lite의 기능이 제공되고, AI 연산도 선생님의 컴퓨터에서 직접 처리해요. 외부 서버 상태에 영향을 받지 않고 안정적인 품질을 기대하실 수 있어요." }, { "jp", "FullはLiteの機能を含み、AIの演算も先生のPCで直接行います。外部サーバーの状態に左右されず、安定した品質が期待できます。" }, { "en", "Full includes all the features of Lite and performs AI computation directly on your PC. You can expect stable quality without relying on external servers." } },
+        // new Dictionary<string, string> { { "ko", "그만큼 용량도 크고, 컴퓨터 성능에 따라 답변 속도가 달라질 수 있어요." }, { "jp", "その分、容量が大きくなり、PCの性能によって応答速度が変わることがあります。" }, { "en", "It takes up more space, and response speed may vary depending on your PC's performance." } },
+        // new Dictionary<string, string> { { "ko", "두 버전은 나중에 언제든지 바꾸실 수 있으니까, 편하게 골라주세요." }, { "jp", "どちらのバージョンも後からいつでも変更できますので、気軽に選んでくださいね。" }, { "en", "You can switch between versions anytime later, so feel free to choose the one you like." } },
+
+        // I00 ~ I01 - Edition 설명 (신)
+        new Dictionary<string, string> { { "ko", "선생님, 안녕하세요." }, { "jp", "先生、こんにちは。" }, { "en", "Hello, Sensei." } },
+        new Dictionary<string, string> { { "ko", "현재 Sample Edition을 사용 중이시네요." }, { "jp", "現在はSample Editionを使用中ですね。" }, { "en", "You’re currently using the Sample Edition." } },
+        new Dictionary<string, string> { { "ko", "현재 Lite Edition을 사용 중이시네요." }, { "jp", "現在はLite Editionを使用中ですね。" }, { "en", "You’re currently using the Lite Edition." } },
+        new Dictionary<string, string> { { "ko", "현재 Full Edition을 사용 중이시네요." }, { "jp", "現在はFull Editionを使用中ですね。" }, { "en", "You’re currently using the Full Edition." } },
+
+        new Dictionary<string, string> { { "ko", "지금보다 더 많은 기능을 사용할 수 있는 상위 Edition을 설치하실 수도 있어요." }, { "jp", "今より多くの機能を使える上位エディションをインストールすることもできますよ。" }, { "en", "You can install a higher Edition that offers more features than your current one." } },
+        new Dictionary<string, string> { { "ko", "이미 모든 기능을 사용하실 수 있는 상태에요!" }, { "jp", "すでにすべての機能をお使いいただける状態です！" }, { "en", "You already have access to all available features!" } },
+
+        new Dictionary<string, string> { { "ko", "설치를 위한 프로그램을 기동할까요? 원하신다면 설치 가능한 Edition들에 대해 간단히 설명드릴수 있어요." }, { "jp", "インストール用のプログラムを起動しましょうか？ ご希望であれば、インストール可能なエディションについて簡単にご説明しますね。" }, { "en", "Shall I start the installation program? If you’d like, I can also explain the available Editions." } },
+        new Dictionary<string, string> { { "ko", "Lite Edition은 Sample Edition에서 다른 캐릭터와 대화할 수 있는 최소 기능만을 추가하여 Full Edition보다 가볍게 이용할 수 있는 edition이에요." }, { "jp", "Lite Editionは、Sample Editionに他のキャラクターと会話できる最小限の機能を追加した、Full Editionより軽量なエディションです。" }, { "en", "Lite Edition adds only the minimal features for talking with other characters, making it lighter than the Full Edition." } },
+        new Dictionary<string, string> { { "ko", "Full Edition은 기존 기능인 음성 인식을 더 높은 품질로도 사용할 수 있고, 화자 인식 같은 추가 기능도 제공되는 edition이에요." }, { "jp", "Full Editionでは、既存の音声認識機能をより高品質に使えるほか、話者認識などの追加機能も利用できます。" }, { "en", "Full Edition allows higher-quality voice recognition and includes extra features such as speaker identification." } },
+        new Dictionary<string, string> { { "ko", "또 저나 프라나짱 외에 다른 캐릭터와 대화하거나 여러 실험적 기능도 써볼 수 있어요!" }, { "jp", "さらに、私やプラナちゃん以外のキャラクターとも会話できたり、さまざまな実験的機能も試せます！" }, { "en", "You can also talk with other characters besides me or Plana-chan, and try several experimental features!" } },
+        new Dictionary<string, string> { { "ko", "그리고 선생님 컴퓨터에서 AI를 직접 구동할 수 있는 기능도 제공돼요." }, { "jp", "そして先生のパソコンでAIを直接実行できる機能もあります。" }, { "en", "It also allows you to run the AI directly on your computer." } },
+        new Dictionary<string, string> { { "ko", "그러면 인터넷 상태와 무관하게 안정적으로 대화할 수 있고, 설정에 따라 검열 없는 대화도 가능해요!" }, { "jp", "そうすれば、インターネット環境に関係なく安定した会話ができて、設定によっては検閲のない会話も可能になります！" }, { "en", "That way, you can have stable conversations regardless of your internet connection, and even enjoy uncensored dialogue depending on your settings!" } },
+        new Dictionary<string, string> { { "ko", "PC 성능이 좋을수록 더 뛰어난 AI 모델도 돌릴 수 있고요." }, { "jp", "PCの性能が高いほど、より高度なAIモデルも動かせますよ。" }, { "en", "The better your PC’s performance, the more advanced AI models you can run." } },
+        new Dictionary<string, string> { { "ko", "설치를 진행해볼까요?" }, { "jp", "インストールを進めましょうか？" }, { "en", "Shall we proceed with the installation?" } },
 
         // I01-1 - 설치 진행
         new Dictionary<string, string> { { "ko", "설치 프로그램을 실행할게요." }, { "jp", "インストールプログラムを実行します。" }, { "en", "I'll run the installation program." } },
@@ -203,6 +226,14 @@ public static class LanguageData
         // C01 - 서버 준비 완료 알림
         new Dictionary<string, string> { { "ko", "선생님, 서버가 준비되었어요!" }, { "jp", "先生、サーバーの準備ができましたよ！" }, { "en", "Sensei, the server is now ready!" }},
 
+        // S01 - 이미지 필요 안내
+        new Dictionary<string, string> { { "ko", "그 대답에는 이미지가 필요해보여요." }, { "jp", "その回答には画像が必要そうです。" }, { "en", "That answer seems to require an image." } },
+        new Dictionary<string, string> { { "ko", "이미지 영역을 설정하거나 클립보드에 이미지를 담아주셔야해요." }, { "jp", "画像領域を設定するか、クリップボードに画像を入れてください。" }, { "en", "You need to set an image area or put an image in the clipboard." } },
+        new Dictionary<string, string> { { "ko", "이미지 영역 설정 창을 열어드릴까요, 선생님?" }, { "jp", "画像領域設定ウィンドウを開いてあげましょうか、先生？" }, { "en", "Shall I open the image area setting window for you, Sensei?" } },
+        new Dictionary<string, string> { { "ko", "잠시만 기다려주세요, 선생님." }, { "jp", "少々お待ちください、先生。" }, { "en", "Please wait a moment, Sensei." } },
+        new Dictionary<string, string> { { "ko", "네 다시 질문해주시는걸 기다리고 있을게요." }, { "jp", "はい、また質問してくださるのを待っています。" }, { "en", "Yes, I'll be waiting for you to ask again." } },
+        new Dictionary<string, string> { { "ko", "네 설정을 바꿀게요 선생님." }, { "jp", "はい、設定を変更しますね、先生。" }, { "en", "Yes, I'll change the settings, Sensei." } },
+
         // C02 - 서버 기동 여부 확인
         new Dictionary<string, string> { { "ko", "선생님, 안녕하세요!" }, { "jp", "先生、こんにちは！" }, { "en", "Hello, Sensei!" } },
         new Dictionary<string, string> { { "ko", "현재 서버를 기동하지 않으셨는데 기동하셔도 괜찮으실까요?" }, { "jp", "現在、サーバーが起動されていませんが、起動してもよろしいですか？" }, { "en", "The server is not currently running. Would you like to start it, Sensei?" } },
@@ -211,13 +242,18 @@ public static class LanguageData
 
         // C90 - 일반 안내
         new Dictionary<string, string> { { "ko", "현재 버전에서는 사용할 수 없는 설정이에요." }, { "jp", "このバージョンでは利用できない設定です。" }, { "en", "This setting is not available in the current version." } },
+        new Dictionary<string, string> { { "ko", "현재 에디션에서는 사용할 수 없는 설정이에요." }, { "jp", "このエディションでは利用できない設定です。" }, { "en", "This edition is not available in the current edition." } },
         new Dictionary<string, string> { { "ko", "Lite 이상의 Edition을 설치하시면 이용하실 수 있어요, 선생님." }, { "jp", "Lite以上のエディションをインストールすればご利用いただけますよ、先生。" }, { "en", "You can use this by installing the Lite edition or higher, Sensei." } },
         new Dictionary<string, string> { { "ko", "Full 이상의 Edition을 설치하시면 이용하실 수 있어요, 선생님." }, { "jp", "Full以上のエディションをインストールすればご利用いただけますよ、先生。" }, { "en", "You can use this by installing the Full edition or higher, Sensei." } },
+        new Dictionary<string, string> { { "ko", "관련 정보가 있는 곳으로 안내해드릴까요, 선생님?" }, { "jp", "関連情報があるページへご案内しましょうか、先生？" }, { "en", "Would you like me to take you to where the related information is, Sensei?" } },
 
         // C91 - API/Quota/모델 안내
         new Dictionary<string, string> { { "ko", "구글에서 개발자에게 제공된 일일 무료 사용량이 이미 모두 소진된 것 같아요." }, { "jp", "Googleが開発者に提供している1日あたりの無料利用枠はすでに使い切られたようです。" }, { "en", "The daily free usage quota provided by Google to developers seems to have already been used up." } },
         new Dictionary<string, string> { { "ko", "API 키를 발급받아 입력하시면 무료 또는 유료 서버와 연결하실 수 있어요." }, { "jp", "APIキーを発行して入力すれば、無料または有料のサーバーに接続できますよ。" }, { "en", "If you obtain and enter an API key, you can connect to either free or paid servers." } },
         new Dictionary<string, string> { { "ko", "구글에서 더 이상 해당 무료 AI 모델을 이용할 수 없는 것 같아요." }, { "jp", "Googleではその無料AIモデルはもう利用できないようです。" }, { "en", "It seems that this free AI model is no longer available from Google." } },
+
+        // C98 - 진행 확인(설정 초기화, Return To Default)
+        new Dictionary<string, string> { { "ko", "정말 진행하시겠어요?" }, { "jp", "本当に続行しますか？" }, { "en", "Do you really want to proceed?" } },
 
         // C99 - 준비/안내
         new Dictionary<string, string> { { "ko", "선생님, 죄송해요 아직 준비가 되지 않았어요..." }, { "jp", "先生、ごめんなさい。まだ準備ができていません..." }, { "en", "Sorry, Sensei... I'm not ready yet." } },

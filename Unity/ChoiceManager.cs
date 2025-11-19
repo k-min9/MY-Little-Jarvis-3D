@@ -110,6 +110,9 @@ public class ChoiceManager : MonoBehaviour
             case string s when s.StartsWith("C"): // Common 시나리오
                 ScenarioCommonManager.Instance.OnChoiceSelected(curChoiceScenario, index);
                 break;
+            case string s when s.StartsWith("S"): // Ask Manager 시나리오
+                ScenarioAskManager.Instance.OnChoiceSelected(curChoiceScenario, index);
+                break;
             default:
                 Debug.LogWarning($"Unknown scenario type: {curChoiceScenario}");
                 break;
