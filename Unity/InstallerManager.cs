@@ -74,14 +74,14 @@ public class InstallerManager : MonoBehaviour
     {
         UnityEngine.Debug.Log("[Installer] RunInstaller() start");
 
-        // 이미 jarvis_server.exe가 있는지 확인
-        if (IsJarvisServerInstalled())
-        {
-            UnityEngine.Debug.Log("[Installer] Jarvis server already installed, skipping installer");
-            // ScenarioInstallerManager에서 이미 설치됨 음성 실행
-            StartCoroutine(ScenarioInstallerManager.Instance.Scenario_I01_3_AlreadyInstalled());
-            return;  // 이미 설치되어 있으면 함수 종료
-        }
+        // TODO : 이미 jarvis_server.exe가 있는지 확인 (Full과 Lite 이름이 동일해서 이 방식은 NG + 재설치여부를 묻는 방식으로 변경필요.)
+        // if (IsJarvisServerInstalled())
+        // {
+        //     UnityEngine.Debug.Log("[Installer] Jarvis server already installed, skipping installer");
+        //     // ScenarioInstallerManager에서 이미 설치됨 음성 실행
+        //     StartCoroutine(ScenarioInstallerManager.Instance.Scenario_I01_3_AlreadyInstalled());
+        //     return;  // 이미 설치되어 있으면 함수 종료
+        // }
 
         // 이미 인스톨러가 실행 중인지 확인
         if (IsInstallerRunning())

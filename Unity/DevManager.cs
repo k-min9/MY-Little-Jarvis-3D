@@ -25,10 +25,10 @@ public class DevManager : MonoBehaviour
 
     private void Awake()
     {
-#if !UNITY_EDITOR
+// #if !UNITY_EDITOR
         // 에디터가 아닌 환경(빌드)에서는 DevManager 비활성화
-        gameObject.SetActive(false);
-#endif
+        // gameObject.SetActive(false);
+// #endif
     }
 
     private void Update()

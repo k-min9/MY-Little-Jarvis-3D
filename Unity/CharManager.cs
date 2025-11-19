@@ -261,7 +261,7 @@ public class CharManager : MonoBehaviour
         // 아로나, 프라나 외의 캐릭터는 Lite 이상부터 가능
         if (index > 2)
         {
-            bool chk = InstallStatusManager.Instance.CheckAndOperateLite();
+            bool chk = InstallStatusManager.Instance.CheckAndOperateFull();
             if (!chk)
             {
                 return;
