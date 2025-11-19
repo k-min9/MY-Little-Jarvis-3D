@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
+using System.Collections.Generic;
 
 public class ScreenshotManager : MonoBehaviour
 {
@@ -72,6 +73,17 @@ public class ScreenshotManager : MonoBehaviour
         backgroundOverlayPanel.SetActive(true); // Activate background
 
         StartCoroutine(SelectArea());
+    }
+
+    // 스크린샷 영역이 설정되었는지 확인
+    public bool IsScreenshotAreaSet()
+    {
+        if (screenshotArea == null) return false;
+        
+        RectTransform panelRectTransform = screenshotArea.GetComponent<RectTransform>();
+        if (panelRectTransform == null) return false;
+        
+        return panelRectTransform.sizeDelta.x > 0 && panelRectTransform.sizeDelta.y > 0;
     }
 
     // public void GetBlueFullScreen()
@@ -186,10 +198,57 @@ public class ScreenshotManager : MonoBehaviour
 
     public void SaveScreenshot()
     {
+        StartCoroutine(SaveScreenshotCoroutine(false));
+    }
+
+    // 저장하고 이미지 보여주기
+    public void SaveAndShowScreenshot()
+    {
+        StartCoroutine(SaveScreenshotCoroutine(true));
+    }
+
+    private IEnumerator SaveScreenshotCoroutine(bool showAfterSave)
+    {
         RectTransform panelRectTransform = screenshotArea.GetComponent<RectTransform>();
 
         if (panelRectTransform.sizeDelta.x > 0 && panelRectTransform.sizeDelta.y > 0)
         {
+            // Char Layer 제외 모드일 경우 GameObject 임시 비활성화
+            List<GameObject> deactivatedObjects = new List<GameObject>();
+            
+            // SettingManager에서 includeCharInScreenshot 설정 조회
+            bool shouldIncludeChar = SettingManager.Instance.settings.includeCharInScreenshot;
+            
+            if (!shouldIncludeChar)
+            {
+                int charLayer = LayerMask.NameToLayer("Char");
+                if (charLayer != -1)
+                {
+                    // 모든 GameObject 중 Char Layer에 속하고 원래 활성화되어 있던 것들만 찾아 비활성화
+                    GameObject[] allObjects = FindObjectsOfType<GameObject>();
+                    foreach (GameObject obj in allObjects)
+                    {
+                        if (obj.layer == charLayer && obj.activeSelf)
+                        {
+                            obj.SetActive(false);
+                            deactivatedObjects.Add(obj);
+                        }
+                    }
+                    Debug.Log($"Char Layer 오브젝트 {deactivatedObjects.Count}개 임시 비활성화");
+                }
+                else
+                {
+                    Debug.LogWarning("'Char' Layer가 존재하지 않습니다.");
+                }
+            }
+            
+            // 렌더링이 화면에 반영될 때까지 대기
+            if (!shouldIncludeChar && deactivatedObjects.Count > 0)
+            {
+                yield return new WaitForEndOfFrame();
+                yield return new WaitForEndOfFrame(); // 추가 프레임 대기로 안정성 확보
+            }
+            
             // 좌상단, 우하단
             Vector2 bottomLeft = new Vector2(
                 panelRectTransform.anchoredPosition.x - panelRectTransform.sizeDelta.x / 2,
@@ -218,9 +277,30 @@ public class ScreenshotManager : MonoBehaviour
                 Directory.CreateDirectory(directory);
             }
             string filePath = Path.Combine(directory, "panel_capture.png");
+            
+            // CaptureDesktopArea 실행
             CaptureDesktopArea((int)x, (int)y, (int)width, (int)height, filePath);  // x, y(좌상단) 기점으로 우하를 width, height 만큼 screenshot
 
+            // 원래 활성화되어 있던 GameObject들만 다시 활성화
+            if (!shouldIncludeChar && deactivatedObjects.Count > 0)
+            {
+                foreach (GameObject obj in deactivatedObjects)
+                {
+                    if (obj != null)
+                    {
+                        obj.SetActive(true);
+                    }
+                }
+                Debug.Log($"Char Layer 오브젝트 {deactivatedObjects.Count}개 재활성화");
+            }
+
             Debug.Log($"Screenshot saved at {filePath}");
+            
+            // 저장 후 이미지 표시 옵션이 활성화된 경우
+            if (showAfterSave)
+            {
+                ShowScreenshotImage();
+            }
         }
         else
         {
@@ -254,6 +334,122 @@ public class ScreenshotManager : MonoBehaviour
         DeleteObject(bitmap);
         DeleteDC(memoryDC);
         ReleaseDC(desktopHwnd, desktopDC);
+    }
+
+    // 메모리에 바로 캡처 (파일 저장 없이)
+    public IEnumerator CaptureScreenshotToMemory(System.Action<byte[]> callback)
+    {
+        RectTransform panelRectTransform = screenshotArea.GetComponent<RectTransform>();
+
+        if (panelRectTransform.sizeDelta.x > 0 && panelRectTransform.sizeDelta.y > 0)
+        {
+            // Char Layer 제외 모드일 경우 GameObject 임시 비활성화
+            List<GameObject> deactivatedObjects = new List<GameObject>();
+            
+            // SettingManager에서 includeCharInScreenshot 설정 조회
+            bool shouldIncludeChar = SettingManager.Instance.settings.includeCharInScreenshot;
+            
+            if (!shouldIncludeChar)
+            {
+                int charLayer = LayerMask.NameToLayer("Char");
+                if (charLayer != -1)
+                {
+                    // 모든 GameObject 중 Char Layer에 속하고 원래 활성화되어 있던 것들만 찾아 비활성화
+                    GameObject[] allObjects = FindObjectsOfType<GameObject>();
+                    foreach (GameObject obj in allObjects)
+                    {
+                        if (obj.layer == charLayer && obj.activeSelf)
+                        {
+                            obj.SetActive(false);
+                            deactivatedObjects.Add(obj);
+                        }
+                    }
+                    Debug.Log($"Char Layer 오브젝트 {deactivatedObjects.Count}개 임시 비활성화");
+                }
+            }
+            
+            // 렌더링이 화면에 반영될 때까지 대기
+            if (!shouldIncludeChar && deactivatedObjects.Count > 0)
+            {
+                yield return new WaitForEndOfFrame();
+                yield return new WaitForEndOfFrame();
+            }
+            
+            // 좌상단, 우하단 계산
+            Vector2 bottomLeft = new Vector2(
+                panelRectTransform.anchoredPosition.x - panelRectTransform.sizeDelta.x / 2,
+                panelRectTransform.anchoredPosition.y + panelRectTransform.sizeDelta.y / 2
+            );
+
+            Vector2 topRight = new Vector2(
+                panelRectTransform.anchoredPosition.x + panelRectTransform.sizeDelta.x / 2,
+                panelRectTransform.anchoredPosition.y - panelRectTransform.sizeDelta.y / 2
+            );
+
+            // Local -> Windows 좌표 변환
+            Vector2 start = ConvertUnityPosToWinpos(bottomLeft);
+            Vector2 end = ConvertUnityPosToWinpos(topRight);
+
+            // 최종 캡처 영역 계산
+            float x = start.x;
+            float y = Screen.height - start.y;
+            int width = (int)(end.x - start.x);
+            int height = (int)(start.y - end.y);
+            Debug.Log("capture to memory:"+x+"/"+y+"/"+width+"/"+height);
+            
+            // 메모리에 캡처
+            byte[] imageBytes = CaptureDesktopAreaToMemory((int)x, (int)y, width, height);
+            
+            // 원래 활성화되어 있던 GameObject들만 다시 활성화
+            if (!shouldIncludeChar && deactivatedObjects.Count > 0)
+            {
+                foreach (GameObject obj in deactivatedObjects)
+                {
+                    if (obj != null)
+                    {
+                        obj.SetActive(true);
+                    }
+                }
+                Debug.Log($"Char Layer 오브젝트 {deactivatedObjects.Count}개 재활성화");
+            }
+            
+            callback?.Invoke(imageBytes);
+        }
+        else
+        {
+            Debug.LogWarning("Screenshot area not set.");
+            callback?.Invoke(null);
+        }
+    }
+
+    // 메모리에 직접 캡처하는 메서드
+    private byte[] CaptureDesktopAreaToMemory(int x, int y, int width, int height)
+    {
+        IntPtr desktopHwnd = GetDesktopWindow();
+        IntPtr desktopDC = GetWindowDC(desktopHwnd);
+        IntPtr memoryDC = CreateCompatibleDC(desktopDC);
+        IntPtr bitmap = CreateCompatibleBitmap(desktopDC, width, height);
+        IntPtr oldBitmap = SelectObject(memoryDC, bitmap);
+
+        BitBlt(memoryDC, 0, 0, width, height, desktopDC, x, y, SRCCOPY);
+
+        byte[] imageBytes = null;
+        using (System.Drawing.Bitmap bmp = System.Drawing.Bitmap.FromHbitmap(bitmap))
+        {
+            using (MemoryStream ms = new MemoryStream())
+            {
+                bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                imageBytes = ms.ToArray();
+            }
+        }
+
+        // Clean up
+        SelectObject(memoryDC, oldBitmap);
+        DeleteObject(bitmap);
+        DeleteDC(memoryDC);
+        ReleaseDC(desktopHwnd, desktopDC);
+
+        return imageBytes;
     }
 
     // Function to set the transparency of a panel

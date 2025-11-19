@@ -13,7 +13,8 @@ public class Conversation
     public string message_trans; // 기존 호환성 유지용 필드
     
     // 새로운 확장 필드들
-    public string role;         // 역할 (user, assistant, system) - 새로운 구조에서만 사용
+    public string role;         // 역할 (user, assistant, system)
+    public string type;         // 타입 ("conversation": 일반 대화, "system": 시스템 메시지/트리거/intent)
     public string messageKo;    // 한국어 메시지
     public string messageJp;    // 일본어 메시지  
     public string messageEn;    // 영어 메시지
@@ -72,24 +73,27 @@ public class MemoryManager : MonoBehaviour
         }
 
         string targetFile = string.IsNullOrEmpty(filename) ? GetFileName() : filename;
-        List<Conversation> data = GetAllConversationMemory(filename);
+        List<Conversation> data = GetAllMemory(filename);
 
         data.Add(new Conversation
         {
             speaker = speaker,
             message = message,
-            message_trans = messageTrans
+            message_trans = messageTrans,
+            type = "conversation"
         });
 
         string json = JsonConvert.SerializeObject(data, Formatting.Indented);
         File.WriteAllText(targetFile, json);
+        
+        RefreshChatHistoryIfActive();
     }
     
     // 확장된 대화 저장 (새로운 구조)
     public void SaveConversationMemory(string speaker, string role, string message, string messageKo, string messageJp, string messageEn, string filename = null)
     {
         string targetFile = string.IsNullOrEmpty(filename) ? GetFileName() : filename;
-        List<Conversation> data = GetAllConversationMemory(filename);
+        List<Conversation> data = GetAllMemory(filename);
 
         data.Add(new Conversation
         {
@@ -100,15 +104,53 @@ public class MemoryManager : MonoBehaviour
             messageKo = messageKo,
             messageJp = messageJp,
             messageEn = messageEn,
+            type = "conversation",
             timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
         });
 
         string json = JsonConvert.SerializeObject(data, Formatting.Indented);
         File.WriteAllText(targetFile, json);
+        
+        RefreshChatHistoryIfActive();
     }
 
-    // 모든 대화 불러오기
-    public List<Conversation> GetAllConversationMemory(string filename = null)
+    // 시스템 메시지 저장 (트리거, intent ask 등)
+    public void SaveSystemMemory(string speaker, string role, string message, string messageKo, string messageJp, string messageEn, string filename = null)
+    {
+        string targetFile = string.IsNullOrEmpty(filename) ? GetFileName() : filename;
+        List<Conversation> data = GetAllMemory(filename);
+
+        data.Add(new Conversation
+        {
+            speaker = speaker,
+            role = role,
+            message = message,
+            message_trans = message,
+            messageKo = messageKo,
+            messageJp = messageJp,
+            messageEn = messageEn,
+            type = "system",
+            timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+        });
+
+        string json = JsonConvert.SerializeObject(data, Formatting.Indented);
+        File.WriteAllText(targetFile, json);
+        
+        RefreshChatHistoryIfActive();
+    }
+
+    // chatHistory가 활성화되어 있을 때만 채팅 이력 자동 갱신 
+    private void RefreshChatHistoryIfActive()
+    {
+        if (UIManager.Instance.chatHistory.activeSelf)
+        {
+            UIChatHistoryManager uIChatHistoryManager = UIManager.Instance.chatHistory.GetComponent<UIChatHistoryManager>();
+            uIChatHistoryManager.LoadChatHistory();
+        }
+    }
+
+    // 모든 메모리 불러오기 (필터링 없음 - 시스템 메시지 포함)
+    public List<Conversation> GetAllMemory(string filename = null)
     {
         string fileName = string.IsNullOrEmpty(filename) ? GetFileName() : filename;
         if (!File.Exists(fileName))
@@ -118,6 +160,15 @@ public class MemoryManager : MonoBehaviour
 
         string json = File.ReadAllText(fileName);
         return JsonConvert.DeserializeObject<List<Conversation>>(json) ?? new List<Conversation>();
+    }
+
+    // 모든 대화 불러오기 (type="conversation"만 반환)
+    public List<Conversation> GetAllConversationMemory(string filename = null)
+    {
+        var allData = GetAllMemory(filename);
+        
+        // type이 null이거나 "conversation"인 것만 반환 (기존 호환성)
+        return allData.Where(c => string.IsNullOrEmpty(c.type) || c.type == "conversation").ToList();
     }
 
     // 최신 대화 가져오기
@@ -213,30 +264,5 @@ public class MemoryManager : MonoBehaviour
                 _ => !string.IsNullOrEmpty(m.message)
             };
         }).ToList();
-    }
-    
-    // 특정 발화자의 메시지만 가져오기
-    public List<Conversation> GetMessagesBySpeaker(string speaker, string filename = null)
-    {
-        var memories = GetAllConversationMemory(filename);
-        return memories.Where(m => m.speaker == speaker).ToList();
-    }
-    
-    // 특정 역할의 메시지만 가져오기
-    public List<Conversation> GetMessagesByRole(string role, string filename = null)
-    {
-        var memories = GetAllConversationMemory(filename);
-        return memories.Where(m => !string.IsNullOrEmpty(m.role) && m.role == role).ToList();
-    }
-    
-    // 메모리 통계 정보
-    public (int user, int assistant, int system, int total) GetMemoryStats(string filename = null)
-    {
-        var memories = GetAllConversationMemory(filename);
-        int userCount = memories.Count(m => !string.IsNullOrEmpty(m.role) && m.role == "user");
-        int assistantCount = memories.Count(m => !string.IsNullOrEmpty(m.role) && m.role == "assistant");
-        int systemCount = memories.Count(m => !string.IsNullOrEmpty(m.role) && m.role == "system");
-        
-        return (userCount, assistantCount, systemCount, memories.Count);
     }
 }
