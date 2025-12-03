@@ -25,6 +25,9 @@ public class APIManager : MonoBehaviour
     private bool isResponsedStarted = false; // 첫 반환이 돌아왔는지 여부
     private bool isAnswerStarted = false; // 첫 대답이 시작했는지 여부
     private string logFilePath; // 로그 파일 경로
+    
+    // 스크린샷 전송 방식 (true: 캡처→전송→저장, false: 기존 파일 전송)
+    private bool isSendScreenshotFirst = true;
 
     // 서버 관련
     public string ngrokUrl = null;  // 없으면 없는데로 오케이
@@ -170,6 +173,7 @@ public class APIManager : MonoBehaviour
             {
                 string line;
                 int curChatIdxNum = int.TryParse(resolvedChatIdx, out var tmpIdx) ? tmpIdx : -1;
+                string currentMemoryType = "conversation"; // 응답 타입 추적
                 while ((line = await reader.ReadLineAsync()) != null)
                 {
                     if (string.IsNullOrEmpty(line)) continue;
@@ -199,6 +203,29 @@ public class APIManager : MonoBehaviour
                             else if (replyType == "webSearch")
                             {
                                 NoticeManager.Instance.Notice("webSearch");
+                            }
+                            else if (replyType == "asking_intent")
+                            {
+                                // 시스템 메시지로 저장
+                                currentMemoryType = "system";
+                                
+                                // intent_info 확인
+                                string intentInfo = jsonObject["intent_info"]?.ToString() ?? "";
+                                if (intentInfo == "change_model")
+                                {
+                                    // 멀티모달 모델 변경 시나리오 시작
+                                    StartCoroutine(ScenarioAskManager.Instance.Scenario_S00_AskChangeModel());
+                                }
+                                else if (intentInfo == "no_image")
+                                {
+                                    // 이미지 필요 시나리오 시작
+                                    StartCoroutine(ScenarioAskManager.Instance.Scenario_S01_AskNeedImage());
+                                }
+                            }
+                            else if (replyType == "trigger")
+                            {
+                                // 시스템 메시지로 저장
+                                currentMemoryType = "system";
                             }
                             else // reply
                             {
@@ -281,7 +308,16 @@ public class APIManager : MonoBehaviour
 
                 if (resolvedChatIdx == GameManager.Instance.chatIdxSuccess)
                 {
-                    OnFinalResponseReceived();
+                    // asking_intent나 trigger의 경우 실제 reply가 없으므로 메모리 저장하지 않음
+                    // 시스템 메시지는 ScenarioUtil.Narration이나 선택지에서 이미 저장됨
+                    if (currentMemoryType != "system")
+                    {
+                        OnFinalResponseReceived();
+                    }
+                    else
+                    {
+                        Debug.Log("Skipping OnFinalResponseReceived for system type (asking_intent/trigger)");
+                    }
                 }
             }
         }
@@ -549,6 +585,123 @@ public class APIManager : MonoBehaviour
         File.AppendAllText(logFilePath, $"{DateTime.Now}: {message}\n");
     }
 
+    // 이미지를 multipart/form-data 요청에 첨부하고 last_send_image.png로 저장
+    private void AttachImageToRequest(StreamWriter writer, MemoryStream memStream, string boundary, byte[] screenshotBytes)
+    {
+        string sourceFilePath = null; // 파일 경로 추적 (파일에서 읽은 경우)
+        byte[] sentImageBytes = null; // 메모리에서 온 경우의 바이트 추적
+        
+        // 이미지 파일 추가 (screenshotBytes가 있으면 사용, 없으면 기존 파일 확인)
+        if (screenshotBytes != null && screenshotBytes.Length > 0)
+        {
+            Debug.Log($"Sending screenshot from memory: {screenshotBytes.Length} bytes");
+            sentImageBytes = screenshotBytes;
+            
+            // 메모리에서 직접 전송
+            writer.WriteLine($"--{boundary}");
+            writer.WriteLine($"Content-Disposition: form-data; name=\"image\"; filename=\"panel_capture.png\"");
+            writer.WriteLine("Content-Type: image/png");
+            writer.WriteLine();
+            writer.Flush();
+            
+            memStream.Write(screenshotBytes, 0, screenshotBytes.Length);
+            writer.WriteLine();
+            
+            // 전송 후 파일로 저장 (로그/백업용)
+            try
+            {
+                string directory = Path.Combine(Application.persistentDataPath, "Screenshots");
+                if (!Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+                string filePath = Path.Combine(directory, "panel_capture.png");
+                File.WriteAllBytes(filePath, screenshotBytes);
+                Debug.Log($"Screenshot saved at {filePath} (after API call)");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"Failed to save screenshot file: {ex.Message}");
+            }
+        }
+        else
+        {
+            // 기존 방식: 파일이 존재하면 전송 (하위 호환성)
+            string directory = Path.Combine(Application.persistentDataPath, "Screenshots");
+            if (!Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            
+            // clipboard.png 우선 확인, 없으면 panel_capture.png
+            string clipboardPath = Path.Combine(directory, "clipboard.png");
+            string screenshotPath = Path.Combine(directory, "panel_capture.png");
+            
+            string filePath = null;
+            if (File.Exists(clipboardPath))
+            {
+                filePath = clipboardPath;
+            }
+            else if (File.Exists(screenshotPath))
+            {
+                filePath = screenshotPath;
+            }
+            
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                Debug.Log($"Sending image from file: {filePath}");
+                sourceFilePath = filePath; // 파일 경로 저장 (복사용)
+                byte[] fileBytes = File.ReadAllBytes(filePath);
+                string fileName = Path.GetFileName(filePath);
+
+                writer.WriteLine($"--{boundary}");
+                writer.WriteLine($"Content-Disposition: form-data; name=\"image\"; filename=\"{fileName}\"");
+                writer.WriteLine("Content-Type: image/png");
+                writer.WriteLine();
+                writer.Flush(); // 헤더 부분을 먼저 메모리에 씀
+
+                memStream.Write(fileBytes, 0, fileBytes.Length);
+                writer.WriteLine();
+            }
+        }
+        
+        // 전송한 이미지를 last_send_image.png로 저장
+        SaveLastSentImage(sentImageBytes, sourceFilePath);
+    }
+
+    // 마지막으로 전송한 이미지를 last_send_image.png로 저장
+    // 파일에서 읽은 경우: File.Copy()로 직접 복사 (빠름)
+    // 메모리에서 온 경우: byte[]를 파일로 저장
+    private void SaveLastSentImage(byte[] imageBytes, string sourceFilePath = null)
+    {
+        try
+        {
+            string directory = Path.Combine(Application.persistentDataPath, "Screenshots");
+            if (!Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            string lastSendImagePath = Path.Combine(directory, "last_send_image.png");
+            
+            // 파일에서 읽은 경우: 직접 복사 (메모리 사용 없이 빠름)
+            if (!string.IsNullOrEmpty(sourceFilePath) && File.Exists(sourceFilePath))
+            {
+                File.Copy(sourceFilePath, lastSendImagePath, true); // overwrite: true
+                Debug.Log($"Last sent image copied from {sourceFilePath} to {lastSendImagePath}");
+            }
+            // 메모리에서 온 경우: byte[]를 파일로 저장
+            else if (imageBytes != null)
+            {
+                File.WriteAllBytes(lastSendImagePath, imageBytes);
+                Debug.Log($"Last sent image saved at {lastSendImagePath}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"Failed to save last_send_image: {ex.Message}");
+        }
+    }
+
     // FetchStreamingData에서 호출할 함수
     private void ProcessReply(JObject jsonObject)
     {
@@ -668,6 +821,7 @@ public class APIManager : MonoBehaviour
 
         Debug.Log("Answer Finished : " + reply);
         
+        // 일반 대화로 저장
         if (query_trans != "")  // 영어 번역이 필요한 LLM 사용시 번역기 답변
         {
             // 사용자 메시지 저장 (번역된 영어 버전)
@@ -687,7 +841,7 @@ public class APIManager : MonoBehaviour
     }
 
     // 스트리밍 데이터를 가져오는 메서드
-    public async Task FetchStreamingData(string url, Dictionary<string, string> data)
+    public async Task FetchStreamingData(string url, Dictionary<string, string> data, byte[] screenshotBytes = null)
     {
         Debug.Log("FetchStreamingData START");
         string jsonData = JsonConvert.SerializeObject(data);
@@ -721,26 +875,11 @@ public class APIManager : MonoBehaviour
                     writer.WriteLine(entry.Value);
                 }
 
-                // 이미지 파일 추가 (파일이 존재할 경우)
-                string directory = Path.Combine(Application.persistentDataPath, "Screenshots");
-                if (!Directory.Exists(directory))
+                // intent_image가 "off"가 아닐 때만 이미지 전송
+                string intent_image = data.ContainsKey("intent_image") ? data["intent_image"] : "off";
+                if (intent_image != "off")
                 {
-                    Directory.CreateDirectory(directory);
-                }
-                string filePath = Path.Combine(directory, "panel_capture.png");
-                if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
-                {
-                    byte[] fileBytes = File.ReadAllBytes(filePath);
-                    string fileName = Path.GetFileName(filePath);
-
-                    writer.WriteLine($"--{boundary}");
-                    writer.WriteLine($"Content-Disposition: form-data; name=\"image\"; filename=\"{fileName}\"");
-                    writer.WriteLine("Content-Type: image/png");
-                    writer.WriteLine();
-                    writer.Flush(); // 헤더 부분을 먼저 메모리에 씀
-
-                    memStream.Write(fileBytes, 0, fileBytes.Length);
-                    writer.WriteLine();
+                    AttachImageToRequest(writer, memStream, boundary, screenshotBytes);
                 }
 
                 // 마지막 boundary 추가
@@ -765,6 +904,7 @@ public class APIManager : MonoBehaviour
                 using (StreamReader reader = new StreamReader(responseStream))
                 {
                     string line;
+                    string currentMemoryType = "conversation"; // 응답 타입 추적
                     while ((line = await reader.ReadLineAsync()) != null)
                     {
                         if (!string.IsNullOrEmpty(line))
@@ -795,6 +935,29 @@ public class APIManager : MonoBehaviour
                                     else if (replyType == "webSearch")
                                     {
                                         NoticeManager.Instance.Notice("webSearch");
+                                    }
+                                    else if (replyType == "asking_intent")
+                                    {
+                                        // 시스템 메시지로 저장
+                                        currentMemoryType = "system";
+                                        
+                                        // intent_info 확인
+                                        string intentInfo = jsonObject["intent_info"]?.ToString() ?? "";
+                                        if (intentInfo == "change_model")
+                                        {
+                                            // 멀티모달 모델 변경 시나리오 시작
+                                            StartCoroutine(ScenarioAskManager.Instance.Scenario_S00_AskChangeModel());
+                                        }
+                                        else if (intentInfo == "no_image")
+                                        {
+                                            // 이미지 필요 시나리오 시작
+                                            StartCoroutine(ScenarioAskManager.Instance.Scenario_S01_AskNeedImage());
+                                        }
+                                    }
+                                    else if (replyType == "trigger")
+                                    {
+                                        // 시스템 메시지로 저장
+                                        currentMemoryType = "system";
                                     }
                                     else  // replyType == "reply"
                                     {
@@ -885,7 +1048,16 @@ public class APIManager : MonoBehaviour
 
                     if (curChatIdx == GameManager.Instance.chatIdxSuccess)
                     {
-                        OnFinalResponseReceived(); // 최종 반환 완료 시 함수 호출
+                        // asking_intent나 trigger의 경우 실제 reply가 없으므로 메모리 저장하지 않음
+                        // 시스템 메시지는 ScenarioUtil.Narration이나 선택지에서 이미 저장됨
+                        if (currentMemoryType != "system")
+                        {
+                            OnFinalResponseReceived(); // 최종 반환 완료 시 함수 호출
+                        }
+                        else
+                        {
+                            Debug.Log("Skipping OnFinalResponseReceived for system type (asking_intent/trigger)");
+                        }
                     }
 
                 }
@@ -914,13 +1086,13 @@ public class APIManager : MonoBehaviour
             return;
 #endif
 
-        // server_type이 2 (Google)인 경우 Gemini 전용 함수 호출
-        int server_type_idx = SettingManager.Instance.settings.server_type_idx;  // 0: Auto, 1: Local, 2: Google, 3: OpenRouter
-        if (server_type_idx == 2 || server_type_idx == 0)
-        {
-            await CallConversationStreamGemini(query, chatIdx, ai_lang_in);
-            return;
-        }
+        // // server_type이 2 (Google)인 경우 Gemini 전용 함수 호출
+        // int server_type_idx = SettingManager.Instance.settings.server_type_idx;  // 0: Auto, 1: Local, 2: Google, 3: OpenRouter
+        // if (server_type_idx == 2 || server_type_idx == 0)
+        // {
+        //     await CallConversationStreamGemini(query, chatIdx, ai_lang_in);
+        //     return;
+        // }
 
 
         // baseUrl을 비동기로 가져오기
@@ -946,10 +1118,122 @@ public class APIManager : MonoBehaviour
             GameManager.Instance.isWebSearchForced = false;
             ai_web_search = "force";
         }
+
+        // 실제로 보낼 이미지가 있는지 확인
+        bool hasImageToSend = false;
+
+        // 1. 클립보드에 이미지가 있는지 확인
+        hasImageToSend = ClipboardManager.Instance.HasImageInClipboard(); 
+        
+        // 2. 스크린샷 영역이 설정되어 있는지 확인
+        if (!hasImageToSend)
+        {
+            ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+            if (sm != null)
+            {
+                hasImageToSend = sm.IsScreenshotAreaSet();
+            }
+        }
+
+        // 이미지 사용 상태 가져오기
         string intent_image = "off";
-        if (ChatBalloonManager.Instance.GetImageUse()) intent_image = "force";
+        if (hasImageToSend) {
+            if (StatusManager.Instance.IsChatting)
+            {
+                // 채팅창을 통한 호출 - changeUseImageInfo()로 변경된 값 사용
+                intent_image = ChatBalloonManager.Instance.GetUseImageInfo();
+                Debug.Log($"[Image Info] ChatBalloon (IsChatting=true): intent_image={intent_image}");
+            }
+            else
+            {
+                // STT 등을 통한 직접 호출 - SettingManager 원본 값 사용
+                int ai_use_image_idx = SettingManager.Instance.settings.ai_use_image_idx;
+                if (ai_use_image_idx == 0) intent_image = "off";
+                else if (ai_use_image_idx == 1) intent_image = "auto";
+                else if (ai_use_image_idx == 2) intent_image = "force";
+                else intent_image = "off";
+                Debug.Log($"[Image Info] Direct call (IsChatting=false): ai_use_image_idx={ai_use_image_idx}, intent_image={intent_image}");
+            }
+        }
+
+        // 현재 모델의 멀티모달 지원 여부 확인
+        string currentModelId = GetCurrentModelId();  // 현재 선택된 모델 ID 가져오기
+        bool isModelSupportsImage = ModelDataMultimodal.SupportsImage(currentModelId);
+        // Debug.Log($"[Multimodal Check] Model: '{currentModelId}', Supports Image: {isModelSupportsImage}");
+
+        // 이미지 인식이 필요한 경우(auto/force) 멀티모달 체크
+        if (intent_image != "off")
+        {
+            // 멀티모달 미지원 모델인 경우
+            if (!isModelSupportsImage)
+            {
+                Debug.Log($"[Multimodal Check] Current model '{currentModelId}' does not support image. intent_image={intent_image}");
+                // 모델 변경할지 물어보기
+                if (SettingManager.Instance.settings.isAskChangeToMultimodal)
+                {
+                    if (hasImageToSend)
+                    {
+                        StartCoroutine(ScenarioAskManager.Instance.Scenario_S00_AskChangeModel());
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 멀티모달인데 이미지가 없을 경우
+        if (isModelSupportsImage && !hasImageToSend)
+        {
+            Debug.Log("No Image to Send");
+        }
+
+        // 변수 설정 시작
         string intent_confirm = "false";
         if (SettingManager.Instance.settings.confirmUserIntent) intent_confirm = "true";
+
+        // intent_image가 "off"가 아닐 때 이미지 준비
+        byte[] screenshotBytes = null;
+        if (intent_image != "off")
+        {
+            // ChatBalloonManager에서 이미지 소스 판단
+            string imageSource = ChatBalloonManager.Instance.GetImageSource();
+            
+            if (isSendScreenshotFirst)
+            {
+                // 메모리에서 직접 전송 (빠름)
+                if (imageSource == "clipboard")
+                {
+                    screenshotBytes = ClipboardManager.Instance.GetImageBytesFromClipboard();
+                    if (screenshotBytes != null)
+                    {
+                        Debug.Log($"Clipboard image loaded: {screenshotBytes.Length} bytes");
+                    }
+                }
+                else if (imageSource == "screenshot")
+                {
+                    var tcsScreenshot = new TaskCompletionSource<byte[]>();
+                    ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+                    if (sm != null && sm.IsScreenshotAreaSet())
+                    {
+                        sm.StartCoroutine(sm.CaptureScreenshotToMemory((bytes) => 
+                        {
+                            tcsScreenshot.SetResult(bytes);
+                        }));
+                        screenshotBytes = await tcsScreenshot.Task;
+                        Debug.Log($"Screenshot captured for API: {(screenshotBytes != null ? screenshotBytes.Length : 0)} bytes");
+                    }
+                }
+            }
+            else
+            {
+                // 파일 저장 후 AttachImageToRequest에서 읽어서 전송
+                if (imageSource == "clipboard")
+                {
+                    ClipboardManager.Instance.SaveImageFromClipboard();
+                    Debug.Log("Clipboard image saved to file");
+                }
+                // screenshot는 파일로 이미 저장되어 있음 (panel_capture.png)
+            }
+        }
 
         var memory = MemoryManager.Instance.GetAllConversationMemory();
         string memoryJson = JsonConvert.SerializeObject(memory);
@@ -1005,7 +1289,7 @@ public class APIManager : MonoBehaviour
             { "server_local_mode", server_local_mode}
         };
 
-        await FetchStreamingData(streamUrl, requestData);
+        await FetchStreamingData(streamUrl, requestData, screenshotBytes);
     }
 
     // Gemini 전용 대화 스트림 호출 함수
@@ -1058,6 +1342,46 @@ public class APIManager : MonoBehaviour
         string ai_language_in = ai_lang_in;  // stt 에서 가져온 언어 있으면 사용
         string ai_language_out = SettingManager.Instance.settings.ai_language_out ?? "";
 
+        // 이미지 사용 상태 가져오기
+        string intent_image;
+        if (StatusManager.Instance.IsChatting)
+        {
+            // 채팅창을 통한 호출 - changeUseImageInfo()로 변경된 값 사용
+            intent_image = ChatBalloonManager.Instance.GetUseImageInfo();
+            Debug.Log($"[Image Info] ChatBalloon (IsChatting=true): intent_image={intent_image}");
+        }
+        else
+        {
+            // STT 등을 통한 직접 호출 - SettingManager 원본 값 사용
+            int ai_use_image_idx = SettingManager.Instance.settings.ai_use_image_idx;
+            if (ai_use_image_idx == 0) intent_image = "off";
+            else if (ai_use_image_idx == 1) intent_image = "auto";
+            else if (ai_use_image_idx == 2) intent_image = "force";
+            else intent_image = "off";
+            Debug.Log($"[Image Info] Direct call (IsChatting=false): ai_use_image_idx={ai_use_image_idx}, intent_image={intent_image}");
+        }
+        
+        // intent_image가 "off"가 아닐 때 스크린샷 캡처
+        byte[] screenshotBytes = null;
+        if (isSendScreenshotFirst && intent_image != "off")
+        {
+            var tcsScreenshot = new TaskCompletionSource<byte[]>();
+            ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+            if (sm != null)
+            {
+                sm.StartCoroutine(sm.CaptureScreenshotToMemory((bytes) => 
+                {
+                    tcsScreenshot.SetResult(bytes);
+                }));
+                screenshotBytes = await tcsScreenshot.Task;
+                Debug.Log($"Screenshot captured for Gemini API: {(screenshotBytes != null ? screenshotBytes.Length : 0)} bytes");
+            }
+            else
+            {
+                Debug.LogWarning("ScreenshotManager not found. Cannot capture screenshot.");
+            }
+        }
+
         var memory = MemoryManager.Instance.GetAllConversationMemory();
         string memoryJson = JsonConvert.SerializeObject(memory);
         string guidelineJson = UIUserCardManager.Instance.GetGuidelineListJson();
@@ -1080,7 +1404,7 @@ public class APIManager : MonoBehaviour
             { "regenerate_count", GameManager.Instance.chatIdxRegenerateCount.ToString() }
         };
 
-        await FetchStreamingData(streamUrl, requestData);
+        await FetchStreamingData(streamUrl, requestData, screenshotBytes);
     }
 
     // 로컬 서버 모델 Release 호출
@@ -1646,5 +1970,338 @@ public class APIManager : MonoBehaviour
         }
     }
 
+    // 현재 선택된 모델 ID 가져오기
+    private string GetCurrentModelId()
+    {
+        string server_type = SettingManager.Instance.settings.server_type ?? "Auto";
+        
+        if (server_type == "Local")
+        {
+            return SettingManager.Instance.settings.model_name_Local ?? "";
+        }
+        else if (server_type == "Google")
+        {
+            return SettingManager.Instance.settings.model_name_Gemini ?? "";
+        }
+        else if (server_type == "OpenRouter")
+        {
+            return SettingManager.Instance.settings.model_name_OpenRouter ?? "";
+        }
+        else if (server_type == "ChatGPT")
+        {
+            return SettingManager.Instance.settings.model_name_ChatGPT ?? "";
+        }
+        else if (server_type == "Custom")
+        {
+            return SettingManager.Instance.settings.model_name_Custom ?? "";
+        }
+        else // Auto 또는 기타
+        {
+            return SettingManager.Instance.settings.model_name_Local ?? "";
+        }
+    }
 
+    // PaddleOCR API 호출
+    public async void CallPaddleOCR(byte[] imageBytes, System.Action<OCRResult> callback)
+    {
+        if (imageBytes == null || imageBytes.Length == 0)
+        {
+            Debug.LogError("[PaddleOCR] Image bytes is null or empty");
+            callback?.Invoke(null);
+            return;
+        }
+
+        try
+        {
+            // baseUrl을 비동기로 가져오기
+            var tcs = new TaskCompletionSource<string>();
+            ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
+            string baseUrl = await tcs.Task;
+            
+            string url = baseUrl + "/paddle/ocr";
+            Debug.Log($"[PaddleOCR] URL: {url}");
+
+            string boundary = "----WebKitFormBoundary" + DateTime.Now.Ticks.ToString("x");
+            string contentType = "multipart/form-data; boundary=" + boundary;
+
+            // 요청 준비
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+            request.Method = "POST";
+            request.ContentType = contentType;
+
+            using (MemoryStream memStream = new MemoryStream())
+            using (StreamWriter writer = new StreamWriter(memStream, Encoding.UTF8, 1024, true))
+            {
+                // 이미지 파일만 전송 (PaddleOCR은 tasks 파라미터 불필요)
+                writer.WriteLine($"--{boundary}");
+                writer.WriteLine($"Content-Disposition: form-data; name=\"image\"; filename=\"fullscreen.png\"");
+                writer.WriteLine("Content-Type: image/png");
+                writer.WriteLine();
+                writer.Flush();
+
+                memStream.Write(imageBytes, 0, imageBytes.Length);
+                writer.WriteLine();
+
+                // 마지막 boundary
+                writer.WriteLine($"--{boundary}--");
+                writer.Flush();
+
+                // 본문 전송
+                request.ContentLength = memStream.Length;
+                using (Stream requestStream = await request.GetRequestStreamAsync())
+                {
+                    memStream.Seek(0, SeekOrigin.Begin);
+                    await memStream.CopyToAsync(requestStream);
+                }
+            }
+
+            Debug.Log("[PaddleOCR] Request sent, waiting for response...");
+
+            // 응답 받기
+            using (WebResponse response = await request.GetResponseAsync())
+            using (Stream responseStream = response.GetResponseStream())
+            using (StreamReader reader = new StreamReader(responseStream))
+            {
+                string responseText = await reader.ReadToEndAsync();
+                Debug.Log($"[PaddleOCR] Response received: {responseText.Substring(0, Math.Min(500, responseText.Length))}...");
+
+                try
+                {
+                    var jsonResponse = JObject.Parse(responseText);
+                    
+                    // 응답 파싱
+                    if (jsonResponse["status"]?.ToString() == "success" && jsonResponse["ocr_with_region"] != null)
+                    {
+                        var ocrData = jsonResponse["ocr_with_region"];
+                        
+                        OCRResult ocrResult = new OCRResult
+                        {
+                            labels = new List<string>(),
+                            quad_boxes = new List<List<List<float>>>()
+                        };
+
+                        // labels 파싱
+                        if (ocrData["labels"] != null)
+                        {
+                            foreach (var label in ocrData["labels"])
+                            {
+                                ocrResult.labels.Add(label.ToString());
+                            }
+                        }
+
+                        // quad_boxes 파싱 및 형식 변환
+                        // PaddleOCR: [x1,y1,x2,y2,x3,y3,x4,y4] (평탄 리스트)
+                        // 내부 형식: [[[x1,y1],[x2,y2],[x3,y3],[x4,y4]]] (중첩 리스트)
+                        if (ocrData["quad_boxes"] != null)
+                        {
+                            foreach (var quadBox in ocrData["quad_boxes"])
+                            {
+                                List<List<float>> quad = new List<List<float>>();
+                                
+                                // PaddleOCR의 평탄 리스트를 중첩 리스트로 변환
+                                // [x1,y1,x2,y2,x3,y3,x4,y4] -> [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
+                                List<float> coords = new List<float>();
+                                foreach (var coord in quadBox)
+                                {
+                                    coords.Add((float)coord);
+                                }
+                                
+                                // 8개 좌표를 4개의 점으로 변환
+                                if (coords.Count >= 8)
+                                {
+                                    for (int i = 0; i < 8; i += 2)
+                                    {
+                                        List<float> point = new List<float> { coords[i], coords[i + 1] };
+                                        quad.Add(point);
+                                    }
+                                    ocrResult.quad_boxes.Add(quad);
+                                }
+                            }
+                        }
+
+                        Debug.Log($"[PaddleOCR] Parsed {ocrResult.labels.Count} text regions");
+                        callback?.Invoke(ocrResult);
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[PaddleOCR] No ocr_with_region data in response or status is not success");
+                        callback?.Invoke(null);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[PaddleOCR] Failed to parse response: {ex.Message}");
+                    callback?.Invoke(null);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[PaddleOCR] Exception: {ex.Message}");
+            callback?.Invoke(null);
+        }
+    }
+
+    // PaddleOCR + 번역 API 호출
+    public async void CallPaddleOCRWithTranslate(byte[] imageBytes, string targetLang, System.Action<OCRWithTranslateResult> callback)
+    {
+        if (imageBytes == null || imageBytes.Length == 0)
+        {
+            Debug.LogError("[PaddleOCR+Translate] Image bytes is null or empty");
+            callback?.Invoke(null);
+            return;
+        }
+
+        try
+        {
+            // baseUrl을 비동기로 가져오기
+            var tcs = new TaskCompletionSource<string>();
+            ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
+            string baseUrl = await tcs.Task;
+            
+            string url = baseUrl + "/paddle/ocr_with_translate";
+            Debug.Log($"[PaddleOCR+Translate] URL: {url}, target_lang: {targetLang}");
+
+            string boundary = "----WebKitFormBoundary" + DateTime.Now.Ticks.ToString("x");
+            string contentType = "multipart/form-data; boundary=" + boundary;
+
+            // 요청 준비
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+            request.Method = "POST";
+            request.ContentType = contentType;
+
+            using (MemoryStream memStream = new MemoryStream())
+            using (StreamWriter writer = new StreamWriter(memStream, Encoding.UTF8, 1024, true))
+            {
+                // 이미지 파일 전송
+                writer.WriteLine($"--{boundary}");
+                writer.WriteLine($"Content-Disposition: form-data; name=\"image\"; filename=\"screenshot.png\"");
+                writer.WriteLine("Content-Type: image/png");
+                writer.WriteLine();
+                writer.Flush();
+
+                memStream.Write(imageBytes, 0, imageBytes.Length);
+                writer.WriteLine();
+
+                // target_lang 파라미터
+                writer.WriteLine($"--{boundary}");
+                writer.WriteLine($"Content-Disposition: form-data; name=\"target_lang\"");
+                writer.WriteLine();
+                writer.WriteLine(targetLang);
+
+                // 마지막 boundary
+                writer.WriteLine($"--{boundary}--");
+                writer.Flush();
+
+                // 본문 전송
+                request.ContentLength = memStream.Length;
+                using (Stream requestStream = await request.GetRequestStreamAsync())
+                {
+                    memStream.Seek(0, SeekOrigin.Begin);
+                    await memStream.CopyToAsync(requestStream);
+                }
+            }
+
+            Debug.Log("[PaddleOCR+Translate] Request sent, waiting for response...");
+
+            // 응답 받기
+            using (WebResponse response = await request.GetResponseAsync())
+            using (Stream responseStream = response.GetResponseStream())
+            using (StreamReader reader = new StreamReader(responseStream))
+            {
+                string responseText = await reader.ReadToEndAsync();
+                Debug.Log($"[PaddleOCR+Translate] Response received: {responseText.Substring(0, Math.Min(500, responseText.Length))}...");
+
+                try
+                {
+                    var jsonResponse = JObject.Parse(responseText);
+                    
+                    // 응답 파싱
+                    if (jsonResponse["status"]?.ToString() == "success" && jsonResponse["ocr_with_region"] != null)
+                    {
+                        var ocrData = jsonResponse["ocr_with_region"];
+                        var ocrDataOrigin = jsonResponse["ocr_with_region_origin"];
+                        
+                        OCRWithTranslateResult result = new OCRWithTranslateResult
+                        {
+                            labels = new List<string>(),
+                            labels_origin = new List<string>(),
+                            quad_boxes = new List<List<List<float>>>()
+                        };
+
+                        // labels 파싱 (번역된 텍스트)
+                        if (ocrData["labels"] != null)
+                        {
+                            foreach (var label in ocrData["labels"])
+                            {
+                                result.labels.Add(label.ToString());
+                            }
+                        }
+
+                        // labels_origin 파싱 (원문 텍스트)
+                        if (ocrDataOrigin != null && ocrDataOrigin["labels"] != null)
+                        {
+                            foreach (var label in ocrDataOrigin["labels"])
+                            {
+                                result.labels_origin.Add(label.ToString());
+                            }
+                        }
+
+                        // quad_boxes 파싱 및 형식 변환
+                        if (ocrData["quad_boxes"] != null)
+                        {
+                            foreach (var quadBox in ocrData["quad_boxes"])
+                            {
+                                List<List<float>> quad = new List<List<float>>();
+                                
+                                List<float> coords = new List<float>();
+                                foreach (var coord in quadBox)
+                                {
+                                    coords.Add((float)coord);
+                                }
+                                
+                                if (coords.Count >= 8)
+                                {
+                                    for (int i = 0; i < 8; i += 2)
+                                    {
+                                        List<float> point = new List<float> { coords[i], coords[i + 1] };
+                                        quad.Add(point);
+                                    }
+                                    result.quad_boxes.Add(quad);
+                                }
+                            }
+                        }
+
+                        Debug.Log($"[PaddleOCR+Translate] Parsed {result.labels.Count} text regions (translated to {targetLang})");
+                        callback?.Invoke(result);
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[PaddleOCR+Translate] No ocr_with_region data in response or status is not success");
+                        callback?.Invoke(null);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[PaddleOCR+Translate] Failed to parse response: {ex.Message}");
+                    callback?.Invoke(null);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[PaddleOCR+Translate] Exception: {ex.Message}");
+            callback?.Invoke(null);
+        }
+    }
+
+}
+
+// OCR + 번역 결과 데이터 구조
+[System.Serializable]
+public class OCRWithTranslateResult
+{
+    public List<string> labels;         // 번역된 텍스트
+    public List<string> labels_origin;  // 원문 텍스트
+    public List<List<List<float>>> quad_boxes;
 }
