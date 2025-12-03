@@ -1,6 +1,7 @@
 using TMPro;
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
@@ -90,10 +91,14 @@ public class SettingManager : MonoBehaviour
     [SerializeField] private TMP_InputField playerNameInputField;
     [SerializeField] private Dropdown aiLangDropdown;
     [SerializeField] private Dropdown aiWebSearchDropdown;
+    [SerializeField] private Dropdown aiUseImageDropdown;
     [SerializeField] private Dropdown aiAskIntentDropdown;
     [SerializeField] private Dropdown aiEmotionDropdown;
     [SerializeField] private Dropdown aiVoiceFilterDropdown;
     [SerializeField] private Toggle confirmUserIntentToggle;
+    [SerializeField] private Toggle includeCharInScreenshotToggle;
+    [SerializeField] private Toggle includeUIInScreenshotToggle;
+    [SerializeField] private Toggle isAskChangeToMultimodalToggle; // 이미지 첨부설정일 경우, 멀티모달 모델로 변경할지 질문
 
     [Header("Dialogue Info")]
     [SerializeField] private Text aiInfoServerType;
@@ -107,6 +112,7 @@ public class SettingManager : MonoBehaviour
     [Header("Dev")]
     [SerializeField] private Toggle devModeToggle;
     [SerializeField] private Toggle devHowlingToggle;
+    [SerializeField] private Toggle devSoundToggle;
 
     // 기타 표시용 UI
     [Header("Extra UI")]
@@ -166,6 +172,8 @@ public class SettingManager : MonoBehaviour
         
         public int ai_web_search_idx;  // 0 : off, 1 : on, 2: force
         public string ai_web_search;
+        public int ai_use_image_idx;  // 0 : off, 1 : on, 2: force
+        public string ai_use_image;
         public int ai_ask_intent_idx;  // 0 : off, 1 : on
         public string ai_ask_intent;
         public int ai_emotion_idx;  // 0 : off, 1 : on
@@ -174,10 +182,14 @@ public class SettingManager : MonoBehaviour
         public bool isAskedTurnOnServer;
         public bool isAPITest;
         public bool confirmUserIntent;
+        public bool includeCharInScreenshot;
+        public bool includeUIInScreenshot;
+        public bool isAskChangeToMultimodal;  // 멀티모달 지원하지 않는 모델일 때 변경 여부 물어보기
 
         // Dev용 데이터
         public bool isDevMode;
-        public bool isDevHowling;  
+        public bool isDevHowling;
+        public bool isDevSound;  // dev_voice 서버 사용 여부 (저장 안함)
 
         // UI외 데이터
         public bool wantFreeServer;  // 무료서버연결의향
@@ -345,17 +357,33 @@ public class SettingManager : MonoBehaviour
         button.interactable = true;
     }
 
-    public void SetAIWebSearch() { int value=aiWebSearchDropdown.value; value = getAiWebSearchFilterScenario(value); aiWebSearchDropdown.value = value; settings.ai_web_search_idx = value; settings.ai_web_search = getONOFFTypeFromIdx(value); SaveSettings(); }
+    public async void SetAIWebSearch() { int value=aiWebSearchDropdown.value; value = await getAiWebSearchFilterScenarioAsync(value); aiWebSearchDropdown.value = value; settings.ai_web_search_idx = value; settings.ai_web_search = getONOFFTypeFromIdx(value); SaveSettings(); }
+    public async void SetAIUseImage() { int value=aiUseImageDropdown.value; value = await getAiUseImageFilterScenarioAsync(value); aiUseImageDropdown.value = value; settings.ai_use_image_idx = value; settings.ai_use_image = getONOFFTypeFromIdx(value); SaveSettings(); if (ChatBalloonManager.Instance != null) ChatBalloonManager.Instance.InitUseImageInfo(); }
+    public async void SetAIUseImageByValue(int value) { value = await getAiUseImageFilterScenarioAsync(value); aiUseImageDropdown.value = value; settings.ai_use_image_idx = value; settings.ai_use_image = getONOFFTypeFromIdx(value); SaveSettings(); if (ChatBalloonManager.Instance != null) ChatBalloonManager.Instance.InitUseImageInfo(); }
     public void SetAIAskIntent() { int value=aiAskIntentDropdown.value; settings.ai_ask_intent_idx = value; settings.server_type=getONOFFTypeFromIdx(value); SaveSettings(); }
     public void SetIsAskedTurnOnServer(bool value) { settings.isAskedTurnOnServer = value; SaveSettings(); }
     public void SetIsAPITest(bool value) { settings.isAPITest = value; SaveSettings(); }
     public void SetConfirmUserIntent(bool value) { settings.confirmUserIntent = value; SaveSettings(); }  // SetAIAskIntent Toggle 버전
+    public void SetIncludeCharInScreenshot(bool value) { settings.includeCharInScreenshot = value; SaveSettings(); }
+    public void SetIncludeUIInScreenshot(bool value) { settings.includeUIInScreenshot = value; SaveSettings(); }
+    public void SetIsAskChangeToMultimodalToggle(bool value) { settings.isAskChangeToMultimodal = value; SaveSettings(); }
     public void SetAiLanguage() { int value=aiLangDropdown.value; settings.ai_language_idx = value; settings.ai_language=getAiLangFromIdx(value); SaveSettings(); }
-    public void SetAIEmotion() { int value=aiEmotionDropdown.value; value = getAiEmotionFilterScenario(value); aiEmotionDropdown.value = value; settings.ai_emotion_idx = value; settings.ai_emotion = getONOFFTypeFromIdx(value); SaveSettings(); }
+    public async void SetAIEmotion() { int value=aiEmotionDropdown.value; value = await getAiEmotionFilterScenarioAsync(value); aiEmotionDropdown.value = value; settings.ai_emotion_idx = value; settings.ai_emotion = getONOFFTypeFromIdx(value); SaveSettings(); }
     public void SetAiVoiceFilter() { int value=aiVoiceFilterDropdown.value; value = getAiVoiceFilterScenario(value); aiVoiceFilterDropdown.value = value; settings.ai_voice_filter_idx = value; SaveSettings(); }
 
     public void SetIsDevModeToggle(bool value) { settings.isDevMode = value; DevManager.Instance.SetInteractableDev(value);}
-    public void SetIsDevHowlingToggle(bool value) { settings.isDevHowling = value; SaveSettings(); }  
+    public void SetIsDevHowlingToggle(bool value) { settings.isDevHowling = value; SaveSettings(); }
+    public void SetIsDevSoundToggle(bool value) { settings.isDevSound = value; }  // dev_voice 서버 사용 여부 (저장 안함)
+    
+    // dev_voice 서버 사용 여부 반환 (Android 또는 DevSound 토글 활성화시 true)
+    public bool IsDevSoundEnabled()
+    {
+#if UNITY_ANDROID
+        return true;  // Android에서는 항상 dev_voice 사용
+#else
+        return settings.isDevSound;  // PC에서는 토글 설정값 사용
+#endif
+    }
     
     // 표시용
     public void SetServerInfoText(string text) { serverInfoText.text = text; }
@@ -375,6 +403,7 @@ public class SettingManager : MonoBehaviour
     {
         // Devmode 초기화
         devModeToggle.isOn = false;
+        devSoundToggle.isOn = false;
         
         // 저장 경로를 Application.persistentDataPath로 설정
         string directoryPath = Path.Combine(Application.persistentDataPath, "config");
@@ -673,7 +702,7 @@ public class SettingManager : MonoBehaviour
         return lang;
     }
 
-    private int getAiEmotionFilterScenario(int value)
+    private async Task<int> getAiEmotionFilterScenarioAsync(int value)
     {
         // DEV MODE 일경우 로그 출력 후 value return
         if (settings.isDevMode)
@@ -685,7 +714,7 @@ public class SettingManager : MonoBehaviour
         // Emotion 기능 키려는데 현재 Sample 버전일 경우 버전업 요구
         if (value == 1)
         {
-            bool chk = InstallStatusManager.Instance.CheckAndOperateFull();
+            bool chk = await InstallStatusManager.Instance.CheckAndOperateFullAsync();
             if (!chk) 
             {
                 // 안내했을 경우, 0으로 반환
@@ -740,7 +769,7 @@ public class SettingManager : MonoBehaviour
         return value;
     }
 
-    private int getAiWebSearchFilterScenario(int value)
+    private async Task<int> getAiWebSearchFilterScenarioAsync(int value)
     {
         // DEV MODE 일경우 로그 출력 후 value return
         if (settings.isDevMode)
@@ -752,7 +781,30 @@ public class SettingManager : MonoBehaviour
         // WebSearch 기능 키려는데 현재 Sample 버전일 경우 버전업 요구
         if (value >= 1)  // 1: on, 2: force 둘 다 체크
         {
-            bool chk = InstallStatusManager.Instance.CheckAndOperateFull();
+            bool chk = await InstallStatusManager.Instance.CheckAndOperateFullAsync();
+            if (!chk) 
+            {
+                // 안내했을 경우, 0으로 반환
+                return 0;
+            }
+        }
+
+        return value;
+    }
+
+    private async Task<int> getAiUseImageFilterScenarioAsync(int value)
+    {
+        // DEV MODE 일경우 로그 출력 후 value return
+        if (settings.isDevMode)
+        {   
+            Debug.Log($"[SettingManager] getAiUseImageFilterScenario - DEV MODE로 통과");
+            return value;
+        }
+
+        // UseImage 기능 키려는데 현재 Sample 버전일 경우 버전업 요구
+        if (value >= 1)  // 1: on, 2: force 둘 다 체크
+        {
+            bool chk = await InstallStatusManager.Instance.CheckAndOperateFullAsync();
             if (!chk) 
             {
                 // 안내했을 경우, 0으로 반환
@@ -999,6 +1051,7 @@ public class SettingManager : MonoBehaviour
 
         // 로딩 후 Dev 값 초기화
         settings.isDevMode = false;
+        settings.isDevSound = false;
     }
 
     // UI 세팅 적용
@@ -1042,16 +1095,21 @@ public class SettingManager : MonoBehaviour
         serverOpenRouterModelNameInputField.text = settings.model_name_OpenRouter;
         serverCustomModelNameInputField.text = settings.model_name_Custom;
         aiWebSearchDropdown.value = settings.ai_web_search_idx;
+        aiUseImageDropdown.value = settings.ai_use_image_idx;
         aiAskIntentDropdown.value = settings.ai_ask_intent_idx;
         isAskedTurnOnServerToggle.isOn = settings.isAskedTurnOnServer;
         isAPITestToggle.isOn = settings.isAPITest;
         confirmUserIntentToggle.isOn = settings.confirmUserIntent;
+        includeCharInScreenshotToggle.isOn = settings.includeCharInScreenshot;
+        includeUIInScreenshotToggle.isOn = settings.includeUIInScreenshot;
+        isAskChangeToMultimodalToggle.isOn = settings.isAskChangeToMultimodal;
         aiLangDropdown.value = settings.ai_language_idx;
         aiEmotionDropdown.value = settings.ai_emotion_idx;
         aiVoiceFilterDropdown.value = settings.ai_voice_filter_idx;
 
         devHowlingToggle.isOn = settings.isDevHowling;
         devModeToggle.isOn = false; // DevMode는 저장과 무관하게 항상 false
+        devSoundToggle.isOn = false; // DevSound는 저장과 무관하게 항상 false
 
         // Text 계열
         soundSpeedMasterText.text = "Speed (" + (int)settings.sound_speedMaster + "%)";
@@ -1238,6 +1296,8 @@ public class SettingManager : MonoBehaviour
         settings.model_name_Custom = "";
         settings.ai_web_search_idx = 0;  // 0 : off, 1 : on, 2: force
         settings.ai_web_search = "OFF";
+        settings.ai_use_image_idx = 0;  // 0 : off, 1 : on, 2: force
+        settings.ai_use_image = "OFF";
         settings.ai_ask_intent_idx = 0;  // 0 : off, 1 : on
         settings.ai_ask_intent = "OFF";
         settings.ai_emotion_idx = 0;  // 0 : off, 1 : on
@@ -1245,6 +1305,9 @@ public class SettingManager : MonoBehaviour
         settings.isAskedTurnOnServer = true;
         settings.isAPITest = false;
         settings.confirmUserIntent = false;
+        settings.includeCharInScreenshot = false;
+        settings.includeUIInScreenshot = true;
+        settings.isAskChangeToMultimodal = false;
 
         settings.isDevHowling = false;
 
