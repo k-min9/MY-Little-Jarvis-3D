@@ -1308,29 +1308,30 @@ public class APIManager : MonoBehaviour
         ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
         string baseUrl = await tcs.Task;
 
-        // 안드로이드인 경우 dev_voice 서버 사용
-#if UNITY_ANDROID
-        // TaskCompletionSource를 사용하여 콜백을 async/await로 변환
-        var tcsDevVoice = new TaskCompletionSource<string>();
-        
-        ServerManager.Instance.GetServerUrlFromServerId("dev_voice", (url) =>
+        // dev_voice 서버 사용 여부 확인 (Android 또는 DevSound 토글 활성화시)
+        if (SettingManager.Instance.IsDevSoundEnabled())
         {
-            tcsDevVoice.SetResult(url);
-        });
-        
-        // dev_voice 서버 URL을 기다림
-        string devVoiceUrl = await tcsDevVoice.Task;
-        
-        if (!string.IsNullOrEmpty(devVoiceUrl))
-        {
-            Debug.Log("dev_voice 서버 URL: " + devVoiceUrl);
-            baseUrl = devVoiceUrl;
+            // TaskCompletionSource를 사용하여 콜백을 async/await로 변환
+            var tcsDevVoice = new TaskCompletionSource<string>();
+            
+            ServerManager.Instance.GetServerUrlFromServerId("dev_voice", (url) =>
+            {
+                tcsDevVoice.SetResult(url);
+            });
+            
+            // dev_voice 서버 URL을 기다림
+            string devVoiceUrl = await tcsDevVoice.Task;
+            
+            if (!string.IsNullOrEmpty(devVoiceUrl))
+            {
+                Debug.Log("dev_voice 서버 URL: " + devVoiceUrl);
+                baseUrl = devVoiceUrl;
+            }
+            else
+            {
+                Debug.LogWarning("dev_voice 서버 URL을 가져올 수 없습니다. 기본 URL을 사용합니다.");
+            }
         }
-        else
-        {
-            Debug.LogWarning("dev_voice 서버 URL을 가져올 수 없습니다. 기본 URL을 사용합니다.");
-        }
-#endif
 
         string streamUrl = baseUrl + "/conversation_stream_gemini";
         Debug.Log("Gemini streamUrl : " + streamUrl);
@@ -1630,10 +1631,9 @@ public class APIManager : MonoBehaviour
         ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
         string baseUrl = await tcs.Task;
 
-        // dev_voice 사용 여부
-        int server_type_idx = SettingManager.Instance.settings.server_type_idx;
-        bool shouldUseDevServer = SettingManager.Instance.GetInstallStatus() < 2;   // no install, lite,
-                                // || (server_type_idx == 2);// && string.IsNullOrEmpty(baseUrl));  // Google(Gemini) with empty baseUrl
+        // dev_voice 사용 여부 (설치 상태 또는 DevSound 토글)
+        bool shouldUseDevServer = SettingManager.Instance.GetInstallStatus() < 2   // no install, lite
+                                || SettingManager.Instance.IsDevSoundEnabled();    // DevSound 토글 또는 Android
         if (shouldUseDevServer)
         {
             // TaskCompletionSource를 사용하여 콜백을 async/await로 변환

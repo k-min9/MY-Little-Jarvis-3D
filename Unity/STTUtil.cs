@@ -4,15 +4,11 @@ using System;
 using System.Collections;
 using System.IO;
 
-/// <summary>
-/// STT(Speech-to-Text) 관련 유틸리티 클래스
-/// MicrophoneNormal과 VADController에서 중복되던 STT 로직을 통합
-/// </summary>
+// STT(Speech-to-Text) 관련 유틸리티 클래스
+// MicrophoneNormal과 VADController에서 중복되던 STT 로직을 통합
 public static class STTUtil
 {
-    /// <summary>
-    /// STT API 응답 데이터 구조
-    /// </summary>
+    // STT API 응답 데이터 구조
     [System.Serializable]
     public class SttResponse
     {
@@ -21,9 +17,7 @@ public static class STTUtil
         public string chatIdx;
     }
 
-    /// <summary>
-    /// 음성 화자 분석 API 응답 데이터 구조
-    /// </summary>
+    // 음성 화자 분석 API 응답 데이터 구조
     [System.Serializable]
     public class VoiceFilterResponse
     {
@@ -36,9 +30,7 @@ public static class STTUtil
         public string error;
     }
 
-    /// <summary>
-    /// 음성 필터링 처리 결과
-    /// </summary>
+    // 음성 필터링 처리 결과
     public class VoiceFilterResult
     {
         public bool shouldIgnore = false;
@@ -70,27 +62,30 @@ public static class STTUtil
         }
     }
 
-    /// <summary>
-    /// WAV 파일을 STT 서버로 전송하고 결과를 처리합니다.
-    /// 음성 필터링이 활성화된 경우 먼저 화자 분석을 수행합니다.
-    /// </summary>
-    /// <param name="monoBehaviour">코루틴 실행을 위한 MonoBehaviour 인스턴스</param>
-    /// <param name="wavData">전송할 WAV 데이터</param>
-    /// <param name="sttLang">STT 언어 (현재 사용되지 않음)</param>
-    /// <param name="sttLevel">STT 레벨 (현재 사용되지 않음)</param>
-    /// <param name="enableDebugLog">디버그 로그 활성화 여부</param>
-    /// <returns>코루틴</returns>
+    // WAV 파일을 STT 서버로 전송하고 결과를 처리
     public static IEnumerator SendWavFileToSTT(MonoBehaviour monoBehaviour, byte[] wavData, 
         string sttLang = "ko", string sttLevel = "small", bool enableDebugLog = false)
     {
         yield return ProcessSTTWithVoiceFilter(monoBehaviour, wavData, sttLang, sttLevel, enableDebugLog);
     }
 
-    /// <summary>
-    /// 음성 필터링 후 STT 처리를 수행하는 코루틴
-    /// </summary>
+    // 음성 필터링 후 STT 처리를 수행하는 코루틴
     private static IEnumerator ProcessSTTWithVoiceFilter(MonoBehaviour monoBehaviour, byte[] wavData, string sttLang, string sttLevel, bool enableDebugLog)
     {
+        // Full 버전 확인
+        int installStatusIndex = InstallStatusManager.Instance.GetInstallStatusIndex();
+        
+        // Full 버전이 아니면 필터링 없이 바로 STT 처리
+        if (installStatusIndex < 2)
+        {
+            if (enableDebugLog)
+            {
+                Debug.Log("Full 버전이 아니므로 음성 필터링을 건너뜁니다.");
+            }
+            yield return SendWavFileCoroutine(wavData, sttLang, sttLevel, enableDebugLog);
+            yield break;
+        }
+
         // 음성 필터 설정 확인
         int aiVoiceFilterIdx = GetVoiceFilterSetting();
         
@@ -130,13 +125,7 @@ public static class STTUtil
         }
     }
 
-    /// <summary>
-    /// 음성 화자 분석을 통한 필터링 체크
-    /// </summary>
-    /// <param name="wavData">음성 데이터</param>
-    /// <param name="filterIdx">필터 모드 (0: 비활성화, 1: 캐릭터 매칭, 2: 비활성화)</param>
-    /// <param name="enableDebugLog">디버그 로그 활성화</param>
-    /// <param name="result">결과를 저장할 VoiceFilterResult 객체</param>
+    // 음성 화자 분석을 통한 필터링 체크
     private static IEnumerator CheckVoiceFilter(byte[] wavData, int filterIdx, bool enableDebugLog, VoiceFilterResult result)
     {
         // baseUrl을 비동기로 가져오기
@@ -152,37 +141,38 @@ public static class STTUtil
         // URL 응답 대기
         yield return new WaitUntil(() => urlReceived);
         
-        // 안드로이드인 경우 dev_voice 서버 사용
-        #if UNITY_ANDROID
-        // dev_voice 서버 URL 가져오기
-        string devVoiceUrl = null;
-        bool devUrlReceived = false;
-        
-        ServerManager.Instance.GetServerUrlFromServerId("dev_voice", (url) =>
+        // dev_voice 서버 사용 여부 확인 (Android 또는 DevSound 토글 활성화시)
+        if (SettingManager.Instance.IsDevSoundEnabled())
         {
-            devVoiceUrl = url;
-            devUrlReceived = true;
-        });
-        
-        // URL 응답 대기
-        yield return new WaitUntil(() => devUrlReceived);
-        
-        if (!string.IsNullOrEmpty(devVoiceUrl))
-        {
-            if (enableDebugLog)
+            // dev_voice 서버 URL 가져오기
+            string devVoiceUrl = null;
+            bool devUrlReceived = false;
+            
+            ServerManager.Instance.GetServerUrlFromServerId("dev_voice", (url) =>
             {
-                Debug.Log("안드로이드 환경: dev_voice 서버 URL 사용 - " + devVoiceUrl);
-            }
-            baseUrl = devVoiceUrl;
-        }
-        else
-        {
-            if (enableDebugLog)
+                devVoiceUrl = url;
+                devUrlReceived = true;
+            });
+            
+            // URL 응답 대기
+            yield return new WaitUntil(() => devUrlReceived);
+            
+            if (!string.IsNullOrEmpty(devVoiceUrl))
             {
-                Debug.LogWarning("dev_voice 서버 URL을 가져올 수 없습니다. 기본 URL을 사용합니다.");
+                if (enableDebugLog)
+                {
+                    Debug.Log("dev_voice 서버 URL 사용 - " + devVoiceUrl);
+                }
+                baseUrl = devVoiceUrl;
+            }
+            else
+            {
+                if (enableDebugLog)
+                {
+                    Debug.LogWarning("dev_voice 서버 URL을 가져올 수 없습니다. 기본 URL을 사용합니다.");
+                }
             }
         }
-        #endif
         
         string url = baseUrl + "/speech_diarization";
         
@@ -191,10 +181,11 @@ public static class STTUtil
             Debug.Log("음성 필터링 체크 URL : " + url);
         }
 
-        // 캐릭터 및 플레이어 정보 가져오기 (APIManager.cs 방식 참조)
+        // 캐릭터 및 플레이어 정보 가져오기
         string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
         string playerName = SettingManager.Instance.settings.player_name;
 
+        // 폼 데이터 생성 및 전송
         WWWForm formData = new WWWForm();
         formData.AddBinaryData("file", wavData, "voice_check.wav", "audio/wav");
         formData.AddField("player", playerName);
@@ -250,9 +241,7 @@ public static class STTUtil
         }
     }
 
-    /// <summary>
-    /// 음성 필터 설정값을 가져옵니다
-    /// </summary>
+    // 음성 필터 설정값을 가져오기 (0: None, 1: Skip AI Voice, 2: User Voice Only)
     private static int GetVoiceFilterSetting()
     {
         try
@@ -270,6 +259,7 @@ public static class STTUtil
         }
     }
 
+    // WAV 파일을 STT 서버로 전송
     private static IEnumerator SendWavFileCoroutine(byte[] wavData, string sttLang, string sttLevel, bool enableDebugLog)
     {
         // baseUrl을 비동기로 가져오기
@@ -285,37 +275,38 @@ public static class STTUtil
         // URL 응답 대기
         yield return new WaitUntil(() => urlReceived);
         
-        // 안드로이드인 경우 dev_voice 서버 사용
-        #if UNITY_ANDROID
-        // dev_voice 서버 URL 가져오기
-        string devVoiceUrl = null;
-        bool devUrlReceived = false;
-        
-        ServerManager.Instance.GetServerUrlFromServerId("dev_voice", (url) =>
+        // dev_voice 서버 사용 여부 확인 (Android 또는 DevSound 토글 활성화시)
+        if (SettingManager.Instance.IsDevSoundEnabled())
         {
-            devVoiceUrl = url;
-            devUrlReceived = true;
-        });
-        
-        // URL 응답 대기
-        yield return new WaitUntil(() => devUrlReceived);
-        
-        if (!string.IsNullOrEmpty(devVoiceUrl))
-        {
-            if (enableDebugLog)
+            // dev_voice 서버 URL 가져오기
+            string devVoiceUrl = null;
+            bool devUrlReceived = false;
+            
+            ServerManager.Instance.GetServerUrlFromServerId("dev_voice", (sttUrl) =>
             {
-                Debug.Log("안드로이드 환경: STT용 dev_voice 서버 URL 사용 - " + devVoiceUrl);
-            }
-            baseUrl = devVoiceUrl;
-        }
-        else
-        {
-            if (enableDebugLog)
+                devVoiceUrl = sttUrl;
+                devUrlReceived = true;
+            });
+            
+            // URL 응답 대기
+            yield return new WaitUntil(() => devUrlReceived);
+            
+            if (!string.IsNullOrEmpty(devVoiceUrl))
             {
-                Debug.LogWarning("STT용 dev_voice 서버 URL을 가져올 수 없습니다. 기본 URL을 사용합니다.");
+                if (enableDebugLog)
+                {
+                    Debug.Log("STT용 dev_voice 서버 URL 사용 - " + devVoiceUrl);
+                }
+                baseUrl = devVoiceUrl;
+            }
+            else
+            {
+                if (enableDebugLog)
+                {
+                    Debug.LogWarning("STT용 dev_voice 서버 URL을 가져올 수 없습니다. 기본 URL을 사용합니다.");
+                }
             }
         }
-        #endif
         
         string url = baseUrl + "/stt"; // http://localhost:5000/stt
         
@@ -324,9 +315,11 @@ public static class STTUtil
             Debug.Log("STT URL : " + url);
         }
 
+        // chatIdx 증가
         GameManager.Instance.chatIdx += 1;
         GameManager.Instance.chatIdxRegenerateCount = 0;
 
+        // 폼 데이터 생성 및 전송
         WWWForm formData = new WWWForm();
         formData.AddBinaryData("file", wavData, "stt.wav", "audio/wav");
         formData.AddField("lang", "ko");
@@ -349,9 +342,7 @@ public static class STTUtil
             {
                 // JSON 응답 파싱
                 string responseText = request.downloadHandler.text;
-
                 var responseJson = JsonUtility.FromJson<SttResponse>(responseText);
-
                 string query = responseJson.text ?? "";
 
                 // STT 결과 처리
@@ -364,12 +355,7 @@ public static class STTUtil
         }
     }
 
-    /// <summary>
-    /// STT 결과를 처리합니다.
-    /// </summary>
-    /// <param name="query">인식된 텍스트</param>
-    /// <param name="chatIdx">채팅 인덱스</param>
-    /// <param name="lang">인식된 언어</param>
+    // STT 결과를 처리
     private static void ProcessSTTResult(string query, string chatIdx, string lang)
     {
         // 풍선에 인식된 텍스트 표시
