@@ -1,6 +1,7 @@
 // From ContextMenuTrigger
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 using DevionGames.UIWidgets;
 using ContextMenu = DevionGames.UIWidgets.ContextMenu;
@@ -159,6 +160,17 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         isSampleVer = false;
 #endif
 
+        // DevMode 체크: UNITY_EDITOR이거나 F12를 눌러서 DevMode를 활성화했을 경우 true
+        bool isDevModeEnabled = false;
+#if UNITY_EDITOR
+        isDevModeEnabled = true;
+#else
+        if (DevManager.Instance != null)
+        {
+            isDevModeEnabled = DevManager.Instance.IsDevModeEnabled();
+        }
+#endif
+
         // setting
         // menuName = LanguageData.Translate("Settings", targetLang);  // Setting은 언어 상관없이 영어로
         m_ContextMenu.AddMenuItem("Settings", delegate {
@@ -169,7 +181,6 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Character", targetLang), new List<(string, UnityAction)>
         {
             (LanguageData.Translate("Action", targetLang), delegate { OnPointerDownRadialMenuAction(); }),
-            // (LanguageData.Translate("Change Char", targetLang), isSampleVer ? null : delegate { UIManager.Instance.ShowCharChange();}),
             (LanguageData.Translate("Change Char", targetLang), delegate { UIManager.Instance.ShowCharChange();}),
             (LanguageData.Translate("Summon Char", targetLang), delegate { UIManager.Instance.ShowCharSummon(); }),
             (LanguageData.Translate("Change Clothes", targetLang),
@@ -181,11 +192,11 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
             ),
         });
 
-        // Chat
+        // Chat - 채팅
         m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Chat", targetLang), new List<(string, UnityAction)>
         {
             (LanguageData.Translate("Guideline", targetLang), delegate { UIManager.Instance.ShowGuideLine(); }), 
-            (LanguageData.Translate("Situation", targetLang), delegate { UIManager.Instance.ShowUIChatSituation(); }), // TODO : 구현 예정
+            (LanguageData.Translate("Situation", targetLang), delegate { UIManager.Instance.ShowUIChatSituation(); }), 
             (LanguageData.Translate("New Chat", targetLang), delegate {
                 MemoryManager.Instance.ResetConversationMemory();
                 AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
@@ -200,7 +211,7 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
             (LanguageData.Translate("Chat History", targetLang), delegate { UIManager.Instance.ShowChatHistory(); }),
         });
 
-        // Control
+        // Control - 제어
         m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Control", targetLang), new List<(string, UnityAction)>
         {
             (LanguageData.Translate("Show Voice Panel", targetLang), delegate { TalkMenuManager.Instance.ShowTalkMenu(); }),
@@ -221,55 +232,50 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
             )
         });
 
-        // Screen
-#if UNITY_STANDALONE_WIN
-        m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Screen", targetLang), new List<(string, UnityAction)>
-        {
-            (LanguageData.Translate("Set Screenshot Area", targetLang), isSampleVer ? null :  delegate {
-                ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
-                if (sm != null) sm.SetScreenshotArea();
-            }),
-            (LanguageData.Translate("Show Screenshot Result", targetLang), isSampleVer ? null : delegate {
-                ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
-                if (sm != null) {
-                    sm.SaveScreenshot();
-                    sm.ShowScreenshotImage();
-                }
-            })
-        });
-#endif
+        // Screen - 화면 : 조금 더 고급화 해서 돌아오자.
+// #if UNITY_STANDALONE_WIN
+//         m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Screen", targetLang), new List<(string, UnityAction)>
+//         {
+//             (LanguageData.Translate("Set Screenshot Area", targetLang), isSampleVer ? null :  delegate {
+//                 ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+//                 if (sm != null) sm.SetScreenshotArea();
+//             }),
+//             (LanguageData.Translate("Show Screenshot Result", targetLang), isSampleVer ? null : delegate {
+//                 ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+//                 if (sm != null) {
+//                     sm.SaveScreenshot();
+//                     sm.ShowScreenshotImage();
+//                 }
+//             })
+//         });
+// #endif
         // Talk
         m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Talk", targetLang), new List<(string, UnityAction)>
         {
-            (LanguageData.Translate("Show Tutorial", targetLang), isSampleVer ? null : delegate { ScenarioTutorialManager.Instance.StartTutorial(); }),
-            (LanguageData.Translate("Idle Talk", targetLang), isSampleVer ? null : delegate { 
+            (LanguageData.Translate("Edition 튜토리얼", targetLang), delegate { ScenarioInstallerManager.Instance.StartInstaller(); }),
+            (LanguageData.Translate("Setting 튜토리얼", targetLang), delegate { ScenarioTutorialManager.Instance.StartTutorial(); }),
+            (LanguageData.Translate("Idle Talk", targetLang), async delegate { 
+                // Full 버전 이상인지 확인
+                if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+                {
+                    return;
+                }
                 string purpose = "잡담"; // 기본 목적
                 APIManager.Instance.CallSmallTalkStream(purpose);
             }), // 잡담
-            (LanguageData.Translate("AROPLA CHANNEL", targetLang), delegate {
-                // 아로프라 채널 모드 토글
-                if (APIAroPlaManager.Instance != null)
-                {
-                    APIAroPlaManager.Instance.ToggleAroplaMode();
-                    string status = APIAroPlaManager.Instance.IsAroplaMode() ? "활성화" : "비활성화";
-                    Debug.Log($"아로프라 채널 모드 {status}");
-                    
-                    // 상태 표시
-                    AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
-                    AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText($"아로프라 채널 {status}됨");
-                }
-                else
-                {
-                    Debug.LogError("APIAroPlaManager 인스턴스를 찾을 수 없습니다.");
-                }
-             }),
         });
 
         // Util
         m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Experiment", targetLang), new List<(string, UnityAction)>
         {
             // (LanguageData.Translate("Alarm", targetLang), true ? null : delegate { Debug.Log("[Alarm] 알람 기능 호출됨"); }),
-            (LanguageData.Translate("20 Questions Game", targetLang), delegate {
+            (LanguageData.Translate("20 Questions Game", targetLang), async delegate {
+                // Full 버전 이상인지 확인
+                if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+                {
+                    return;
+                }
+
                 // 스무고개 게임 모드 토글
                 MiniGame20QManager.Instance.Toggle20QMode();
                 string status = MiniGame20QManager.Instance.Is20QMode() ? "활성화" : "비활성화";
@@ -293,11 +299,69 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
                     // Panel 숨기기
                     UIGame20QPanelManager.Instance.HidePanel();
                 }
-             })
+             }),
+            (LanguageData.Translate("AROPLA CHANNEL", targetLang), async delegate {
+                // Full 버전 이상인지 확인
+                if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+                {
+                    return;
+                }
+
+                // 아로프라 채널 모드 토글
+                if (APIAroPlaManager.Instance != null)
+                {
+                    APIAroPlaManager.Instance.ToggleAroplaMode();
+                    string status = APIAroPlaManager.Instance.IsAroplaMode() ? "활성화" : "비활성화";
+                    Debug.Log($"아로프라 채널 모드 {status}");
+                    
+                    // 상태 표시
+                    AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+                    AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText($"아로프라 채널 {status}됨");
+                }
+                else
+                {
+                    Debug.LogError("APIAroPlaManager 인스턴스를 찾을 수 없습니다.");
+                }
+             }),
+            (LanguageData.Translate("Set Screenshot Area", targetLang), async delegate {
+                // Full 버전 이상인지 확인
+                if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+                {
+                    return;
+                }
+
+                ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+                if (sm != null) sm.SetScreenshotArea();
+            }),
+            (LanguageData.Translate("Show Screenshot Result", targetLang), async delegate {
+                // Full 버전 이상인지 확인
+                if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+                {
+                    return;
+                }
+
+                ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+                if (sm != null) {
+                    sm.ShowScreenshotImage();
+                }
+            }),
+            (LanguageData.Translate("Save and Show Screenshot", targetLang), async delegate {
+                // Full 버전 이상인지 확인
+                if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+                {
+                    return;
+                }
+
+                ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+                if (sm != null) {
+                    sm.SaveAndShowScreenshot();
+                }
+            })
         });
 
-        // Dev
-#if UNITY_EDITOR
+        // Dev - UNITY_EDITOR이거나 DevMode가 활성화된 경우에만 표시
+        if (isDevModeEnabled)
+        {
         m_ContextMenu.AddMenuItem(LanguageData.Translate("Debug", targetLang), delegate
         {
             // EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), 10.0f);
@@ -312,7 +376,7 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Dev", targetLang), new List<(string, UnityAction)>
         {
             (LanguageData.Translate("Test", targetLang), delegate {
-                UIChatSituationManager.Instance.ResetScrollPosition();
+                ClipboardManager.Instance.GetContentFromClipboard();
             }),
             (LanguageData.Translate("Test2", targetLang), delegate { 
                 // 아로프라 채널 모드 토글
@@ -331,9 +395,64 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
                     Debug.LogError("APIAroPlaManager 인스턴스를 찾을 수 없습니다.");
                 }
             }),
-            (LanguageData.Translate("Test3", targetLang), delegate { Debug.Log("Test3 실행"); })
-        });
-#endif
+                (LanguageData.Translate("Test3", targetLang), delegate {
+                    Debug.Log("Test3 실행");
+
+                    // 전체화면 OCR 실행
+                    ScreenshotOCRManager ocrManager = FindObjectOfType<ScreenshotOCRManager>();
+                    if (ocrManager != null)
+                    {
+                        ocrManager.ExecuteFullScreenOCR();
+                    }
+                    else
+                    {
+                        Debug.LogError("ScreenshotOCRManager 인스턴스를 찾을 수 없습니다.");
+                    }
+                }),
+                (LanguageData.Translate("Test4", targetLang), delegate {
+                    Debug.Log("Test4 실행 - 영역 OCR");
+
+                    // 영역 OCR 실행 (ScreenshotManager에서 설정한 영역)
+                    ScreenshotOCRManager ocrManager = FindObjectOfType<ScreenshotOCRManager>();
+                    if (ocrManager != null)
+                    {
+                        ocrManager.ExecuteAreaOCR();
+                    }
+                    else
+                    {
+                        Debug.LogError("ScreenshotOCRManager 인스턴스를 찾을 수 없습니다.");
+                    }
+                }),
+                (LanguageData.Translate("Test5", targetLang), delegate {
+                    Debug.Log("Test5 실행 - 전체화면 OCR + 번역");
+
+                    // 전체화면 OCR + 번역 실행
+                    ScreenshotOCRManager ocrManager = FindObjectOfType<ScreenshotOCRManager>();
+                    if (ocrManager != null)
+                    {
+                        ocrManager.ExecuteFullScreenOCRWithTranslate("ko");
+                    }
+                    else
+                    {
+                        Debug.LogError("ScreenshotOCRManager 인스턴스를 찾을 수 없습니다.");
+                    }
+                }),
+                (LanguageData.Translate("Test6", targetLang), delegate {
+                    Debug.Log("Test6 실행 - 영역 OCR + 번역");
+
+                    // 영역 OCR + 번역 실행 (ScreenshotManager에서 설정한 영역)
+                    ScreenshotOCRManager ocrManager = FindObjectOfType<ScreenshotOCRManager>();
+                    if (ocrManager != null)
+                    {
+                        ocrManager.ExecuteAreaOCRWithTranslate("ko");
+                    }
+                    else
+                    {
+                        Debug.LogError("ScreenshotOCRManager 인스턴스를 찾을 수 없습니다.");
+                    }
+                })
+            });
+        }
 
         // Version
         m_ContextMenu.AddMenuItem(LanguageData.Translate("Version", targetLang), delegate {
