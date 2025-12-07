@@ -3,12 +3,28 @@ using System.Collections;
 using System.Runtime.InteropServices;
 using System;
 
+/// 전역입력 감지 매니저
+/// 단 버벅임이 발생함.필요한 구간에서 필요할때만 사용하기
 public class GlobalInputManager : MonoBehaviour
 {
     private static GlobalInputManager instance;
     
+    // 체크할 키 목록
+    private KeyCode[] keysToCheck = new KeyCode[] 
+    {
+        KeyCode.Return,  // 엔터
+        KeyCode.KeypadEnter  // 넘패드 엔터
+    };
+    
+    // 입력 감지 쓰로틀링 설정
+    private const float MOUSE_DISTANCE_UPDATE_INTERVAL = 0.1f; // 100ms마다 (초당 10회)
+    private float lastMouseDistanceUpdateTime = 0f;
+    
     // 마우스 이전 위치 저장
     private Vector3 lastMousePosition;
+    
+    // 카메라 캐싱 (Camera.main 반복 호출 방지)
+    private Camera mainCamera;
     
     // Windows API 키보드 후킹
     #if UNITY_STANDALONE_WIN && !UNITY_EDITOR
@@ -86,6 +102,7 @@ public class GlobalInputManager : MonoBehaviour
     void Start()
     {
         lastMousePosition = Input.mousePosition;
+        mainCamera = Camera.main; // 카메라 캐싱
         LogToDebugBalloon("[GlobalInputManager] 전역 입력 관리자 시작됨");
         
         #if UNITY_STANDALONE_WIN && !UNITY_EDITOR
@@ -114,7 +131,7 @@ public class GlobalInputManager : MonoBehaviour
         DetectKeyboardInput();
         
         // 마우스 이동 감지
-        DetectMouseMovement();
+        // DetectMouseMovement();
     }
 
     void DetectMouseInput()
@@ -123,20 +140,38 @@ public class GlobalInputManager : MonoBehaviour
         if (Input.GetMouseButtonDown(0))
         {
             Vector3 mousePos = Input.mousePosition;
-            Vector3 worldPos = Camera.main.ScreenToWorldPoint(mousePos);
+            Vector3 worldPos = mainCamera != null ? mainCamera.ScreenToWorldPoint(mousePos) : Vector3.zero;
             LogToDebugBalloon($"[GlobalInput] 마우스 왼쪽 클릭 - 스크린: {mousePos}, 월드: {worldPos}");
+            
+            // GlobalInputVariableManager에 좌클릭 통계 추가
+            if (GlobalInputVariableManager.Instance != null)
+            {
+                GlobalInputVariableManager.Instance.AddLeftClick();
+            }
         }
         
         if (Input.GetMouseButtonDown(1))
         {
             Vector3 mousePos = Input.mousePosition;
             LogToDebugBalloon($"[GlobalInput] 마우스 오른쪽 클릭 - 스크린: {mousePos}");
+            
+            // GlobalInputVariableManager에 우클릭 통계 추가
+            if (GlobalInputVariableManager.Instance != null)
+            {
+                GlobalInputVariableManager.Instance.AddRightClick();
+            }
         }
         
         if (Input.GetMouseButtonDown(2))
         {
             Vector3 mousePos = Input.mousePosition;
             LogToDebugBalloon($"[GlobalInput] 마우스 휠 클릭 - 스크린: {mousePos}");
+            
+            // GlobalInputVariableManager에 휠클릭 통계 추가
+            if (GlobalInputVariableManager.Instance != null)
+            {
+                GlobalInputVariableManager.Instance.AddMiddleClick();
+            }
         }
         
         // 마우스 버튼 릴리즈 감지
@@ -157,6 +192,16 @@ public class GlobalInputManager : MonoBehaviour
         if (scroll != 0f)
         {
             LogToDebugBalloon($"[GlobalInput] 마우스 휠 스크롤: {scroll} (위: +, 아래: -)");
+        }
+        
+        // 마우스 이동거리 통계 (Unity Input 버전) - 쓰로틀링 적용
+        float currentTime = Time.time;
+        if (GlobalInputVariableManager.Instance != null && 
+            currentTime - lastMouseDistanceUpdateTime >= MOUSE_DISTANCE_UPDATE_INTERVAL)
+        {
+            Vector3 currentMousePos = Input.mousePosition;
+            GlobalInputVariableManager.Instance.UpdateMouseDistance(new Vector2(currentMousePos.x, currentMousePos.y));
+            lastMouseDistanceUpdateTime = currentTime;
         }
     }
 
@@ -200,19 +245,29 @@ public class GlobalInputManager : MonoBehaviour
     {
         // 에디터나 Windows가 아닌 환경에서는 기본 Unity Input 사용
         #if UNITY_EDITOR || !UNITY_STANDALONE_WIN
-        // 모든 키 입력 감지 (KeyCode 기반)
-        foreach (KeyCode keyCode in System.Enum.GetValues(typeof(KeyCode)))
+        // 필요한 키만 체크 (성능 최적화)
+        foreach (KeyCode keyCode in keysToCheck)
         {
             if (Input.GetKeyDown(keyCode))
             {
                 LogToDebugBalloon($"[GlobalInput] 키 입력: {keyCode}");
+                
+                // GlobalInputVariableManager에 키보드 입력 통계 추가
+                if (GlobalInputVariableManager.Instance != null)
+                {
+                    GlobalInputVariableManager.Instance.AddKeyboardInput(keyCode.ToString());
+                }
+                if (keyCode == KeyCode.F12)
+                {
+                    PressF12();
+                }
             }
         }
         
-        // 입력된 문자도 추가로 표시 (한글, 특수문자 등)
+        // 입력된 문자 표시(로깅 전용). 통계는 KeyDown에서만 집계하여 중복 방지
         foreach (char c in Input.inputString)
         {
-            if (c != 0) // null 문자가 아닌 모든 문자
+            if (c != 0)
             {
                 string displayChar = c.ToString();
                 if (c == '\b') displayChar = "백스페이스";
@@ -220,12 +275,31 @@ public class GlobalInputManager : MonoBehaviour
                 else if (c == '\t') displayChar = "탭";
                 else if (c == ' ') displayChar = "스페이스";
                 else if (char.IsControl(c)) displayChar = $"제어문자({(int)c})";
-                
+
                 LogToDebugBalloon($"[GlobalInput] 문자 입력: '{displayChar}' (코드: {(int)c})");
+                // 통계 증가 제거: KeyDown에서만 처리
             }
         }
         #endif
         // Windows 빌드에서는 전역 후킹으로 키보드 입력 감지 (HookCallback에서 처리)
+    }
+
+    // 마우스 KeyCode 여부 판별 (키보드 집계에서 제외하기 위함)
+    private static bool IsMouseKey(KeyCode keyCode)
+    {
+        switch (keyCode)
+        {
+            case KeyCode.Mouse0:
+            case KeyCode.Mouse1:
+            case KeyCode.Mouse2:
+            case KeyCode.Mouse3:
+            case KeyCode.Mouse4:
+            case KeyCode.Mouse5:
+            case KeyCode.Mouse6:
+                return true;
+            default:
+                return false;
+        }
     }
 
     #if UNITY_STANDALONE_WIN && !UNITY_EDITOR
@@ -261,6 +335,17 @@ public class GlobalInputManager : MonoBehaviour
                 int vkCode = Marshal.ReadInt32(lParam);
                 string keyName = GetKeyName(vkCode);
                 _instance.LogToDebugBalloon($"[GlobalInput] 전역 키 입력: {keyName} (VK:{vkCode})");
+                
+                if (vkCode == 0x7B) // F12
+                {
+                    _instance.PressF12();
+                }
+                
+                // GlobalInputVariableManager에 키보드 입력 통계 추가
+                if (GlobalInputVariableManager.Instance != null)
+                {
+                    GlobalInputVariableManager.Instance.AddKeyboardInput(keyName);
+                }
             }
         }
         
@@ -279,18 +364,33 @@ public class GlobalInputManager : MonoBehaviour
             {
                 case WM_LBUTTONDOWN:
                     _instance.LogToDebugBalloon($"[GlobalInput] 전역 마우스 왼쪽 클릭 - 위치: ({mousePos.x}, {mousePos.y})");
+                    // GlobalInputVariableManager에 좌클릭 통계 추가
+                    if (GlobalInputVariableManager.Instance != null)
+                    {
+                        GlobalInputVariableManager.Instance.AddLeftClick();
+                    }
                     break;
                 case WM_LBUTTONUP:
                     _instance.LogToDebugBalloon($"[GlobalInput] 전역 마우스 왼쪽 릴리즈 - 위치: ({mousePos.x}, {mousePos.y})");
                     break;
                 case WM_RBUTTONDOWN:
                     _instance.LogToDebugBalloon($"[GlobalInput] 전역 마우스 오른쪽 클릭 - 위치: ({mousePos.x}, {mousePos.y})");
+                    // GlobalInputVariableManager에 우클릭 통계 추가
+                    if (GlobalInputVariableManager.Instance != null)
+                    {
+                        GlobalInputVariableManager.Instance.AddRightClick();
+                    }
                     break;
                 case WM_RBUTTONUP:
                     _instance.LogToDebugBalloon($"[GlobalInput] 전역 마우스 오른쪽 릴리즈 - 위치: ({mousePos.x}, {mousePos.y})");
                     break;
                 case WM_MBUTTONDOWN:
                     _instance.LogToDebugBalloon($"[GlobalInput] 전역 마우스 휠 클릭 - 위치: ({mousePos.x}, {mousePos.y})");
+                    // GlobalInputVariableManager에 휠클릭 통계 추가
+                    if (GlobalInputVariableManager.Instance != null)
+                    {
+                        GlobalInputVariableManager.Instance.AddMiddleClick();
+                    }
                     break;
                 case WM_MBUTTONUP:
                     _instance.LogToDebugBalloon($"[GlobalInput] 전역 마우스 휠 릴리즈 - 위치: ({mousePos.x}, {mousePos.y})");
@@ -300,10 +400,16 @@ public class GlobalInputManager : MonoBehaviour
                     string direction = wheelDelta > 0 ? "위로" : "아래로";
                     _instance.LogToDebugBalloon($"[GlobalInput] 전역 마우스 휠 스크롤 {direction} - 위치: ({mousePos.x}, {mousePos.y})");
                     break;
-                // WM_MOUSEMOVE는 너무 많은 로그를 생성하므로 주석처리
-                // case WM_MOUSEMOVE:
-                //     _instance.LogToDebugBalloon($"[GlobalInput] 전역 마우스 이동 - 위치: ({mousePos.x}, {mousePos.y})");
-                //     break;
+                case WM_MOUSEMOVE:
+                    // 마우스 이동거리 통계 추가 - 쓰로틀링 적용
+                    float currentTime = Time.time;
+                    if (GlobalInputVariableManager.Instance != null &&
+                        currentTime - _instance.lastMouseDistanceUpdateTime >= MOUSE_DISTANCE_UPDATE_INTERVAL)
+                    {
+                        GlobalInputVariableManager.Instance.UpdateMouseDistanceFromScreenCoords(mousePos.x, mousePos.y);
+                        _instance.lastMouseDistanceUpdateTime = currentTime;
+                    }
+                    break;
             }
         }
         
@@ -388,18 +494,19 @@ public class GlobalInputManager : MonoBehaviour
     // 입력 감지 활성화/비활성화
     private bool inputDetectionEnabled = true;
     
-    // DebugBalloon에 로그를 출력하는 메서드
+    // DebugBalloon에 로그를 출력하는 메서드(Test용)
     private void LogToDebugBalloon(string message)
     {
         // DebugBalloonManager가 있으면 사용, 없으면 일반 Debug.Log 사용
         if (DebugBalloonManager.Instance != null)
         {
-            DebugBalloonManager.Instance.AddDebugLog(message);
-            Debug.Log(message);
+            // InputManager에서는 더 이상 표기 안함
+            // DebugBalloonManager.Instance.AddDebugLog(message);
+            // Debug.Log(message);
         }
         else
         {
-            Debug.Log(message);
+            // Debug.Log(message);
         }
     }
     
@@ -412,5 +519,14 @@ public class GlobalInputManager : MonoBehaviour
     public bool IsInputDetectionEnabled()
     {
         return inputDetectionEnabled;
+    }
+
+    // F12 키 입력 시 호출되는 함수
+    public void PressF12()
+    {
+        if (DevManager.Instance != null)
+        {
+            DevManager.Instance.ToggleShowSettingDevTab();
+        }
     }
 }
