@@ -25,6 +25,10 @@ public class APIManager : MonoBehaviour
     private bool isResponsedStarted = false; // 첫 반환이 돌아왔는지 여부
     private bool isAnswerStarted = false; // 첫 대답이 시작했는지 여부
     private string logFilePath; // 로그 파일 경로
+
+    private DateTime lastSmallTalkCallTime = DateTime.MinValue;
+    private bool isSmallTalkWaiting = false;
+    private GameObject questionEmotionBalloonInstance;
     
     // 스크린샷 전송 방식 (true: 캡처→전송→저장, false: 기존 파일 전송)
     private bool isSendScreenshotFirst = true;
@@ -82,6 +86,25 @@ public class APIManager : MonoBehaviour
     // Small Talk 호출
     public async void CallSmallTalkStream(string purpose = "잡담", string currentSpeaker = null, string chatIdx = "-1", string aiLanguage = null)
     {
+        // 호출 제한 체크
+        DateTime now = DateTime.Now;
+
+        if ((now - lastSmallTalkCallTime).TotalSeconds < 3)
+        {
+            Debug.Log("[SmallTalk] 호출 간격 부족 (3초 미경과)");
+            EmotionBalloonManager.Instance.ShowNoEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), 2f);
+            return;
+        }
+        if (isSmallTalkWaiting && (now - lastSmallTalkCallTime).TotalSeconds < 10)
+        {
+            Debug.Log("[SmallTalk] 답변 대기 중 (10초 미경과)");
+            EmotionBalloonManager.Instance.ShowNoEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), 2f);
+            return;
+        }
+        lastSmallTalkCallTime = now;
+        isSmallTalkWaiting = true;
+        ShowQuestionBalloon();
+
         // baseUrl을 비동기로 가져오기
         var tcs = new TaskCompletionSource<string>();
         ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
@@ -324,6 +347,11 @@ public class APIManager : MonoBehaviour
         catch (Exception ex)
         {
             Debug.Log($"SmallTalkStream Exception: {ex.Message}");
+        }
+        finally
+        {
+            isSmallTalkWaiting = false;
+            DestroyQuestionBalloon();
         }
     }
 
@@ -802,6 +830,7 @@ public class APIManager : MonoBehaviour
 
         Debug.Log("All replies have been received.");
         LogToFile("ProcessReply completed."); // ProcessReply 완료 로그
+        DestroyQuestionBalloon();
 
         // 다국어 답변 조립
         string replyKo = string.Join(" ", replyListKo);
@@ -1066,6 +1095,10 @@ public class APIManager : MonoBehaviour
         catch (Exception ex)
         {
             Debug.Log($"Exception: {ex.Message}");
+        }
+        finally
+        {
+            DestroyQuestionBalloon();
         }
     }
 
@@ -1970,6 +2003,24 @@ public class APIManager : MonoBehaviour
         }
     }
 
+    private void ShowQuestionBalloon()
+    {
+        if (questionEmotionBalloonInstance != null)
+        {
+            Destroy(questionEmotionBalloonInstance);
+        }
+        questionEmotionBalloonInstance = EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), "Question");
+    }
+
+    private void DestroyQuestionBalloon()
+    {
+        if (questionEmotionBalloonInstance != null)
+        {
+            Destroy(questionEmotionBalloonInstance);
+            questionEmotionBalloonInstance = null;
+        }
+    }
+
     // 현재 선택된 모델 ID 가져오기
     private string GetCurrentModelId()
     {
@@ -2013,10 +2064,20 @@ public class APIManager : MonoBehaviour
 
         try
         {
-            // baseUrl을 비동기로 가져오기
+            // dev_ocr_translate 서버 URL 가져오기
             var tcs = new TaskCompletionSource<string>();
-            ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
+            ServerManager.Instance.GetServerUrlFromServerId("dev_ocr_translate", (url) =>
+            {
+                tcs.SetResult(url);
+            });
             string baseUrl = await tcs.Task;
+            
+            if (string.IsNullOrEmpty(baseUrl))
+            {
+                Debug.LogError("[PaddleOCR] dev_ocr_translate 서버 URL을 가져올 수 없습니다.");
+                callback?.Invoke(null);
+                return;
+            }
             
             string url = baseUrl + "/paddle/ocr";
             Debug.Log($"[PaddleOCR] URL: {url}");
@@ -2154,10 +2215,20 @@ public class APIManager : MonoBehaviour
 
         try
         {
-            // baseUrl을 비동기로 가져오기
+            // dev_ocr_translate 서버 URL 가져오기
             var tcs = new TaskCompletionSource<string>();
-            ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
+            ServerManager.Instance.GetServerUrlFromServerId("dev_ocr_translate", (url) =>
+            {
+                tcs.SetResult(url);
+            });
             string baseUrl = await tcs.Task;
+            
+            if (string.IsNullOrEmpty(baseUrl))
+            {
+                Debug.LogError("[PaddleOCR+Translate] dev_ocr_translate 서버 URL을 가져올 수 없습니다.");
+                callback?.Invoke(null);
+                return;
+            }
             
             string url = baseUrl + "/paddle/ocr_with_translate";
             Debug.Log($"[PaddleOCR+Translate] URL: {url}, target_lang: {targetLang}");

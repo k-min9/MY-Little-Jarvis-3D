@@ -8,6 +8,8 @@ using System.IO;
 // MicrophoneNormal과 VADController에서 중복되던 STT 로직을 통합
 public static class STTUtil
 {
+    private static GameObject writeEmotionBalloonInstance;
+
     // STT API 응답 데이터 구조
     [System.Serializable]
     public class SttResponse
@@ -66,7 +68,15 @@ public static class STTUtil
     public static IEnumerator SendWavFileToSTT(MonoBehaviour monoBehaviour, byte[] wavData, 
         string sttLang = "ko", string sttLevel = "small", bool enableDebugLog = false)
     {
-        yield return ProcessSTTWithVoiceFilter(monoBehaviour, wavData, sttLang, sttLevel, enableDebugLog);
+        ShowWriteBalloon();
+        try
+        {
+            yield return ProcessSTTWithVoiceFilter(monoBehaviour, wavData, sttLang, sttLevel, enableDebugLog);
+        }
+        finally
+        {
+            DestroyWriteBalloon();
+        }
     }
 
     // 음성 필터링 후 STT 처리를 수행하는 코루틴
@@ -358,8 +368,31 @@ public static class STTUtil
     // STT 결과를 처리
     private static void ProcessSTTResult(string query, string chatIdx, string lang)
     {
-        // 풍선에 인식된 텍스트 표시
-        NoticeBalloonManager.Instance.ModifyNoticeBalloonText(query);
+        // 빈 쿼리 체크 (방어적 프로그래밍)
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            Debug.LogWarning("[STTUtil] Query is empty or whitespace. Skipping processing.");
+            return;
+        }
+
+        // STT Preview 설정여부 
+        if (ChatBalloonManager.Instance != null && 
+            ChatBalloonManager.Instance.chatBalloonMode != "off" && 
+            SettingManager.Instance.settings.editSttinChatInput)
+        {
+            // ChatBalloon이 활성화되어 있으면 InputField에 텍스트만 추가
+            ChatBalloonManager.Instance.AppendSTTTextToInputField(query);
+            
+            // NoticeBalloon에도 표시 (사용자 피드백용)
+            NoticeBalloonManager.Instance.ModifyNoticeBalloonText($"[입력됨] {query}");
+            
+            Debug.Log($"[STTUtil] STT 결과를 InputField에 추가: {query}");
+            return; // 바로 전송하지 않고 종료
+        }
+        else 
+        {
+            // 바로 API 호출
+            NoticeBalloonManager.Instance.ModifyNoticeBalloonText(query);  // 풍선에 인식된 텍스트 표시
 
         // 대화 시작
         APIManager.Instance.CallConversationStream(query, chatIdx, lang);
@@ -372,5 +405,26 @@ public static class STTUtil
 
         // 기존 음성 중지 및 초기화
         VoiceManager.Instance.ResetAudio();
+        }
+    }
+
+    private static void ShowWriteBalloon()
+    {
+        if (EmotionBalloonManager.Instance == null) return;
+
+        if (writeEmotionBalloonInstance != null)
+        {
+            UnityEngine.Object.Destroy(writeEmotionBalloonInstance);
+        }
+        writeEmotionBalloonInstance = EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), "Write", 15f);
+    }
+
+    private static void DestroyWriteBalloon()
+    {
+        if (writeEmotionBalloonInstance != null)
+        {
+            UnityEngine.Object.Destroy(writeEmotionBalloonInstance);
+            writeEmotionBalloonInstance = null;
+        }
     }
 }

@@ -21,20 +21,11 @@ public class WhisperSTTManager : MonoBehaviour
 
     [Header("Whisper Settings")]
     [SerializeField] private WhisperManager whisperManager;
+    private GameObject writeEmotionBalloonInstance;
 
     private void Awake()
     {
-        // 싱글톤 초기화
-        if (instance == null)
-        {
-            instance = this;
-            DontDestroyOnLoad(gameObject);
-            InitializeWhisper();
-        }
-        else if (instance != this)
-        {
-            Destroy(gameObject);
-        }
+        InitializeWhisper();
     }
 
     void InitializeWhisper()
@@ -59,60 +50,70 @@ public class WhisperSTTManager : MonoBehaviour
     public IEnumerator ProcessSTTFromWavData(byte[] wavData, string lang = "ko")
     {
         Debug.Log("Starting internal Whisper STT processing...");
+        ShowWriteBalloon();
         
-        // WAV 데이터를 AudioClip으로 변환
-        AudioClip audioClip = WavDataToAudioClip(wavData);
-        
-        if (audioClip == null)
+        try
         {
-            Debug.LogError("Failed to convert WAV data to AudioClip");
-            yield break;
-        }
+            // WAV 데이터를 AudioClip으로 변환
+            AudioClip audioClip = WavDataToAudioClip(wavData);
+            
+            if (audioClip == null)
+            {
+                Debug.LogError("Failed to convert WAV data to AudioClip");
+                yield break;
+            }
 
-        Debug.Log($"Audio converted: {audioClip.length}s, {audioClip.frequency}Hz");
+            Debug.Log($"Audio converted: {audioClip.length}s, {audioClip.frequency}Hz");
 
-        // Whisper STT 실행
-        var whisperTask = whisperManager.GetTextAsync(audioClip);
-        
-        // Task 완료까지 대기
-        while (!whisperTask.IsCompleted)
-        {
-            yield return null;
-        }
-        
-        // 결과 처리
-        string result = "";
-        
-        if (whisperTask.Exception != null)
-        {
-            Debug.LogError($"Whisper STT failed: {whisperTask.Exception.Message}");
-        }
-        else if (whisperTask.Result != null && whisperTask.Result.Result != null)
-        {
-            result = whisperTask.Result.Result;
-            Debug.Log($"Whisper STT completed: {result}");
-        }
-        else
-        {
-            Debug.LogWarning("Whisper STT returned null result");
-        }
+            // Whisper STT 실행
+            var whisperTask = whisperManager.GetTextAsync(audioClip);
+            
+            // Task 완료까지 대기
+            while (!whisperTask.IsCompleted)
+            {
+                yield return null;
+            }
+            
+            // 결과 처리
+            string result = "";
+            
+            if (whisperTask.Exception != null)
+            {
+                Debug.LogError($"Whisper STT failed: {whisperTask.Exception.Message}");
+            }
+            else if (whisperTask.Result != null && whisperTask.Result.Result != null)
+            {
+                result = whisperTask.Result.Result;
+                Debug.Log($"Whisper STT completed: {result}");
+            }
+            else
+            {
+                Debug.LogWarning("Whisper STT returned null result");
+            }
 
-        // 결과가 비어있거나 의미없는 경우 처리하지 않음
-        if (string.IsNullOrWhiteSpace(result))
-        {
-            Debug.LogWarning("STT result is empty or whitespace only. Skipping response processing.");
-            yield break;
+            // 결과가 비어있거나 의미없는 경우 처리하지 않음
+            if (string.IsNullOrWhiteSpace(result) || 
+                result.Contains("[BLANK_AUDIO]") || // whisper 특수 토큰
+                result.Trim() == "[BLANK_AUDIO]")
+            {
+                Debug.LogWarning("STT result is empty, whitespace, or blank audio. Skipping response processing.");
+                yield break;
+            }
+
+            // SttResponse 생성 및 처리
+            SttResponse response = new SttResponse
+            {
+                text = result,
+                lang = lang,
+                chatIdx = GameManager.Instance.chatIdx.ToString()
+            };
+
+            ProcessSTTResponse(response);
         }
-
-        // SttResponse 생성 및 처리
-        SttResponse response = new SttResponse
+        finally
         {
-            text = result,
-            lang = lang,
-            chatIdx = GameManager.Instance.chatIdx.ToString()
-        };
-
-        ProcessSTTResponse(response);
+            DestroyWriteBalloon();
+        }
     }
 
     private AudioClip WavDataToAudioClip(byte[] wavData)
@@ -185,6 +186,32 @@ public class WhisperSTTManager : MonoBehaviour
     {
         string query = response.text ?? "";
 
+        // 빈 쿼리 또는 Whisper 특수 토큰 체크 (방어적 프로그래밍)
+        if (string.IsNullOrWhiteSpace(query) || 
+            query.Contains("[BLANK_AUDIO]") || 
+            query.Trim() == "[BLANK_AUDIO]")
+        {
+            Debug.LogWarning("[WhisperSTTManager] Query is empty, whitespace, or blank audio. Skipping processing.");
+            return;
+        }
+
+        // STT Preview 설정여부 
+        if (ChatBalloonManager.Instance != null && 
+            ChatBalloonManager.Instance.chatBalloonMode != "off" && 
+            SettingManager.Instance.settings.editSttinChatInput)
+        {
+            // ChatBalloon이 활성화되어 있으면 InputField에 텍스트만 추가
+            ChatBalloonManager.Instance.AppendSTTTextToInputField(query);
+            
+            // NoticeBalloon에도 표시 (사용자 피드백용)
+            NoticeBalloonManager.Instance.ModifyNoticeBalloonText($"[입력됨] {query}");
+            
+            Debug.Log($"[WhisperSTTManager] STT 결과를 InputField에 추가: {query}");
+            return; // 바로 전송하지 않고 종료
+        }
+        else
+        {
+            // 바로 API 호출
         NoticeBalloonManager.Instance.ModifyNoticeBalloonText(query);
 
         // 대화 시작 - chatIdx는 string 타입
@@ -198,6 +225,7 @@ public class WhisperSTTManager : MonoBehaviour
 
         // 기존 음성 중지 및 초기화
         VoiceManager.Instance.ResetAudio();
+        }
     }
 
     // 이벤트 핸들러들
@@ -218,6 +246,26 @@ public class WhisperSTTManager : MonoBehaviour
         {
             whisperManager.OnNewSegment -= OnTranscriptionSegment;
             whisperManager.OnProgress -= OnTranscriptionProgress;
+        }
+    }
+
+    private void ShowWriteBalloon()
+    {
+        if (EmotionBalloonManager.Instance == null) return;
+
+        if (writeEmotionBalloonInstance != null)
+        {
+            Destroy(writeEmotionBalloonInstance);
+        }
+        writeEmotionBalloonInstance = EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), "Write", 15f);
+    }
+
+    private void DestroyWriteBalloon()
+    {
+        if (writeEmotionBalloonInstance != null)
+        {
+            Destroy(writeEmotionBalloonInstance);
+            writeEmotionBalloonInstance = null;
         }
     }
 }

@@ -29,6 +29,7 @@ public class MicrophoneManager : MonoBehaviour
     private byte[] wavData;
 
     [SerializeField] public GameObject overlayFilter; // 녹음 중 필터 오버레이
+    private GameObject listenEmotionBalloonInstance; // 머리 위 말풍선
 
     private void Awake()
     {
@@ -100,10 +101,24 @@ public class MicrophoneManager : MonoBehaviour
         audioClip = Microphone.Start(microphoneDevice, false, (int)maxRecordingDuration, 44100); // 최대 30초 녹음
         startRecordingTime = Time.time;
         isRecording = true;
+        
+        // emotionBalloon 추가
+        if (listenEmotionBalloonInstance != null)
+        {
+            Destroy(listenEmotionBalloonInstance);
+        }
+        listenEmotionBalloonInstance = EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), "Listen", maxRecordingDuration);
     }
 
     public void StopRecording()
     {
+        // emotionBalloon 제거
+        if (listenEmotionBalloonInstance != null)
+        {
+            Destroy(listenEmotionBalloonInstance);
+            listenEmotionBalloonInstance = null;
+        }
+
         if (overlayFilter != null)
         {
             overlayFilter.SetActive(false);
