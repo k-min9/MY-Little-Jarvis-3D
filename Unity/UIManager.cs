@@ -6,14 +6,14 @@ using UnityEngine.UI;
 
 public class UIManager : MonoBehaviour
 {
-    [SerializeField] private GameObject charChange; // CharChange
-    [SerializeField] private GameObject charSummon; // charSummon
-    [SerializeField] private GameObject version; // version+thanks
-    [SerializeField] private Text versionThanksContent; // version+thanks
-    [SerializeField] private GameObject settings; // settings
-    [SerializeField] private GameObject chatHistory; // chatHistory
-    [SerializeField] private GameObject guideLine; // guideLine
-    [SerializeField] private GameObject situation; // UIChatSituation
+    [SerializeField] public GameObject charChange; // CharChange
+    [SerializeField] public GameObject charSummon; // charSummon
+    [SerializeField] public GameObject version; // version+thanks
+    [SerializeField] public Text versionThanksContent; // version+thanks
+    [SerializeField] public GameObject settings; // settings
+    [SerializeField] public GameObject chatHistory; // chatHistory
+    [SerializeField] public GameObject guideLine; // guideLine
+    [SerializeField] public GameObject situation; // UIChatSituation
 
     // 싱글톤 인스턴스
     private static UIManager instance;
@@ -97,6 +97,27 @@ public class UIManager : MonoBehaviour
         uIWidget.Show();
     }
 
+    // charChange-UIWidget의 Close 작동
+    public void CloseCharChange()
+    {
+        UIWidget uIWidget = charChange.GetComponent<UIWidget>();
+
+        uIWidget.Close();
+    }
+
+    // charChange-UIWidget의 Toggle 작동
+    public void ToggleCharChange()
+    {
+        if (charChange.activeSelf)
+        {
+            CloseCharChange();
+        }
+        else
+        {
+            ShowCharChange();
+        }
+    }
+
     // GuideLine-UIWidget의 Show 작동
     public void ShowGuideLine()
     {
@@ -114,6 +135,27 @@ public class UIManager : MonoBehaviour
         UIUserCardManager.Instance.InitUserCard();
 
         uIWidget.Show();
+    }
+
+    // GuideLine-UIWidget의 Close 작동
+    public void CloseGuideLine()
+    {
+        UIWidget uIWidget = guideLine.GetComponent<UIWidget>();
+        
+        uIWidget.Close();
+    }
+
+    // GuideLine-UIWidget의 Toggle 작동
+    public void ToggleGuideLine()
+    {
+        if (guideLine.activeSelf)
+        {
+            CloseGuideLine();
+        }
+        else
+        {
+            ShowGuideLine();
+        }
     }
 
     // ChatSituation 활성화 후 -UIWidget의 Show 작동
@@ -139,8 +181,29 @@ public class UIManager : MonoBehaviour
         UIChatSituationManager.Instance.ResetScrollPosition();
     }
 
+    // ChatSituation-UIWidget의 Close 작동
+    public void CloseUIChatSituation()
+    {
+        UIWidget uIWidget = situation.GetComponent<UIWidget>();
+        
+        uIWidget.Close();
+    }
 
-    // charChange-UIWidget의 Show 작동
+    // ChatSituation-UIWidget의 Toggle 작동
+    public void ToggleUIChatSituation()
+    {
+        if (situation.activeSelf)
+        {
+            CloseUIChatSituation();
+        }
+        else
+        {
+            ShowUIChatSituation();
+        }
+    }
+
+
+    // charSummon-UIWidget의 Show 작동
     public void ShowCharSummon()
     {
         UIWidget uIWidget = charSummon.GetComponent<UIWidget>();
@@ -155,6 +218,27 @@ public class UIManager : MonoBehaviour
         }
 
         uIWidget.Show();
+    }
+
+    // charSummon-UIWidget의 Close 작동
+    public void CloseCharSummon()
+    {
+        UIWidget uIWidget = charSummon.GetComponent<UIWidget>();
+        
+        uIWidget.Close();
+    }
+
+    // charSummon-UIWidget의 Toggle 작동
+    public void ToggleCharSummon()
+    {
+        if (charSummon.activeSelf)
+        {
+            CloseCharSummon();
+        }
+        else
+        {
+            ShowCharSummon();
+        }
     }
 
     // version-UIWidget의 Show 작동
@@ -190,20 +274,93 @@ public class UIManager : MonoBehaviour
         uIWidget.Show();
     }
 
-    // charChange-UIWidget의 Show 작동
+    // version-UIWidget의 Close 작동
+    public void CloseVersion()
+    {
+        UIWidget uIWidget = version.GetComponent<UIWidget>();
+        
+        uIWidget.Close();
+    }
+
+    // version-UIWidget의 Toggle 작동
+    public void ToggleVersion()
+    {
+        if (version.activeSelf)
+        {
+            CloseVersion();
+        }
+        else
+        {
+            ShowVersion();
+        }
+    }
+
+    // settings-UIWidget의 Show 작동
     public void showSettings()
     {
         UIWidget uIWidget = settings.GetComponent<UIWidget>();
         uIWidget.Show();
     }
 
-    // charChange-UIWidget의 Show 작동
+    // settings-UIWidget의 Close 작동
+    public void CloseSettings()
+    {
+        UIWidget uIWidget = settings.GetComponent<UIWidget>();
+        
+        uIWidget.Close();
+    }
+
+    // settings-UIWidget의 Toggle 작동
+    public void ToggleSettings()
+    {
+        if (settings.activeSelf)
+        {
+            CloseSettings();
+        }
+        else
+        {
+            showSettings();
+        }
+    }
+
+    // chatHistory-UIWidget의 Show 작동
     public void ShowChatHistory()
     {
         UIChatHistoryManager uIChatHistoryManager = chatHistory.GetComponent<UIChatHistoryManager>();
         uIChatHistoryManager.LoadChatHistory();
 
         UIWidget uIWidget = chatHistory.GetComponent<UIWidget>();
+
+        // 이미 활성화되어 있지 않은 경우라면 위치 조정
+        if (!chatHistory.activeSelf)
+        {
+            // Vector3 position = UIPositionManager.Instance.GetCanvasPositionRight();
+            Vector3 position = UIPositionManager.Instance.GetMenuPosition("chatHistory");
+            Debug.Log(position);
+            chatHistory.GetComponent<RectTransform>().position = position;
+        }
+
         uIWidget.Show();
+    }
+
+    // chatHistory-UIWidget의 Close 작동
+    public void CloseChatHistory()
+    {
+        UIWidget uIWidget = chatHistory.GetComponent<UIWidget>();
+        
+        uIWidget.Close();
+    }
+
+    // chatHistory-UIWidget의 Toggle 작동
+    public void ToggleChatHistory()
+    {
+        if (chatHistory.activeSelf)
+        {
+            CloseChatHistory();
+        }
+        else
+        {
+            ShowChatHistory();
+        }
     }
 }
