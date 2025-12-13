@@ -13,6 +13,9 @@ public class ScreenshotManager : MonoBehaviour
     public GameObject screenshotArea; // Panel acting as screenshot area (with borders)
     public GameObject backgroundOverlayPanel; // Panel for background overlay
     
+    // Unity 창 핸들 캐싱
+    private IntPtr _unityWindowHandle = IntPtr.Zero;
+    
     // Tag 기반 상호 배타적 오브젝트 그룹 (key: Face, Pose 등, value: 해당 그룹의 오브젝트 리스트)
     private Dictionary<string, List<GameObject>> exclusiveObjectGroups;
 
@@ -51,29 +54,41 @@ public class ScreenshotManager : MonoBehaviour
     [DllImport("user32.dll")]
     private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
 
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
+
+    // Unity 창 캡처 제외를 위한 Windows API
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetActiveWindow();
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint dwAffinity);
+
     private const int SRCCOPY = 0x00CC0020;
+    
+    // GetSystemMetrics 상수
+    private const int SM_CXSCREEN = 0;  // 주 모니터 너비
+    private const int SM_CYSCREEN = 1;  // 주 모니터 높이
+    
+    // SetWindowDisplayAffinity 상수
+    private const uint WDA_NONE = 0x00000000;
+    private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
 
     void Start()
     {
         backgroundOverlayPanel.SetActive(false); // Initially, background is disabled
         screenshotArea.SetActive(false); // Initially, screenshot area is hidden
         _canvas = FindObjectOfType<Canvas>();  // 최상위 Canvas
+        
+        // Unity 창 핸들 획득
+        _unityWindowHandle = GetActiveWindow();
+        Debug.Log($"Unity Window Handle: {_unityWindowHandle}");
     }
 
     public void SetScreenshotArea()
     {
         isSelectingArea = true;
 
-        // // Capture the entire screen using Windows API
-        // Texture2D screenCapture = CaptureFullScreen();
-
-        // // Apply the captured screenshot as the background of backgroundOverlayPanel
-        // UnityEngine.UI.Image bgImage = backgroundOverlayPanel.GetComponent<UnityEngine.UI.Image>();
-        // if (bgImage != null)
-        // {
-        //     bgImage.sprite = Sprite.Create(screenCapture, new Rect(0, 0, screenCapture.width, screenCapture.height), new Vector2(0.5f, 0.5f));
-        //     bgImage.raycastTarget = false; // Ensure background doesn't block input
-        // }
         backgroundOverlayPanel.SetActive(true); // Activate background
 
         StartCoroutine(SelectArea());
@@ -90,62 +105,232 @@ public class ScreenshotManager : MonoBehaviour
         return panelRectTransform.sizeDelta.x > 0 && panelRectTransform.sizeDelta.y > 0;
     }
 
-    // public void GetBlueFullScreen()
-    // {
-    //     // Load the sprite from the assets folder (make sure Square.png is imported in Unity)
-    //     Sprite squareSprite = Resources.Load<Sprite>("Sprites/Square");
+    // Unity 창을 캡처에서 제외/포함 설정
+    private bool SetCaptureExclusion(bool exclude)
+    {
+        // 핸들이 없으면 다시 획득 시도
+        if (_unityWindowHandle == IntPtr.Zero)
+        {
+            _unityWindowHandle = GetActiveWindow();
+            Debug.Log($"Reacquired Unity Window Handle: {_unityWindowHandle}");
+        }
 
-    //     if (squareSprite == null)
-    //     {
-    //         Debug.LogError("Square sprite not found. Make sure it's located at Assets/Sprites/Square.png.");
-    //         return;
-    //     }
+        // affinity 값 설정
+        uint affinity = exclude ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE;
+        
+        // SetWindowDisplayAffinity 호출
+        bool result = SetWindowDisplayAffinity(_unityWindowHandle, affinity);
+        
+        if (result)
+        {
+            Debug.Log($"SetCaptureExclusion: {(exclude ? "제외" : "포함")} 모드 설정 성공");
+        }
+        else
+        {
+            Debug.LogWarning($"SetCaptureExclusion: {(exclude ? "제외" : "포함")} 모드 설정 실패");
+        }
+        
+        return result;
+    }
 
-    //     // Access the Image component of the backgroundOverlayPanel
-    //     UnityEngine.UI.Image bgImage = backgroundOverlayPanel.GetComponent<UnityEngine.UI.Image>();
+    #region 레이어별 비활성화 로직 (Hybrid 방식 - 하나만 제외할 경우 사용)
+    
+    // 캡처를 위해 특정 레이어들을 비활성화
+    private (List<GameObject> deactivatedCharObjects, List<GameObject> deactivatedUIObjects, Dictionary<GameObject, bool> uiWidgetVisibleStates) DeactivateLayersForCapture()
+    {
+        List<GameObject> deactivatedCharObjects = new List<GameObject>();
+        List<GameObject> deactivatedUIObjects = new List<GameObject>();
+        Dictionary<GameObject, bool> uiWidgetVisibleStates = new Dictionary<GameObject, bool>();
+        
+        // SettingManager에서 설정 조회
+        bool shouldIncludeChar = SettingManager.Instance.settings.includeCharInScreenshot;
+        bool shouldIncludeUI = SettingManager.Instance.settings.includeUIInScreenshot;
+        
+        GameObject[] allObjects = FindObjectsOfType<GameObject>(true); // true = 비활성 포함
+        
+        // Char Layer 필터링
+        if (!shouldIncludeChar)
+        {
+            int charLayer = LayerMask.NameToLayer("Char");
+            if (charLayer != -1)
+            {
+                foreach (GameObject obj in allObjects)
+                {
+                    if (obj.layer == charLayer && obj.activeSelf)
+                    {
+                        obj.SetActive(false);
+                        deactivatedCharObjects.Add(obj);
+                    }
+                }
+                Debug.Log($"Char Layer 오브젝트 {deactivatedCharObjects.Count}개 임시 비활성화");
+                
+                // Single 태그 기반 상호 배타적 그룹 수집 (활성화/비활성화 모두 포함)
+                CollectSingleTaggedObjects();
+            }
+            else
+            {
+                Debug.LogWarning("'Char' Layer가 존재하지 않습니다.");
+            }
+        }
+        
+        // UI Layer 필터링
+        if (!shouldIncludeUI)
+        {
+            int uiLayer = LayerMask.NameToLayer("UI");
+            if (uiLayer != -1)
+            {
+                foreach (GameObject obj in allObjects)
+                {
+                    if (obj.layer == uiLayer && obj.activeSelf)
+                    {
+                        // UIWidget이 있으면 IsVisible 상태 저장
+                        UIWidget widget = obj.GetComponent<UIWidget>();
+                        if (widget != null)
+                        {
+                            uiWidgetVisibleStates[obj] = widget.IsM_IsShowing;
+                        }
+                        
+                        obj.SetActive(false);
+                        deactivatedUIObjects.Add(obj);
+                    }
+                }
+                Debug.Log($"UI Layer 오브젝트 {deactivatedUIObjects.Count}개 임시 비활성화");
+            }
+            else
+            {
+                Debug.LogWarning("'UI' Layer가 존재하지 않습니다.");
+            }
+        }
+        
+        return (deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates);
+    }
+    
+    // 캡처 후 비활성화했던 레이어들을 재활성화
+    private void ReactivateLayersAfterCapture(List<GameObject> deactivatedCharObjects, List<GameObject> deactivatedUIObjects, Dictionary<GameObject, bool> uiWidgetVisibleStates)
+    {
+        // 원래 활성화되어 있던 Char Layer GameObject들 다시 활성화
+        if (deactivatedCharObjects.Count > 0)
+        {
+            foreach (GameObject obj in deactivatedCharObjects)
+            {
+                if (obj != null)
+                {
+                    obj.SetActive(true);
+                }
+            }
+            Debug.Log($"Char Layer 오브젝트 {deactivatedCharObjects.Count}개 재활성화");
+            
+            // 상호 배타적인 오브젝트 그룹 정리 (중복 활성화 방지)
+            RefreshObjects();
+        }
+        
+        // 원래 활성화되어 있던 UI Layer GameObject들 다시 활성화
+        if (deactivatedUIObjects.Count > 0)
+        {
+            foreach (GameObject obj in deactivatedUIObjects)
+            {
+                if (obj != null)
+                {
+                    // UIWidget이 있고 Close 중이었으면 복원하지 않음
+                    if (uiWidgetVisibleStates.TryGetValue(obj, out bool wasVisible))
+                    {
+                        if (wasVisible)
+                        {
+                            obj.SetActive(true);
+                        }
+                        else
+                        {
+                            Debug.Log($"[Screenshot] Skipping restore for closing widget: {obj.name}");
+                        }
+                    }
+                    else
+                    {
+                        // UIWidget이 없는 일반 UI 오브젝트는 그대로 복원
+                        obj.SetActive(true);
+                    }
+                }
+            }
+            Debug.Log($"UI Layer 오브젝트 {deactivatedUIObjects.Count}개 재활성화");
+        }
+    }
 
-    //     if (bgImage != null)
-    //     {
-    //         // Apply the Square sprite
-    //         bgImage.sprite = squareSprite;
+    // Char Layer에서 Single로 시작하는 태그를 가진 오브젝트들을 그룹화
+    private void CollectSingleTaggedObjects()
+    {
+        exclusiveObjectGroups = new Dictionary<string, List<GameObject>>();
+        
+        int charLayer = LayerMask.NameToLayer("Char");
+        if (charLayer == -1) return;
+        
+        // Char Layer의 모든 오브젝트 탐색 (활성화/비활성화 모두 포함)
+        GameObject[] allObjects = FindObjectsOfType<GameObject>(true); // true = 비활성 포함
+        
+        foreach (GameObject obj in allObjects)
+        {
+            if (obj.layer == charLayer && obj.tag.StartsWith("Single"))
+            {
+                // "SingleFace" -> "Face" 추출
+                string groupKey = obj.tag.Substring(6); // "Single" 제거
+                
+                if (!exclusiveObjectGroups.ContainsKey(groupKey))
+                {
+                    exclusiveObjectGroups[groupKey] = new List<GameObject>();
+                }
+                
+                exclusiveObjectGroups[groupKey].Add(obj);
+            }
+        }
+        
+        // 수집 결과 로그
+        foreach (var kvp in exclusiveObjectGroups)
+        {
+            Debug.Log($"Single 그룹 수집: {kvp.Key} - {kvp.Value.Count}개 오브젝트");
+        }
+    }
 
-    //         // Set the color to fully opaque blue
-    //         bgImage.color = new UnityEngine.Color(0, 0, 1, 1);  // RGB for blue and Alpha for full opacity
+    // 상호 배타적인 오브젝트 그룹 관리 - 각 그룹에서 2개 이상 활성화되어 있으면 첫 번째만 남기고 나머지 비활성화
+    public void RefreshObjects()
+    {
+        if (exclusiveObjectGroups == null || exclusiveObjectGroups.Count == 0) return;
 
-    //         // Ensure that the panel is active and visible
-    //         backgroundOverlayPanel.SetActive(true);
-    //     }
-    //     else
-    //     {
-    //         Debug.LogWarning("No Image component found on backgroundOverlayPanel.");
-    //     }
-    // }
+        foreach (var kvp in exclusiveObjectGroups)
+        {
+            var group = kvp.Value;
+            if (group == null || group.Count == 0) continue;
 
-    // Capture the entire screen using Windows API
+            // 그룹 내에서 활성화된 오브젝트들을 찾음
+            List<GameObject> activeObjects = new List<GameObject>();
+            foreach (var obj in group)
+            {
+                if (obj != null && obj.activeSelf)
+                {
+                    activeObjects.Add(obj);
+                }
+            }
+
+            // 2개 이상 활성화되어 있으면 첫 번째만 남기고 나머지 비활성화
+            if (activeObjects.Count > 1)
+            {
+                for (int i = 1; i < activeObjects.Count; i++)
+                {
+                    activeObjects[i].SetActive(false);
+                }
+                Debug.Log($"RefreshObjects: {kvp.Key} 그룹에서 {activeObjects.Count}개 활성화 감지, 첫 번째만 유지");
+            }
+        }
+    }
+    
+    #endregion
+
+    // 영역을 전체로 잡고 Capture
     private Texture2D CaptureFullScreen()
     {
-        int width = Screen.width;
-        int height = Screen.height;
+        byte[] imageBytes = CaptureDesktopAreaToMemory(0, 0, Screen.width, Screen.height);
         
-        Texture2D screenCapture = new Texture2D(width, height, TextureFormat.RGB24, false);
+        Texture2D texture = new Texture2D(2, 2);
+        texture.LoadImage(imageBytes);
         
-        IntPtr hdcSrc = GetDC(IntPtr.Zero);
-        IntPtr hdcDest = CreateCompatibleDC(hdcSrc);
-        IntPtr hBitmap = CreateCompatibleBitmap(hdcSrc, width, height);
-        IntPtr hOld = SelectObject(hdcDest, hBitmap);
-        
-        BitBlt(hdcDest, 0, 0, width, height, hdcSrc, 0, 0, 0x00CC0020); // SRCCOPY
-        
-        // Copy the captured bitmap to a Texture2D
-        screenCapture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-        screenCapture.Apply();
-        
-        // Cleanup
-        SelectObject(hdcDest, hOld);
-        DeleteObject(hBitmap);
-        ReleaseDC(IntPtr.Zero, hdcSrc);
-
-        return screenCapture;
+        return texture;
     }
 
     private IEnumerator SelectArea()
@@ -219,165 +404,123 @@ public class ScreenshotManager : MonoBehaviour
 
     private IEnumerator SaveScreenshotCoroutine(bool showAfterSave)
     {
+        // 1단계: 스크린샷 영역 유효성 검사
         RectTransform panelRectTransform = screenshotArea.GetComponent<RectTransform>();
 
         if (panelRectTransform.sizeDelta.x > 0 && panelRectTransform.sizeDelta.y > 0)
         {
-            // Char/UI Layer 제외 모드일 경우 GameObject 임시 비활성화
-            List<GameObject> deactivatedCharObjects = new List<GameObject>();
-            List<GameObject> deactivatedUIObjects = new List<GameObject>();
-            Dictionary<GameObject, bool> uiWidgetVisibleStates = new Dictionary<GameObject, bool>();
-            
-            // SettingManager에서 설정 조회
+            // 2단계: 캡처 제외 설정 판단
             bool shouldIncludeChar = SettingManager.Instance.settings.includeCharInScreenshot;
             bool shouldIncludeUI = SettingManager.Instance.settings.includeUIInScreenshot;
             
-            GameObject[] allObjects = FindObjectsOfType<GameObject>(true); // true = 비활성 포함
+            // 3단계: 캡처 제외 처리 (Fallback 포함)
+            bool shouldExcludeUnity = !shouldIncludeChar && !shouldIncludeUI; // 둘 다 제외
+            bool shouldUseLayerDeactivation = (!shouldIncludeChar && shouldIncludeUI) || (shouldIncludeChar && !shouldIncludeUI); // 하나만 제외
             
-            // Char Layer 필터링
-            if (!shouldIncludeChar)
-            {
-                int charLayer = LayerMask.NameToLayer("Char");
-                if (charLayer != -1)
-                {
-                    foreach (GameObject obj in allObjects)
-                    {
-                        if (obj.layer == charLayer && obj.activeSelf)
-                        {
-                            obj.SetActive(false);
-                            deactivatedCharObjects.Add(obj);
-                        }
-                    }
-                    Debug.Log($"Char Layer 오브젝트 {deactivatedCharObjects.Count}개 임시 비활성화");
-                    
-                    // Single 태그 기반 상호 배타적 그룹 수집 (활성화/비활성화 모두 포함)
-                    CollectSingleTaggedObjects();
-                }
-                else
-                {
-                    Debug.LogWarning("'Char' Layer가 존재하지 않습니다.");
-                }
-            }
+            List<GameObject> deactivatedCharObjects = null;
+            List<GameObject> deactivatedUIObjects = null;
+            Dictionary<GameObject, bool> uiWidgetVisibleStates = null;
             
-            // UI Layer 필터링
-            if (!shouldIncludeUI)
+            // 전처리: SetCaptureExclusion 또는 레이어 비활성화
+            if (shouldExcludeUnity)
             {
-                int uiLayer = LayerMask.NameToLayer("UI");
-                if (uiLayer != -1)
-                {
-                    foreach (GameObject obj in allObjects)
-                    {
-                        if (obj.layer == uiLayer && obj.activeSelf)
-                        {
-                            // UIWidget이 있으면 IsVisible 상태 저장
-                            UIWidget widget = obj.GetComponent<UIWidget>();
-                            if (widget != null)
-                            {
-                                uiWidgetVisibleStates[obj] = widget.IsM_IsShowing;
-                            }
-                            
-                            obj.SetActive(false);
-                            deactivatedUIObjects.Add(obj);
-                        }
-                    }
-                    Debug.Log($"UI Layer 오브젝트 {deactivatedUIObjects.Count}개 임시 비활성화");
-                }
-                else
-                {
-                    Debug.LogWarning("'UI' Layer가 존재하지 않습니다.");
-                }
-            }
-            
-            // 렌더링이 화면에 반영될 때까지 대기
-            if (deactivatedCharObjects.Count > 0 || deactivatedUIObjects.Count > 0)
-            {
-                yield return new WaitForEndOfFrame();
-                yield return new WaitForEndOfFrame(); // 추가 프레임 대기로 안정성 확보
-            }
-            
-            // 좌상단, 우하단
-            Vector2 bottomLeft = new Vector2(
-                panelRectTransform.anchoredPosition.x - panelRectTransform.sizeDelta.x / 2,
-                panelRectTransform.anchoredPosition.y + panelRectTransform.sizeDelta.y / 2
-            );
-
-            Vector2 topRight = new Vector2(
-                panelRectTransform.anchoredPosition.x + panelRectTransform.sizeDelta.x / 2,
-                panelRectTransform.anchoredPosition.y - panelRectTransform.sizeDelta.y / 2
-            );
-
-            // Local -> Windows 좌표 변환
-            Vector2 start = ConvertUnityPosToWinpos(bottomLeft);
-            Vector2 end = ConvertUnityPosToWinpos(topRight);
-
-            // 최종 캡처 영역 계산
-            float x = start.x;
-            float y = Screen.height - start.y;  // Y축 반전 보정
-            int width = (int)(end.x - start.x);
-            int height = (int)(start.y - end.y);
-            Debug.Log("capture:"+x+"/"+y+"/"+width+"/"+height);
-
-            string directory = Path.Combine(Application.persistentDataPath, "Screenshots");
-            if (!Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-            string filePath = Path.Combine(directory, "panel_capture.png");
-            
-            // CaptureDesktopArea 실행
-            CaptureDesktopArea((int)x, (int)y, (int)width, (int)height, filePath);  // x, y(좌상단) 기점으로 우하를 width, height 만큼 screenshot
-
-            // 원래 활성화되어 있던 Char Layer GameObject들 다시 활성화
-            if (deactivatedCharObjects.Count > 0)
-            {
-                foreach (GameObject obj in deactivatedCharObjects)
-                {
-                    if (obj != null)
-                    {
-                        obj.SetActive(true);
-                    }
-                }
-                Debug.Log($"Char Layer 오브젝트 {deactivatedCharObjects.Count}개 재활성화");
+                // 케이스 1: 둘 다 제외 - Unity 창 전체를 캡처에서 제외 시도
+                Debug.Log("[Screenshot] 모드: Unity 창 전체 제외 시도 (SetCaptureExclusion)");
+                bool exclusionSuccess = SetCaptureExclusion(true);
                 
-                // 상호 배타적인 오브젝트 그룹 정리 (중복 활성화 방지)
-                RefreshObjects();
+                if (!exclusionSuccess)
+                {
+                    // Fallback: SetCaptureExclusion 실패 시 레이어 비활성화 방식으로 전환
+                    Debug.LogWarning("[Screenshot] SetCaptureExclusion 실패, 레이어 비활성화 방식으로 폴백");
+                    shouldExcludeUnity = false;
+                    shouldUseLayerDeactivation = true;
+                    (deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates) = DeactivateLayersForCapture();
+                }
+            }
+            else if (shouldUseLayerDeactivation)
+            {
+                // 케이스 2: 하나만 제외 - 특정 레이어만 비활성화
+                Debug.Log("[Screenshot] 모드: 레이어별 선택적 비활성화 (SetActive)");
+                (deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates) = DeactivateLayersForCapture();
+            }
+            else
+            {
+                // 케이스 3: 둘 다 포함 - 아무 로직도 실행하지 않음
+                Debug.Log("[Screenshot] 모드: 전체 포함 (로직 없음)");
             }
             
-            // 원래 활성화되어 있던 UI Layer GameObject들 다시 활성화
-            if (deactivatedUIObjects.Count > 0)
+            // try-finally로 예외 안전성 확보
+            try
             {
-                foreach (GameObject obj in deactivatedUIObjects)
+                // 렌더링 대기
+                if (shouldExcludeUnity)
                 {
-                    if (obj != null)
+                    yield return new WaitForEndOfFrame();
+                    yield return new WaitForEndOfFrame();
+                    yield return new WaitForSeconds(0.05f);
+                }
+                else if (shouldUseLayerDeactivation && 
+                         ((deactivatedCharObjects != null && deactivatedCharObjects.Count > 0) || 
+                          (deactivatedUIObjects != null && deactivatedUIObjects.Count > 0)))
+                {
+                    yield return new WaitForEndOfFrame();
+                    yield return new WaitForEndOfFrame();
+                }
+                
+                // 4단계: 좌표 계산
+                Vector2 bottomLeft = new Vector2(
+                    panelRectTransform.anchoredPosition.x - panelRectTransform.sizeDelta.x / 2,
+                    panelRectTransform.anchoredPosition.y + panelRectTransform.sizeDelta.y / 2
+                );
+
+                Vector2 topRight = new Vector2(
+                    panelRectTransform.anchoredPosition.x + panelRectTransform.sizeDelta.x / 2,
+                    panelRectTransform.anchoredPosition.y - panelRectTransform.sizeDelta.y / 2
+                );
+
+                // Local -> Windows 좌표 변환
+                Vector2 start = ConvertUnityPosToWinpos(bottomLeft);
+                Vector2 end = ConvertUnityPosToWinpos(topRight);
+
+                // 최종 캡처 영역 계산
+                float x = start.x;
+                float y = Screen.height - start.y;
+                int width = (int)(end.x - start.x);
+                int height = (int)(start.y - end.y);
+                Debug.Log("capture:"+x+"/"+y+"/"+width+"/"+height);
+
+                // 5단계: 디렉토리 및 파일 경로 설정
+                string directory = Path.Combine(Application.persistentDataPath, "Screenshots");
+                if (!Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+                string filePath = Path.Combine(directory, "panel_capture.png");
+                
+                // 6단계: 캡처 실행
+                CaptureDesktopArea((int)x, (int)y, (int)width, (int)height, filePath);
+
+                Debug.Log($"Screenshot saved at {filePath}");
+                
+                if (showAfterSave)
+                {
+                    ShowScreenshotImage();
+                }
+            }
+            finally
+            {
+                // 7단계: 후처리 - 예외 발생 여부와 관계없이 반드시 실행
+                if (shouldExcludeUnity)
+                {
+                    SetCaptureExclusion(false);
+                }
+                else if (shouldUseLayerDeactivation)
+                {
+                    if (deactivatedCharObjects != null || deactivatedUIObjects != null)
                     {
-                        // UIWidget이 있고 Close 중이었으면 복원하지 않음
-                        if (uiWidgetVisibleStates.TryGetValue(obj, out bool wasVisible))
-                        {
-                            if (wasVisible)
-                            {
-                                obj.SetActive(true);
-                            }
-                            else
-                            {
-                                Debug.Log($"[Screenshot] Skipping restore for closing widget: {obj.name}");
-                            }
-                        }
-                        else
-                        {
-                            // UIWidget이 없는 일반 UI 오브젝트는 그대로 복원
-                            obj.SetActive(true);
-                        }
+                        ReactivateLayersAfterCapture(deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates);
                     }
                 }
-                Debug.Log($"UI Layer 오브젝트 {deactivatedUIObjects.Count}개 재활성화");
-            }
-
-            Debug.Log($"Screenshot saved at {filePath}");
-            
-            // 저장 후 이미지 표시 옵션이 활성화된 경우
-            if (showAfterSave)
-            {
-                ShowScreenshotImage();
             }
         }
         else
@@ -414,213 +557,111 @@ public class ScreenshotManager : MonoBehaviour
         ReleaseDC(desktopHwnd, desktopDC);
     }
 
-    // Char Layer에서 Single로 시작하는 태그를 가진 오브젝트들을 그룹화
-    private void CollectSingleTaggedObjects()
-    {
-        exclusiveObjectGroups = new Dictionary<string, List<GameObject>>();
-        
-        int charLayer = LayerMask.NameToLayer("Char");
-        if (charLayer == -1) return;
-        
-        // Char Layer의 모든 오브젝트 탐색 (활성화/비활성화 모두 포함)
-        GameObject[] allObjects = FindObjectsOfType<GameObject>(true); // true = 비활성 포함
-        
-        foreach (GameObject obj in allObjects)
-        {
-            if (obj.layer == charLayer && obj.tag.StartsWith("Single"))
-            {
-                // "SingleFace" -> "Face" 추출
-                string groupKey = obj.tag.Substring(6); // "Single" 제거
-                
-                if (!exclusiveObjectGroups.ContainsKey(groupKey))
-                {
-                    exclusiveObjectGroups[groupKey] = new List<GameObject>();
-                }
-                
-                exclusiveObjectGroups[groupKey].Add(obj);
-            }
-        }
-        
-        // 수집 결과 로그
-        foreach (var kvp in exclusiveObjectGroups)
-        {
-            Debug.Log($"Single 그룹 수집: {kvp.Key} - {kvp.Value.Count}개 오브젝트");
-        }
-    }
-
-    // 상호 배타적인 오브젝트 그룹 관리 - 각 그룹에서 2개 이상 활성화되어 있으면 첫 번째만 남기고 나머지 비활성화
-    public void RefreshObjects()
-    {
-        if (exclusiveObjectGroups == null || exclusiveObjectGroups.Count == 0) return;
-
-        foreach (var kvp in exclusiveObjectGroups)
-        {
-            var group = kvp.Value;
-            if (group == null || group.Count == 0) continue;
-
-            // 그룹 내에서 활성화된 오브젝트들을 찾음
-            List<GameObject> activeObjects = new List<GameObject>();
-            foreach (var obj in group)
-            {
-                if (obj != null && obj.activeSelf)
-                {
-                    activeObjects.Add(obj);
-                }
-            }
-
-            // 2개 이상 활성화되어 있으면 첫 번째만 남기고 나머지 비활성화
-            if (activeObjects.Count > 1)
-            {
-                for (int i = 1; i < activeObjects.Count; i++)
-                {
-                    activeObjects[i].SetActive(false);
-                }
-                Debug.Log($"RefreshObjects: {kvp.Key} 그룹에서 {activeObjects.Count}개 활성화 감지, 첫 번째만 유지");
-            }
-        }
-    }
-
     // 메모리에 바로 캡처 (파일 저장 없이)
     public IEnumerator CaptureScreenshotToMemory(System.Action<byte[]> callback)
     {
+        // 1단계: 스크린샷 영역 유효성 검사
         RectTransform panelRectTransform = screenshotArea.GetComponent<RectTransform>();
 
         if (panelRectTransform.sizeDelta.x > 0 && panelRectTransform.sizeDelta.y > 0)
         {
-            // Char/UI Layer 제외 모드일 경우 GameObject 임시 비활성화
-            List<GameObject> deactivatedCharObjects = new List<GameObject>();
-            List<GameObject> deactivatedUIObjects = new List<GameObject>();
-            Dictionary<GameObject, bool> uiWidgetVisibleStates = new Dictionary<GameObject, bool>();
-            
-            // SettingManager에서 설정 조회
+            // 2단계: 캡처 제외 설정 판단
             bool shouldIncludeChar = SettingManager.Instance.settings.includeCharInScreenshot;
             bool shouldIncludeUI = SettingManager.Instance.settings.includeUIInScreenshot;
             
-            GameObject[] allObjects = FindObjectsOfType<GameObject>(true); // true = 비활성 포함
+            // 3단계: 캡처 제외 처리 (Fallback 포함)
+            bool shouldExcludeUnity = !shouldIncludeChar && !shouldIncludeUI;
+            bool shouldUseLayerDeactivation = (!shouldIncludeChar && shouldIncludeUI) || (shouldIncludeChar && !shouldIncludeUI);
             
-            // Char Layer 필터링
-            if (!shouldIncludeChar)
+            List<GameObject> deactivatedCharObjects = null;
+            List<GameObject> deactivatedUIObjects = null;
+            Dictionary<GameObject, bool> uiWidgetVisibleStates = null;
+            
+            // 전처리
+            if (shouldExcludeUnity)
             {
-                int charLayer = LayerMask.NameToLayer("Char");
-                if (charLayer != -1)
-                {
-                    foreach (GameObject obj in allObjects)
-                    {
-                        if (obj.layer == charLayer && obj.activeSelf)
-                        {
-                            obj.SetActive(false);
-                            deactivatedCharObjects.Add(obj);
-                        }
-                    }
-                    Debug.Log($"Char Layer 오브젝트 {deactivatedCharObjects.Count}개 임시 비활성화");
-                    
-                    // Single 태그 기반 상호 배타적 그룹 수집 (활성화/비활성화 모두 포함)
-                    CollectSingleTaggedObjects();
-                }
-            }
-            
-            // UI Layer 필터링
-            if (!shouldIncludeUI)
-            {
-                int uiLayer = LayerMask.NameToLayer("UI");
-                if (uiLayer != -1)
-                {
-                    foreach (GameObject obj in allObjects)
-                    {
-                        if (obj.layer == uiLayer && obj.activeSelf)
-                        {
-                            // UIWidget이 있으면 IsVisible 상태 저장
-                            UIWidget widget = obj.GetComponent<UIWidget>();
-                            if (widget != null)
-                            {
-                                uiWidgetVisibleStates[obj] = widget.IsM_IsShowing;
-                            }
-                            
-                            obj.SetActive(false);
-                            deactivatedUIObjects.Add(obj);
-                        }
-                    }
-                    Debug.Log($"UI Layer 오브젝트 {deactivatedUIObjects.Count}개 임시 비활성화");
-                }
-            }
-            
-            // 렌더링이 화면에 반영될 때까지 대기
-            if (deactivatedCharObjects.Count > 0 || deactivatedUIObjects.Count > 0)
-            {
-                yield return new WaitForEndOfFrame();
-                yield return new WaitForEndOfFrame();
-            }
-            
-            // 좌상단, 우하단 계산
-            Vector2 bottomLeft = new Vector2(
-                panelRectTransform.anchoredPosition.x - panelRectTransform.sizeDelta.x / 2,
-                panelRectTransform.anchoredPosition.y + panelRectTransform.sizeDelta.y / 2
-            );
-
-            Vector2 topRight = new Vector2(
-                panelRectTransform.anchoredPosition.x + panelRectTransform.sizeDelta.x / 2,
-                panelRectTransform.anchoredPosition.y - panelRectTransform.sizeDelta.y / 2
-            );
-
-            // Local -> Windows 좌표 변환
-            Vector2 start = ConvertUnityPosToWinpos(bottomLeft);
-            Vector2 end = ConvertUnityPosToWinpos(topRight);
-
-            // 최종 캡처 영역 계산
-            float x = start.x;
-            float y = Screen.height - start.y;
-            int width = (int)(end.x - start.x);
-            int height = (int)(start.y - end.y);
-            Debug.Log("capture to memory:"+x+"/"+y+"/"+width+"/"+height);
-            
-            // 메모리에 캡처
-            byte[] imageBytes = CaptureDesktopAreaToMemory((int)x, (int)y, width, height);
-            
-            // 원래 활성화되어 있던 Char Layer GameObject들 다시 활성화
-            if (deactivatedCharObjects.Count > 0)
-            {
-                foreach (GameObject obj in deactivatedCharObjects)
-                {
-                    if (obj != null)
-                    {
-                        obj.SetActive(true);
-                    }
-                }
-                Debug.Log($"Char Layer 오브젝트 {deactivatedCharObjects.Count}개 재활성화");
+                Debug.Log("[Screenshot Memory] 모드: Unity 창 전체 제외 시도 (SetCaptureExclusion)");
+                bool exclusionSuccess = SetCaptureExclusion(true);
                 
-                // 상호 배타적인 오브젝트 그룹 정리 (중복 활성화 방지)
-                RefreshObjects();
+                if (!exclusionSuccess)
+                {
+                    Debug.LogWarning("[Screenshot Memory] SetCaptureExclusion 실패, 레이어 비활성화 방식으로 폴백");
+                    shouldExcludeUnity = false;
+                    shouldUseLayerDeactivation = true;
+                    (deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates) = DeactivateLayersForCapture();
+                }
+            }
+            else if (shouldUseLayerDeactivation)
+            {
+                Debug.Log("[Screenshot Memory] 모드: 레이어별 선택적 비활성화 (SetActive)");
+                (deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates) = DeactivateLayersForCapture();
+            }
+            else
+            {
+                Debug.Log("[Screenshot Memory] 모드: 전체 포함 (로직 없음)");
             }
             
-            // 원래 활성화되어 있던 UI Layer GameObject들 다시 활성화
-            if (deactivatedUIObjects.Count > 0)
+            // try-finally로 예외 안전성 확보
+            byte[] imageBytes = null;
+            try
             {
-                foreach (GameObject obj in deactivatedUIObjects)
+                // 렌더링 대기
+                if (shouldExcludeUnity)
                 {
-                    if (obj != null)
+                    yield return new WaitForEndOfFrame();
+                    yield return new WaitForEndOfFrame();
+                    yield return new WaitForSeconds(0.05f);
+                }
+                else if (shouldUseLayerDeactivation && 
+                         ((deactivatedCharObjects != null && deactivatedCharObjects.Count > 0) || 
+                          (deactivatedUIObjects != null && deactivatedUIObjects.Count > 0)))
+                {
+                    yield return new WaitForEndOfFrame();
+                    yield return new WaitForEndOfFrame();
+                }
+                
+                // 4단계: 좌표 계산
+                Vector2 bottomLeft = new Vector2(
+                    panelRectTransform.anchoredPosition.x - panelRectTransform.sizeDelta.x / 2,
+                    panelRectTransform.anchoredPosition.y + panelRectTransform.sizeDelta.y / 2
+                );
+
+                Vector2 topRight = new Vector2(
+                    panelRectTransform.anchoredPosition.x + panelRectTransform.sizeDelta.x / 2,
+                    panelRectTransform.anchoredPosition.y - panelRectTransform.sizeDelta.y / 2
+                );
+
+                // Local -> Windows 좌표 변환
+                Vector2 start = ConvertUnityPosToWinpos(bottomLeft);
+                Vector2 end = ConvertUnityPosToWinpos(topRight);
+
+                // 최종 캡처 영역 계산
+                float x = start.x;
+                float y = Screen.height - start.y;
+                int width = (int)(end.x - start.x);
+                int height = (int)(start.y - end.y);
+                Debug.Log("capture to memory:"+x+"/"+y+"/"+width+"/"+height);
+                
+                // 5단계: 메모리에 캡처
+                imageBytes = CaptureDesktopAreaToMemory((int)x, (int)y, width, height);
+            }
+            finally
+            {
+                // 6단계: 후처리 - 예외 발생 여부와 관계없이 반드시 실행
+                if (shouldExcludeUnity)
+                {
+                    SetCaptureExclusion(false);
+                }
+                else if (shouldUseLayerDeactivation)
+                {
+                    if (deactivatedCharObjects != null || deactivatedUIObjects != null)
                     {
-                        // UIWidget이 있고 Close 중이었으면 복원하지 않음
-                        if (uiWidgetVisibleStates.TryGetValue(obj, out bool wasVisible))
-                        {
-                            if (wasVisible)
-                            {
-                                obj.SetActive(true);
-                            }
-                            else
-                            {
-                                Debug.Log($"[Screenshot] Skipping restore for closing widget: {obj.name}");
-                            }
-                        }
-                        else
-                        {
-                            // UIWidget이 없는 일반 UI 오브젝트는 그대로 복원
-                            obj.SetActive(true);
-                        }
+                        ReactivateLayersAfterCapture(deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates);
                     }
                 }
-                Debug.Log($"UI Layer 오브젝트 {deactivatedUIObjects.Count}개 재활성화");
             }
             
+            // 7단계: 콜백 호출
             callback?.Invoke(imageBytes);
         }
         else
@@ -633,141 +674,110 @@ public class ScreenshotManager : MonoBehaviour
     // 메모리에 캡처 + 영역 정보 반환 (OCR용)
     public IEnumerator CaptureScreenshotToMemoryWithInfo(System.Action<byte[], int, int, int, int> callback)
     {
+        // 1단계: 스크린샷 영역 유효성 검사
         RectTransform panelRectTransform = screenshotArea.GetComponent<RectTransform>();
 
         if (panelRectTransform.sizeDelta.x > 0 && panelRectTransform.sizeDelta.y > 0)
         {
-            // Char/UI Layer 제외 모드일 경우 GameObject 임시 비활성화
-            List<GameObject> deactivatedCharObjects = new List<GameObject>();
-            List<GameObject> deactivatedUIObjects = new List<GameObject>();
-            Dictionary<GameObject, bool> uiWidgetVisibleStates = new Dictionary<GameObject, bool>();
-            
-            // SettingManager에서 설정 조회
+            // 2단계: 캡처 제외 설정 판단
             bool shouldIncludeChar = SettingManager.Instance.settings.includeCharInScreenshot;
             bool shouldIncludeUI = SettingManager.Instance.settings.includeUIInScreenshot;
             
-            GameObject[] allObjects = FindObjectsOfType<GameObject>(true);
+            // 3단계: 캡처 제외 처리 (Fallback 포함)
+            bool shouldExcludeUnity = !shouldIncludeChar && !shouldIncludeUI;
+            bool shouldUseLayerDeactivation = (!shouldIncludeChar && shouldIncludeUI) || (shouldIncludeChar && !shouldIncludeUI);
             
-            // Char Layer 필터링
-            if (!shouldIncludeChar)
+            List<GameObject> deactivatedCharObjects = null;
+            List<GameObject> deactivatedUIObjects = null;
+            Dictionary<GameObject, bool> uiWidgetVisibleStates = null;
+            
+            // 전처리
+            if (shouldExcludeUnity)
             {
-                int charLayer = LayerMask.NameToLayer("Char");
-                if (charLayer != -1)
+                Debug.Log("[OCR Screenshot] 모드: Unity 창 전체 제외 시도 (SetCaptureExclusion)");
+                bool exclusionSuccess = SetCaptureExclusion(true);
+                
+                if (!exclusionSuccess)
                 {
-                    foreach (GameObject obj in allObjects)
-                    {
-                        if (obj.layer == charLayer && obj.activeSelf)
-                        {
-                            obj.SetActive(false);
-                            deactivatedCharObjects.Add(obj);
-                        }
-                    }
-                    Debug.Log($"Char Layer 오브젝트 {deactivatedCharObjects.Count}개 임시 비활성화");
-                    CollectSingleTaggedObjects();
+                    Debug.LogWarning("[OCR Screenshot] SetCaptureExclusion 실패, 레이어 비활성화 방식으로 폴백");
+                    shouldExcludeUnity = false;
+                    shouldUseLayerDeactivation = true;
+                    (deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates) = DeactivateLayersForCapture();
                 }
             }
-            
-            // UI Layer 필터링
-            if (!shouldIncludeUI)
+            else if (shouldUseLayerDeactivation)
             {
-                int uiLayer = LayerMask.NameToLayer("UI");
-                if (uiLayer != -1)
+                Debug.Log("[OCR Screenshot] 모드: 레이어별 선택적 비활성화 (SetActive)");
+                (deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates) = DeactivateLayersForCapture();
+            }
+            else
+            {
+                Debug.Log("[OCR Screenshot] 모드: 전체 포함 (로직 없음)");
+            }
+            
+            // try-finally로 예외 안전성 확보
+            byte[] imageBytes = null;
+            int x = 0, y = 0, width = 0, height = 0;
+            
+            try
+            {
+                // 렌더링 대기
+                if (shouldExcludeUnity)
                 {
-                    foreach (GameObject obj in allObjects)
-                    {
-                        if (obj.layer == uiLayer && obj.activeSelf)
-                        {
-                            // UIWidget이 있으면 IsVisible 상태 저장
-                            UIWidget widget = obj.GetComponent<UIWidget>();
-                            if (widget != null)
-                            {
-                                uiWidgetVisibleStates[obj] = widget.IsM_IsShowing;
-                            }
-                            
-                            obj.SetActive(false);
-                            deactivatedUIObjects.Add(obj);
-                        }
-                    }
-                    Debug.Log($"UI Layer 오브젝트 {deactivatedUIObjects.Count}개 임시 비활성화");
+                    yield return new WaitForEndOfFrame();
+                    yield return new WaitForEndOfFrame();
+                    yield return new WaitForSeconds(0.05f);
                 }
-            }
-            
-            // 렌더링이 화면에 반영될 때까지 대기
-            if (deactivatedCharObjects.Count > 0 || deactivatedUIObjects.Count > 0)
-            {
-                yield return new WaitForEndOfFrame();
-                yield return new WaitForEndOfFrame();
-            }
-            
-            // 좌상단, 우하단 계산
-            Vector2 bottomLeft = new Vector2(
-                panelRectTransform.anchoredPosition.x - panelRectTransform.sizeDelta.x / 2,
-                panelRectTransform.anchoredPosition.y + panelRectTransform.sizeDelta.y / 2
-            );
+                else if (shouldUseLayerDeactivation && 
+                         ((deactivatedCharObjects != null && deactivatedCharObjects.Count > 0) || 
+                          (deactivatedUIObjects != null && deactivatedUIObjects.Count > 0)))
+                {
+                    yield return new WaitForEndOfFrame();
+                    yield return new WaitForEndOfFrame();
+                }
+                
+                // 4단계: 좌표 계산
+                Vector2 bottomLeft = new Vector2(
+                    panelRectTransform.anchoredPosition.x - panelRectTransform.sizeDelta.x / 2,
+                    panelRectTransform.anchoredPosition.y + panelRectTransform.sizeDelta.y / 2
+                );
 
-            Vector2 topRight = new Vector2(
-                panelRectTransform.anchoredPosition.x + panelRectTransform.sizeDelta.x / 2,
-                panelRectTransform.anchoredPosition.y - panelRectTransform.sizeDelta.y / 2
-            );
+                Vector2 topRight = new Vector2(
+                    panelRectTransform.anchoredPosition.x + panelRectTransform.sizeDelta.x / 2,
+                    panelRectTransform.anchoredPosition.y - panelRectTransform.sizeDelta.y / 2
+                );
 
-            // Local -> Windows 좌표 변환
-            Vector2 start = ConvertUnityPosToWinpos(bottomLeft);
-            Vector2 end = ConvertUnityPosToWinpos(topRight);
+                // Local -> Windows 좌표 변환
+                Vector2 start = ConvertUnityPosToWinpos(bottomLeft);
+                Vector2 end = ConvertUnityPosToWinpos(topRight);
 
-            // 최종 캡처 영역 계산
-            int x = (int)start.x;
-            int y = (int)(Screen.height - start.y);
-            int width = (int)(end.x - start.x);
-            int height = (int)(start.y - end.y);
-            Debug.Log($"[OCR] Capture area: x={x}, y={y}, width={width}, height={height}");
-            
-            // 메모리에 캡처
-            byte[] imageBytes = CaptureDesktopAreaToMemory(x, y, width, height);
-            
-            // 원래 활성화되어 있던 Char Layer GameObject들 다시 활성화
-            if (deactivatedCharObjects.Count > 0)
+                // 최종 캡처 영역 계산
+                x = (int)start.x;
+                y = (int)(Screen.height - start.y);
+                width = (int)(end.x - start.x);
+                height = (int)(start.y - end.y);
+                Debug.Log($"[OCR] Capture area: x={x}, y={y}, width={width}, height={height}");
+                
+                // 5단계: 메모리에 캡처
+                imageBytes = CaptureDesktopAreaToMemory(x, y, width, height);
+            }
+            finally
             {
-                foreach (GameObject obj in deactivatedCharObjects)
+                // 6단계: 후처리 - 예외 발생 여부와 관계없이 반드시 실행
+                if (shouldExcludeUnity)
                 {
-                    if (obj != null)
+                    SetCaptureExclusion(false);
+                }
+                else if (shouldUseLayerDeactivation)
+                {
+                    if (deactivatedCharObjects != null || deactivatedUIObjects != null)
                     {
-                        obj.SetActive(true);
+                        ReactivateLayersAfterCapture(deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates);
                     }
                 }
-                Debug.Log($"Char Layer 오브젝트 {deactivatedCharObjects.Count}개 재활성화");
-                RefreshObjects();
             }
             
-            // 원래 활성화되어 있던 UI Layer GameObject들 다시 활성화
-            if (deactivatedUIObjects.Count > 0)
-            {
-                foreach (GameObject obj in deactivatedUIObjects)
-                {
-                    if (obj != null)
-                    {
-                        // UIWidget이 있고 Close 중이었으면 복원하지 않음
-                        if (uiWidgetVisibleStates.TryGetValue(obj, out bool wasVisible))
-                        {
-                            if (wasVisible)
-                            {
-                                obj.SetActive(true);
-                            }
-                            else
-                            {
-                                Debug.Log($"[Screenshot] Skipping restore for closing widget: {obj.name}");
-                            }
-                        }
-                        else
-                        {
-                            // UIWidget이 없는 일반 UI 오브젝트는 그대로 복원
-                            obj.SetActive(true);
-                        }
-                    }
-                }
-                Debug.Log($"UI Layer 오브젝트 {deactivatedUIObjects.Count}개 재활성화");
-            }
-            
-            // 이미지 바이트 + 영역 정보 반환
+            // 7단계: 이미지 바이트 + 영역 정보 반환
             callback?.Invoke(imageBytes, x, y, width, height);
         }
         else
@@ -805,6 +815,92 @@ public class ScreenshotManager : MonoBehaviour
         ReleaseDC(desktopHwnd, desktopDC);
 
         return imageBytes;
+    }
+
+    // 전체 화면 캡처 (Hybrid 방식 적용)
+    public IEnumerator CaptureFullScreenToMemory(System.Action<byte[]> callback)
+    {
+        // 캡처 제외 설정 판단
+        bool shouldIncludeChar = SettingManager.Instance.settings.includeCharInScreenshot;
+        bool shouldIncludeUI = SettingManager.Instance.settings.includeUIInScreenshot;
+        
+        // 캡처 제외 처리 (Fallback 포함)
+        bool shouldExcludeUnity = !shouldIncludeChar && !shouldIncludeUI;
+        bool shouldUseLayerDeactivation = (!shouldIncludeChar && shouldIncludeUI) || (shouldIncludeChar && !shouldIncludeUI);
+        
+        List<GameObject> deactivatedCharObjects = null;
+        List<GameObject> deactivatedUIObjects = null;
+        Dictionary<GameObject, bool> uiWidgetVisibleStates = null;
+        
+        // 전처리
+        if (shouldExcludeUnity)
+        {
+            Debug.Log("[Screenshot FullScreen] 모드: Unity 창 전체 제외 시도 (SetCaptureExclusion)");
+            bool exclusionSuccess = SetCaptureExclusion(true);
+            
+            if (!exclusionSuccess)
+            {
+                Debug.LogWarning("[Screenshot FullScreen] SetCaptureExclusion 실패, 레이어 비활성화 방식으로 폴백");
+                shouldExcludeUnity = false;
+                shouldUseLayerDeactivation = true;
+                (deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates) = DeactivateLayersForCapture();
+            }
+        }
+        else if (shouldUseLayerDeactivation)
+        {
+            Debug.Log("[Screenshot FullScreen] 모드: 레이어별 선택적 비활성화 (SetActive)");
+            (deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates) = DeactivateLayersForCapture();
+        }
+        else
+        {
+            Debug.Log("[Screenshot FullScreen] 모드: 전체 포함 (로직 없음)");
+        }
+        
+        // try-finally로 예외 안전성 확보
+        byte[] imageBytes = null;
+        
+        try
+        {
+            // 렌더링 대기
+            if (shouldExcludeUnity)
+            {
+                yield return new WaitForEndOfFrame();
+                yield return new WaitForEndOfFrame();
+                yield return new WaitForSeconds(0.05f);
+            }
+            else if (shouldUseLayerDeactivation && 
+                     ((deactivatedCharObjects != null && deactivatedCharObjects.Count > 0) || 
+                      (deactivatedUIObjects != null && deactivatedUIObjects.Count > 0)))
+            {
+                yield return new WaitForEndOfFrame();
+                yield return new WaitForEndOfFrame();
+            }
+            
+            // 전체 화면 캡처
+            int width = GetSystemMetrics(SM_CXSCREEN);
+            int height = GetSystemMetrics(SM_CYSCREEN);
+            Debug.Log($"[Screenshot FullScreen] Capturing primary monitor: {width}x{height}");
+            
+            imageBytes = CaptureDesktopAreaToMemory(0, 0, width, height);
+        }
+        finally
+        {
+            // 후처리 - 예외 발생 여부와 관계없이 반드시 실행
+            if (shouldExcludeUnity)
+            {
+                SetCaptureExclusion(false);
+            }
+            else if (shouldUseLayerDeactivation)
+            {
+                if (deactivatedCharObjects != null || deactivatedUIObjects != null)
+                {
+                    ReactivateLayersAfterCapture(deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates);
+                }
+            }
+        }
+        
+        // 콜백 호출
+        callback?.Invoke(imageBytes);
     }
 
     // Function to set the transparency of a panel
