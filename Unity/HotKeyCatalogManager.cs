@@ -74,22 +74,12 @@ public class HotKeyCatalogManager : MonoBehaviour
     private string ctrl9SelectedAction = "ActionNone";
     private string ctrl0SelectedAction = "ActionNone";
 
-    void Awake()
-    {
-        if (instance == null)
-        {
-            instance = this;
-            DontDestroyOnLoad(gameObject);
-        }
-        else if (instance != this)
-        {
-            Destroy(gameObject);
-        }
-    }
-
     void Start()
     {
         InitializeDropdowns();
+        
+        // HotKeyManager에서 로드된 핫키 데이터를 UI에 반영
+        RefreshAllDropdowns();
     }
 
     // Unity 입력에서 현재 눌린 키를 HotKeyCatalog로 변환
@@ -97,27 +87,63 @@ public class HotKeyCatalogManager : MonoBehaviour
     {
         bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
 
-        // Ctrl + 숫자키 조합
+        // Ctrl + 숫자키 조합 (메인 키보드와 키패드 모두 체크)
         if (ctrl)
         {
-            if (Input.GetKeyDown(KeyCode.Alpha1)) return HotKeyCatalog.Ctrl_1;
-            if (Input.GetKeyDown(KeyCode.Alpha2)) return HotKeyCatalog.Ctrl_2;
-            if (Input.GetKeyDown(KeyCode.Alpha3)) return HotKeyCatalog.Ctrl_3;
-            if (Input.GetKeyDown(KeyCode.Alpha4)) return HotKeyCatalog.Ctrl_4;
-            if (Input.GetKeyDown(KeyCode.Alpha5)) return HotKeyCatalog.Ctrl_5;
-            if (Input.GetKeyDown(KeyCode.Alpha6)) return HotKeyCatalog.Ctrl_6;
-            if (Input.GetKeyDown(KeyCode.Alpha7)) return HotKeyCatalog.Ctrl_7;
-            if (Input.GetKeyDown(KeyCode.Alpha8)) return HotKeyCatalog.Ctrl_8;
-            if (Input.GetKeyDown(KeyCode.Alpha9)) return HotKeyCatalog.Ctrl_9;
-            if (Input.GetKeyDown(KeyCode.Alpha0)) return HotKeyCatalog.Ctrl_0;
+            if (Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Keypad1)) return HotKeyCatalog.Ctrl_1;
+            if (Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Keypad2)) return HotKeyCatalog.Ctrl_2;
+            if (Input.GetKeyDown(KeyCode.Alpha3) || Input.GetKeyDown(KeyCode.Keypad3)) return HotKeyCatalog.Ctrl_3;
+            if (Input.GetKeyDown(KeyCode.Alpha4) || Input.GetKeyDown(KeyCode.Keypad4)) return HotKeyCatalog.Ctrl_4;
+            if (Input.GetKeyDown(KeyCode.Alpha5) || Input.GetKeyDown(KeyCode.Keypad5)) return HotKeyCatalog.Ctrl_5;
+            if (Input.GetKeyDown(KeyCode.Alpha6) || Input.GetKeyDown(KeyCode.Keypad6)) return HotKeyCatalog.Ctrl_6;
+            if (Input.GetKeyDown(KeyCode.Alpha7) || Input.GetKeyDown(KeyCode.Keypad7)) return HotKeyCatalog.Ctrl_7;
+            if (Input.GetKeyDown(KeyCode.Alpha8) || Input.GetKeyDown(KeyCode.Keypad8)) return HotKeyCatalog.Ctrl_8;
+            if (Input.GetKeyDown(KeyCode.Alpha9) || Input.GetKeyDown(KeyCode.Keypad9)) return HotKeyCatalog.Ctrl_9;
+            if (Input.GetKeyDown(KeyCode.Alpha0) || Input.GetKeyDown(KeyCode.Keypad0)) return HotKeyCatalog.Ctrl_0;
         }
 
-        // 단일 키
-        if (Input.GetKeyDown(KeyCode.F9)) return HotKeyCatalog.F9;
-        if (Input.GetKeyDown(KeyCode.F10)) return HotKeyCatalog.F10;
-        if (Input.GetKeyDown(KeyCode.F11)) return HotKeyCatalog.F11;
-        if (Input.GetKeyDown(KeyCode.F12)) return HotKeyCatalog.F12;
-        if (Input.GetKeyDown(KeyCode.BackQuote)) return HotKeyCatalog.BackQuote;
+        // 단일 키 (Ctrl 없이)
+        if (!ctrl)
+        {
+            if (Input.GetKeyDown(KeyCode.F9)) return HotKeyCatalog.F9;
+            if (Input.GetKeyDown(KeyCode.F10)) return HotKeyCatalog.F10;
+            if (Input.GetKeyDown(KeyCode.F11)) return HotKeyCatalog.F11;
+            if (Input.GetKeyDown(KeyCode.F12)) return HotKeyCatalog.F12;
+            if (Input.GetKeyDown(KeyCode.BackQuote)) return HotKeyCatalog.BackQuote;
+        }
+
+        return HotKeyCatalog.None;
+    }
+
+    // Unity 입력에서 현재 떼어진 키를 HotKeyCatalog로 변환 (KeyUp 버전)
+    public HotKeyCatalog GetCatalogFromInputUp()
+    {
+        bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+
+        // Ctrl + 숫자키 조합 (메인 키보드와 키패드 모두 체크)
+        if (ctrl)
+        {
+            if (Input.GetKeyUp(KeyCode.Alpha1) || Input.GetKeyUp(KeyCode.Keypad1)) return HotKeyCatalog.Ctrl_1;
+            if (Input.GetKeyUp(KeyCode.Alpha2) || Input.GetKeyUp(KeyCode.Keypad2)) return HotKeyCatalog.Ctrl_2;
+            if (Input.GetKeyUp(KeyCode.Alpha3) || Input.GetKeyUp(KeyCode.Keypad3)) return HotKeyCatalog.Ctrl_3;
+            if (Input.GetKeyUp(KeyCode.Alpha4) || Input.GetKeyUp(KeyCode.Keypad4)) return HotKeyCatalog.Ctrl_4;
+            if (Input.GetKeyUp(KeyCode.Alpha5) || Input.GetKeyUp(KeyCode.Keypad5)) return HotKeyCatalog.Ctrl_5;
+            if (Input.GetKeyUp(KeyCode.Alpha6) || Input.GetKeyUp(KeyCode.Keypad6)) return HotKeyCatalog.Ctrl_6;
+            if (Input.GetKeyUp(KeyCode.Alpha7) || Input.GetKeyUp(KeyCode.Keypad7)) return HotKeyCatalog.Ctrl_7;
+            if (Input.GetKeyUp(KeyCode.Alpha8) || Input.GetKeyUp(KeyCode.Keypad8)) return HotKeyCatalog.Ctrl_8;
+            if (Input.GetKeyUp(KeyCode.Alpha9) || Input.GetKeyUp(KeyCode.Keypad9)) return HotKeyCatalog.Ctrl_9;
+            if (Input.GetKeyUp(KeyCode.Alpha0) || Input.GetKeyUp(KeyCode.Keypad0)) return HotKeyCatalog.Ctrl_0;
+        }
+
+        // 단일 키 (Ctrl 없이)
+        if (!ctrl)
+        {
+            if (Input.GetKeyUp(KeyCode.F9)) return HotKeyCatalog.F9;
+            if (Input.GetKeyUp(KeyCode.F10)) return HotKeyCatalog.F10;
+            if (Input.GetKeyUp(KeyCode.F11)) return HotKeyCatalog.F11;
+            if (Input.GetKeyUp(KeyCode.F12)) return HotKeyCatalog.F12;
+            if (Input.GetKeyUp(KeyCode.BackQuote)) return HotKeyCatalog.BackQuote;
+        }
 
         return HotKeyCatalog.None;
     }
@@ -141,6 +167,69 @@ public class HotKeyCatalogManager : MonoBehaviour
             default: return catalog.ToString();
         }
     }
+
+    // Windows VK Code를 HotKeyCatalog로 변환 (전역 입력용)
+    public HotKeyCatalog VKCodeToCatalog(int vkCode)
+    {
+        bool ctrl = IsCtrlPressed();
+
+        // Ctrl 조합 키
+        if (ctrl)
+        {
+            switch (vkCode)
+            {
+                case 0x31: return HotKeyCatalog.Ctrl_1; // '1'
+                case 0x32: return HotKeyCatalog.Ctrl_2; // '2'
+                case 0x33: return HotKeyCatalog.Ctrl_3; // '3'
+                case 0x34: return HotKeyCatalog.Ctrl_4; // '4'
+                case 0x35: return HotKeyCatalog.Ctrl_5; // '5'
+                case 0x36: return HotKeyCatalog.Ctrl_6; // '6'
+                case 0x37: return HotKeyCatalog.Ctrl_7; // '7'
+                case 0x38: return HotKeyCatalog.Ctrl_8; // '8'
+                case 0x39: return HotKeyCatalog.Ctrl_9; // '9'
+                case 0x30: return HotKeyCatalog.Ctrl_0; // '0'
+            }
+        }
+
+        // 단일 키 (Ctrl 없이)
+        if (!ctrl)
+        {
+            switch (vkCode)
+            {
+                case 0x78: return HotKeyCatalog.F9;   // F9
+                case 0x79: return HotKeyCatalog.F10;  // F10
+                case 0x7A: return HotKeyCatalog.F11;  // F11
+                case 0x7B: return HotKeyCatalog.F12;  // F12
+                case 0xC0: return HotKeyCatalog.BackQuote; // ` (Grave accent)
+            }
+        }
+
+        return HotKeyCatalog.None;
+    }
+
+#if UNITY_STANDALONE_WIN
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
+
+    // Ctrl 키 눌림 여부 확인
+    private bool IsCtrlPressed()
+    {
+        const int VK_CONTROL = 0x11;
+        const int VK_LCONTROL = 0xA2;
+        const int VK_RCONTROL = 0xA3;
+        
+        return (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0 ||
+               (GetAsyncKeyState(VK_LCONTROL) & 0x8000) != 0 ||
+               (GetAsyncKeyState(VK_RCONTROL) & 0x8000) != 0;
+    }
+#else
+    // 에디터나 다른 플랫폼에서는 Unity Input 사용
+    private bool IsCtrlPressed()
+    {
+        return Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+    }
+#endif
+
 
     // 드롭다운 초기화
     private void InitializeDropdowns()
@@ -224,7 +313,7 @@ public class HotKeyCatalogManager : MonoBehaviour
             Debug.Log($"{label} 키 액션 변경: {displayTexts[index]} ({actionName})");
             if (HotkeyManager.Instance != null)
             {
-                HotkeyManager.Instance.SetBinding(catalog, selectedAction, false);
+                HotkeyManager.Instance.SetBinding(catalog, selectedAction, true);
             }
         }
     }
@@ -239,7 +328,7 @@ public class HotKeyCatalogManager : MonoBehaviour
             Debug.Log($"{label} 키 액션 변경: {displayTexts[index]} ({actionName})");
             if (HotkeyManager.Instance != null)
             {
-                HotkeyManager.Instance.SetBinding(catalog, selectedAction, false);
+                HotkeyManager.Instance.SetBinding(catalog, selectedAction, true);
             }
         }
     }
@@ -262,43 +351,65 @@ public class HotKeyCatalogManager : MonoBehaviour
     public string GetCtrl0Action() { return ctrl0SelectedAction; }
 
     // 버튼으로 호출: 기본 매핑 설정
-    public void SetDroopDownDefault()
+    public void SetDropDownDefault()
     {
-        ApplyDefault(backQuoteDropdown, HotKeyCatalog.BackQuote, ref backQuoteSelectedAction, "ActionGetClipboard");
-        ApplyDefault(f9Dropdown, HotKeyCatalog.F9, ref f9SelectedAction, "ActionNextEmotion");
-        ApplyDefault(f10Dropdown, HotKeyCatalog.F10, ref f10SelectedAction, "ActionToggleDebugBalloon");
-        ApplyDefault(f11Dropdown, HotKeyCatalog.F11, ref f11SelectedAction, "ActionToggleDevTab");
-        ApplyDefault(f12Dropdown, HotKeyCatalog.F12, ref f12SelectedAction, "ActionExecuteFullScreenOCR");
-        ApplyDefault(ctrl1Dropdown, HotKeyCatalog.Ctrl_1, ref ctrl1SelectedAction, "ActionExecuteAreaOCR");
-        ApplyDefault(ctrl2Dropdown, HotKeyCatalog.Ctrl_2, ref ctrl2SelectedAction, "ActionExecuteAreaOCRWithTranslate");
-        ApplyDefault(ctrl3Dropdown, HotKeyCatalog.Ctrl_3, ref ctrl3SelectedAction, "ActionExecuteFullScreenOCRWithTranslate");
-        ApplyDefault(ctrl4Dropdown, HotKeyCatalog.Ctrl_4, ref ctrl4SelectedAction, "ActionToggleAroplaMode");
-        ApplyDefault(ctrl5Dropdown, HotKeyCatalog.Ctrl_5, ref ctrl5SelectedAction, "ActionNone");
-        ApplyDefault(ctrl6Dropdown, HotKeyCatalog.Ctrl_6, ref ctrl6SelectedAction, "ActionNone");
-        ApplyDefault(ctrl7Dropdown, HotKeyCatalog.Ctrl_7, ref ctrl7SelectedAction, "ActionNone");
-        ApplyDefault(ctrl8Dropdown, HotKeyCatalog.Ctrl_8, ref ctrl8SelectedAction, "ActionNone");
-        ApplyDefault(ctrl9Dropdown, HotKeyCatalog.Ctrl_9, ref ctrl9SelectedAction, "ActionNone");
-        ApplyDefault(ctrl0Dropdown, HotKeyCatalog.Ctrl_0, ref ctrl0SelectedAction, "ActionNone");
+        if (HotkeyManager.Instance != null)
+        {
+            HotkeyManager.Instance.SetDefaultValues();
+            RefreshAllDropdowns();
+        }
     }
 
     // 버튼으로 호출: 전부 None으로 설정
-    public void SetDroopDownNone()
+    public void SetDropDownNone()
     {
-        ApplyDefault(backQuoteDropdown, HotKeyCatalog.BackQuote, ref backQuoteSelectedAction, "ActionNone");
-        ApplyDefault(f9Dropdown, HotKeyCatalog.F9, ref f9SelectedAction, "ActionNone");
-        ApplyDefault(f10Dropdown, HotKeyCatalog.F10, ref f10SelectedAction, "ActionNone");
-        ApplyDefault(f11Dropdown, HotKeyCatalog.F11, ref f11SelectedAction, "ActionNone");
-        ApplyDefault(f12Dropdown, HotKeyCatalog.F12, ref f12SelectedAction, "ActionNone");
-        ApplyDefault(ctrl1Dropdown, HotKeyCatalog.Ctrl_1, ref ctrl1SelectedAction, "ActionNone");
-        ApplyDefault(ctrl2Dropdown, HotKeyCatalog.Ctrl_2, ref ctrl2SelectedAction, "ActionNone");
-        ApplyDefault(ctrl3Dropdown, HotKeyCatalog.Ctrl_3, ref ctrl3SelectedAction, "ActionNone");
-        ApplyDefault(ctrl4Dropdown, HotKeyCatalog.Ctrl_4, ref ctrl4SelectedAction, "ActionNone");
-        ApplyDefault(ctrl5Dropdown, HotKeyCatalog.Ctrl_5, ref ctrl5SelectedAction, "ActionNone");
-        ApplyDefault(ctrl6Dropdown, HotKeyCatalog.Ctrl_6, ref ctrl6SelectedAction, "ActionNone");
-        ApplyDefault(ctrl7Dropdown, HotKeyCatalog.Ctrl_7, ref ctrl7SelectedAction, "ActionNone");
-        ApplyDefault(ctrl8Dropdown, HotKeyCatalog.Ctrl_8, ref ctrl8SelectedAction, "ActionNone");
-        ApplyDefault(ctrl9Dropdown, HotKeyCatalog.Ctrl_9, ref ctrl9SelectedAction, "ActionNone");
-        ApplyDefault(ctrl0Dropdown, HotKeyCatalog.Ctrl_0, ref ctrl0SelectedAction, "ActionNone");
+        if (HotkeyManager.Instance != null)
+        {
+            HotkeyManager.Instance.SetNoneValues();
+            RefreshAllDropdowns();
+        }
+    }
+
+    // 모든 드롭다운 갱신 (HotKeyManager의 데이터 기준)
+    public void RefreshAllDropdowns()
+    {
+        if (HotkeyManager.Instance == null) return;
+
+        var bindings = HotkeyManager.Instance.GetBindings();
+        foreach (var binding in bindings)
+        {
+            RefreshDropdown(binding.catalogKey, binding.actionName);
+        }
+    }
+
+    // 개별 드롭다운 갱신
+    private void RefreshDropdown(HotKeyCatalog catalog, string actionName)
+    {
+        TMP_Dropdown dropdown = null;
+        
+        switch (catalog)
+        {
+            case HotKeyCatalog.BackQuote: dropdown = backQuoteDropdown; backQuoteSelectedAction = actionName; break;
+            case HotKeyCatalog.F9: dropdown = f9Dropdown; f9SelectedAction = actionName; break;
+            case HotKeyCatalog.F10: dropdown = f10Dropdown; f10SelectedAction = actionName; break;
+            case HotKeyCatalog.F11: dropdown = f11Dropdown; f11SelectedAction = actionName; break;
+            case HotKeyCatalog.F12: dropdown = f12Dropdown; f12SelectedAction = actionName; break;
+            case HotKeyCatalog.Ctrl_1: dropdown = ctrl1Dropdown; ctrl1SelectedAction = actionName; break;
+            case HotKeyCatalog.Ctrl_2: dropdown = ctrl2Dropdown; ctrl2SelectedAction = actionName; break;
+            case HotKeyCatalog.Ctrl_3: dropdown = ctrl3Dropdown; ctrl3SelectedAction = actionName; break;
+            case HotKeyCatalog.Ctrl_4: dropdown = ctrl4Dropdown; ctrl4SelectedAction = actionName; break;
+            case HotKeyCatalog.Ctrl_5: dropdown = ctrl5Dropdown; ctrl5SelectedAction = actionName; break;
+            case HotKeyCatalog.Ctrl_6: dropdown = ctrl6Dropdown; ctrl6SelectedAction = actionName; break;
+            case HotKeyCatalog.Ctrl_7: dropdown = ctrl7Dropdown; ctrl7SelectedAction = actionName; break;
+            case HotKeyCatalog.Ctrl_8: dropdown = ctrl8Dropdown; ctrl8SelectedAction = actionName; break;
+            case HotKeyCatalog.Ctrl_9: dropdown = ctrl9Dropdown; ctrl9SelectedAction = actionName; break;
+            case HotKeyCatalog.Ctrl_0: dropdown = ctrl0Dropdown; ctrl0SelectedAction = actionName; break;
+        }
+
+        if (dropdown != null)
+        {
+            SetDropdownValue(dropdown, actionName);
+        }
     }
 
     private void ApplyDefault(TMP_Dropdown dropdown, HotKeyCatalog catalog, ref string selectedAction, string actionName)
