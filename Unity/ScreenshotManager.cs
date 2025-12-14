@@ -74,6 +74,141 @@ public class ScreenshotManager : MonoBehaviour
     private const uint WDA_NONE = 0x00000000;
     private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
 
+    #region Helper method
+    
+    // 캡처 전처리/후처리에 필요한 상태 정보를 담는 구조체
+    private struct CaptureState
+    {
+        public bool shouldExcludeUnity;
+        public bool shouldUseLayerDeactivation;
+        public List<GameObject> deactivatedCharObjects;
+        public List<GameObject> deactivatedUIObjects;
+        public Dictionary<GameObject, bool> uiWidgetVisibleStates;
+    }
+    
+    // 캡처 전처리: 설정 판단 + 케이스 분기 + SetCaptureExclusion 또는 레이어 비활성화 수행
+    private CaptureState PrepareCapture(string logPrefix)
+    {
+        CaptureState state = new CaptureState();
+        
+        // 설정 조회
+        bool shouldIncludeChar = SettingManager.Instance.settings.includeCharInScreenshot;
+        bool shouldIncludeUI = SettingManager.Instance.settings.includeUIInScreenshot;
+        
+        // 케이스 분기 판단
+        state.shouldExcludeUnity = !shouldIncludeChar && !shouldIncludeUI; // 둘 다 제외
+        state.shouldUseLayerDeactivation = (!shouldIncludeChar && shouldIncludeUI) || (shouldIncludeChar && !shouldIncludeUI); // 하나만 제외
+        
+        // 전처리 수행
+        if (state.shouldExcludeUnity)
+        {
+            // 케이스 1: 둘 다 제외 - Unity 창 전체를 캡처에서 제외 시도
+            Debug.Log($"{logPrefix} 모드: Unity 창 전체 제외 시도 (SetCaptureExclusion)");
+            bool exclusionSuccess = SetCaptureExclusion(true);
+            
+            if (!exclusionSuccess)
+            {
+                // Fallback: SetCaptureExclusion 실패 시 레이어 비활성화 방식으로 전환
+                Debug.LogWarning($"{logPrefix} SetCaptureExclusion 실패, 레이어 비활성화 방식으로 폴백");
+                state.shouldExcludeUnity = false;
+                state.shouldUseLayerDeactivation = true;
+                (state.deactivatedCharObjects, state.deactivatedUIObjects, state.uiWidgetVisibleStates) = DeactivateLayersForCapture();
+            }
+        }
+        else if (state.shouldUseLayerDeactivation)
+        {
+            // 케이스 2: 하나만 제외 - 특정 레이어만 비활성화
+            Debug.Log($"{logPrefix} 모드: 레이어별 선택적 비활성화 (SetActive)");
+            (state.deactivatedCharObjects, state.deactivatedUIObjects, state.uiWidgetVisibleStates) = DeactivateLayersForCapture();
+        }
+        else
+        {
+            // 케이스 3: 둘 다 포함 - 아무 로직도 실행하지 않음
+            Debug.Log($"{logPrefix} 모드: 전체 포함 (로직 없음)");
+        }
+        
+        return state;
+    }
+    
+    // 캡처 후처리: 상태 복구 (SetCaptureExclusion 해제 또는 레이어 재활성화)
+    private void CleanupCapture(CaptureState state)
+    {
+        try
+        {
+            if (state.shouldExcludeUnity)
+            {
+                SetCaptureExclusion(false);
+            }
+            else if (state.shouldUseLayerDeactivation)
+            {
+                if (state.deactivatedCharObjects != null || state.deactivatedUIObjects != null)
+                {
+                    ReactivateLayersAfterCapture(state.deactivatedCharObjects, state.deactivatedUIObjects, state.uiWidgetVisibleStates);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[Screenshot] CleanupCapture 중 예외 발생: {ex.Message}");
+        }
+    }
+    
+    // 캡처 전 렌더링 대기 코루틴
+    private IEnumerator WaitForCapture(CaptureState state)
+    {
+        if (state.shouldExcludeUnity)
+        {
+            // Unity 창 제외 모드: 2프레임 + 50ms 대기
+            yield return new WaitForEndOfFrame();
+            yield return new WaitForEndOfFrame();
+            yield return new WaitForSeconds(0.05f);
+        }
+        else if (state.shouldUseLayerDeactivation)
+        {
+            // 레이어 비활성화 모드: 비활성화된 오브젝트가 있으면 2프레임 대기
+            bool hasDeactivatedObjects = 
+                (state.deactivatedCharObjects != null && state.deactivatedCharObjects.Count > 0) ||
+                (state.deactivatedUIObjects != null && state.deactivatedUIObjects.Count > 0);
+            
+            if (hasDeactivatedObjects)
+            {
+                yield return new WaitForEndOfFrame();
+                yield return new WaitForEndOfFrame();
+            }
+        }
+        // 케이스 3 (둘 다 포함): 대기 없음
+    }
+    
+    // screenshotArea 기반 캡처 영역 좌표 계산
+    private (int x, int y, int width, int height) CalculateCaptureArea()
+    {
+        RectTransform panelRectTransform = screenshotArea.GetComponent<RectTransform>();
+        
+        Vector2 bottomLeft = new Vector2(
+            panelRectTransform.anchoredPosition.x - panelRectTransform.sizeDelta.x / 2,
+            panelRectTransform.anchoredPosition.y + panelRectTransform.sizeDelta.y / 2
+        );
+
+        Vector2 topRight = new Vector2(
+            panelRectTransform.anchoredPosition.x + panelRectTransform.sizeDelta.x / 2,
+            panelRectTransform.anchoredPosition.y - panelRectTransform.sizeDelta.y / 2
+        );
+
+        // Local -> Windows 좌표 변환
+        Vector2 start = ConvertUnityPosToWinpos(bottomLeft);
+        Vector2 end = ConvertUnityPosToWinpos(topRight);
+
+        // 최종 캡처 영역 계산
+        int x = (int)start.x;
+        int y = (int)(Screen.height - start.y);
+        int width = (int)(end.x - start.x);
+        int height = (int)(start.y - end.y);
+        
+        return (x, y, width, height);
+    }
+    
+    #endregion
+
     void Start()
     {
         backgroundOverlayPanel.SetActive(false); // Initially, background is disabled
@@ -209,7 +344,7 @@ public class ScreenshotManager : MonoBehaviour
     private void ReactivateLayersAfterCapture(List<GameObject> deactivatedCharObjects, List<GameObject> deactivatedUIObjects, Dictionary<GameObject, bool> uiWidgetVisibleStates)
     {
         // 원래 활성화되어 있던 Char Layer GameObject들 다시 활성화
-        if (deactivatedCharObjects.Count > 0)
+        if (deactivatedCharObjects != null && deactivatedCharObjects.Count > 0)
         {
             foreach (GameObject obj in deactivatedCharObjects)
             {
@@ -225,14 +360,14 @@ public class ScreenshotManager : MonoBehaviour
         }
         
         // 원래 활성화되어 있던 UI Layer GameObject들 다시 활성화
-        if (deactivatedUIObjects.Count > 0)
+        if (deactivatedUIObjects != null && deactivatedUIObjects.Count > 0)
         {
             foreach (GameObject obj in deactivatedUIObjects)
             {
                 if (obj != null)
                 {
                     // UIWidget이 있고 Close 중이었으면 복원하지 않음
-                    if (uiWidgetVisibleStates.TryGetValue(obj, out bool wasVisible))
+                    if (uiWidgetVisibleStates != null && uiWidgetVisibleStates.TryGetValue(obj, out bool wasVisible))
                     {
                         if (wasVisible)
                         {
@@ -404,128 +539,47 @@ public class ScreenshotManager : MonoBehaviour
 
     private IEnumerator SaveScreenshotCoroutine(bool showAfterSave)
     {
-        // 1단계: 스크린샷 영역 유효성 검사
-        RectTransform panelRectTransform = screenshotArea.GetComponent<RectTransform>();
-
-        if (panelRectTransform.sizeDelta.x > 0 && panelRectTransform.sizeDelta.y > 0)
-        {
-            // 2단계: 캡처 제외 설정 판단
-            bool shouldIncludeChar = SettingManager.Instance.settings.includeCharInScreenshot;
-            bool shouldIncludeUI = SettingManager.Instance.settings.includeUIInScreenshot;
-            
-            // 3단계: 캡처 제외 처리 (Fallback 포함)
-            bool shouldExcludeUnity = !shouldIncludeChar && !shouldIncludeUI; // 둘 다 제외
-            bool shouldUseLayerDeactivation = (!shouldIncludeChar && shouldIncludeUI) || (shouldIncludeChar && !shouldIncludeUI); // 하나만 제외
-            
-            List<GameObject> deactivatedCharObjects = null;
-            List<GameObject> deactivatedUIObjects = null;
-            Dictionary<GameObject, bool> uiWidgetVisibleStates = null;
-            
-            // 전처리: SetCaptureExclusion 또는 레이어 비활성화
-            if (shouldExcludeUnity)
-            {
-                // 케이스 1: 둘 다 제외 - Unity 창 전체를 캡처에서 제외 시도
-                Debug.Log("[Screenshot] 모드: Unity 창 전체 제외 시도 (SetCaptureExclusion)");
-                bool exclusionSuccess = SetCaptureExclusion(true);
-                
-                if (!exclusionSuccess)
-                {
-                    // Fallback: SetCaptureExclusion 실패 시 레이어 비활성화 방식으로 전환
-                    Debug.LogWarning("[Screenshot] SetCaptureExclusion 실패, 레이어 비활성화 방식으로 폴백");
-                    shouldExcludeUnity = false;
-                    shouldUseLayerDeactivation = true;
-                    (deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates) = DeactivateLayersForCapture();
-                }
-            }
-            else if (shouldUseLayerDeactivation)
-            {
-                // 케이스 2: 하나만 제외 - 특정 레이어만 비활성화
-                Debug.Log("[Screenshot] 모드: 레이어별 선택적 비활성화 (SetActive)");
-                (deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates) = DeactivateLayersForCapture();
-            }
-            else
-            {
-                // 케이스 3: 둘 다 포함 - 아무 로직도 실행하지 않음
-                Debug.Log("[Screenshot] 모드: 전체 포함 (로직 없음)");
-            }
-            
-            // try-finally로 예외 안전성 확보
-            try
-            {
-                // 렌더링 대기
-                if (shouldExcludeUnity)
-                {
-                    yield return new WaitForEndOfFrame();
-                    yield return new WaitForEndOfFrame();
-                    yield return new WaitForSeconds(0.05f);
-                }
-                else if (shouldUseLayerDeactivation && 
-                         ((deactivatedCharObjects != null && deactivatedCharObjects.Count > 0) || 
-                          (deactivatedUIObjects != null && deactivatedUIObjects.Count > 0)))
-                {
-                    yield return new WaitForEndOfFrame();
-                    yield return new WaitForEndOfFrame();
-                }
-                
-                // 4단계: 좌표 계산
-                Vector2 bottomLeft = new Vector2(
-                    panelRectTransform.anchoredPosition.x - panelRectTransform.sizeDelta.x / 2,
-                    panelRectTransform.anchoredPosition.y + panelRectTransform.sizeDelta.y / 2
-                );
-
-                Vector2 topRight = new Vector2(
-                    panelRectTransform.anchoredPosition.x + panelRectTransform.sizeDelta.x / 2,
-                    panelRectTransform.anchoredPosition.y - panelRectTransform.sizeDelta.y / 2
-                );
-
-                // Local -> Windows 좌표 변환
-                Vector2 start = ConvertUnityPosToWinpos(bottomLeft);
-                Vector2 end = ConvertUnityPosToWinpos(topRight);
-
-                // 최종 캡처 영역 계산
-                float x = start.x;
-                float y = Screen.height - start.y;
-                int width = (int)(end.x - start.x);
-                int height = (int)(start.y - end.y);
-                Debug.Log("capture:"+x+"/"+y+"/"+width+"/"+height);
-
-                // 5단계: 디렉토리 및 파일 경로 설정
-                string directory = Path.Combine(Application.persistentDataPath, "Screenshots");
-                if (!Directory.Exists(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-                string filePath = Path.Combine(directory, "panel_capture.png");
-                
-                // 6단계: 캡처 실행
-                CaptureDesktopArea((int)x, (int)y, (int)width, (int)height, filePath);
-
-                Debug.Log($"Screenshot saved at {filePath}");
-                
-                if (showAfterSave)
-                {
-                    ShowScreenshotImage();
-                }
-            }
-            finally
-            {
-                // 7단계: 후처리 - 예외 발생 여부와 관계없이 반드시 실행
-                if (shouldExcludeUnity)
-                {
-                    SetCaptureExclusion(false);
-                }
-                else if (shouldUseLayerDeactivation)
-                {
-                    if (deactivatedCharObjects != null || deactivatedUIObjects != null)
-                    {
-                        ReactivateLayersAfterCapture(deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates);
-                    }
-                }
-            }
-        }
-        else
+        // 유효성 검사
+        if (!IsScreenshotAreaSet())
         {
             Debug.LogWarning("Please set the screenshot area first.");
+            yield break;
+        }
+        
+        // 전처리
+        CaptureState state = PrepareCapture("[Screenshot]");
+        
+        try
+        {
+            // 렌더링 대기
+            yield return WaitForCapture(state);
+            
+            // 좌표 계산
+            var (x, y, width, height) = CalculateCaptureArea();
+            Debug.Log($"capture: {x}/{y}/{width}/{height}");
+            
+            // 디렉토리 및 파일 경로 설정
+            string directory = Path.Combine(Application.persistentDataPath, "Screenshots");
+            if (!Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            string filePath = Path.Combine(directory, "panel_capture.png");
+            
+            // 캡처 실행
+            CaptureDesktopArea(x, y, width, height, filePath);
+            
+            Debug.Log($"Screenshot saved at {filePath}");
+            
+            if (showAfterSave)
+            {
+                ShowScreenshotImage();
+            }
+        }
+        finally
+        {
+            // 후처리 - 예외 발생 여부와 관계없이 반드시 실행
+            CleanupCapture(state);
         }
     }
 
@@ -560,231 +614,77 @@ public class ScreenshotManager : MonoBehaviour
     // 메모리에 바로 캡처 (파일 저장 없이)
     public IEnumerator CaptureScreenshotToMemory(System.Action<byte[]> callback)
     {
-        // 1단계: 스크린샷 영역 유효성 검사
-        RectTransform panelRectTransform = screenshotArea.GetComponent<RectTransform>();
-
-        if (panelRectTransform.sizeDelta.x > 0 && panelRectTransform.sizeDelta.y > 0)
-        {
-            // 2단계: 캡처 제외 설정 판단
-            bool shouldIncludeChar = SettingManager.Instance.settings.includeCharInScreenshot;
-            bool shouldIncludeUI = SettingManager.Instance.settings.includeUIInScreenshot;
-            
-            // 3단계: 캡처 제외 처리 (Fallback 포함)
-            bool shouldExcludeUnity = !shouldIncludeChar && !shouldIncludeUI;
-            bool shouldUseLayerDeactivation = (!shouldIncludeChar && shouldIncludeUI) || (shouldIncludeChar && !shouldIncludeUI);
-            
-            List<GameObject> deactivatedCharObjects = null;
-            List<GameObject> deactivatedUIObjects = null;
-            Dictionary<GameObject, bool> uiWidgetVisibleStates = null;
-            
-            // 전처리
-            if (shouldExcludeUnity)
-            {
-                Debug.Log("[Screenshot Memory] 모드: Unity 창 전체 제외 시도 (SetCaptureExclusion)");
-                bool exclusionSuccess = SetCaptureExclusion(true);
-                
-                if (!exclusionSuccess)
-                {
-                    Debug.LogWarning("[Screenshot Memory] SetCaptureExclusion 실패, 레이어 비활성화 방식으로 폴백");
-                    shouldExcludeUnity = false;
-                    shouldUseLayerDeactivation = true;
-                    (deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates) = DeactivateLayersForCapture();
-                }
-            }
-            else if (shouldUseLayerDeactivation)
-            {
-                Debug.Log("[Screenshot Memory] 모드: 레이어별 선택적 비활성화 (SetActive)");
-                (deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates) = DeactivateLayersForCapture();
-            }
-            else
-            {
-                Debug.Log("[Screenshot Memory] 모드: 전체 포함 (로직 없음)");
-            }
-            
-            // try-finally로 예외 안전성 확보
-            byte[] imageBytes = null;
-            try
-            {
-                // 렌더링 대기
-                if (shouldExcludeUnity)
-                {
-                    yield return new WaitForEndOfFrame();
-                    yield return new WaitForEndOfFrame();
-                    yield return new WaitForSeconds(0.05f);
-                }
-                else if (shouldUseLayerDeactivation && 
-                         ((deactivatedCharObjects != null && deactivatedCharObjects.Count > 0) || 
-                          (deactivatedUIObjects != null && deactivatedUIObjects.Count > 0)))
-                {
-                    yield return new WaitForEndOfFrame();
-                    yield return new WaitForEndOfFrame();
-                }
-                
-                // 4단계: 좌표 계산
-                Vector2 bottomLeft = new Vector2(
-                    panelRectTransform.anchoredPosition.x - panelRectTransform.sizeDelta.x / 2,
-                    panelRectTransform.anchoredPosition.y + panelRectTransform.sizeDelta.y / 2
-                );
-
-                Vector2 topRight = new Vector2(
-                    panelRectTransform.anchoredPosition.x + panelRectTransform.sizeDelta.x / 2,
-                    panelRectTransform.anchoredPosition.y - panelRectTransform.sizeDelta.y / 2
-                );
-
-                // Local -> Windows 좌표 변환
-                Vector2 start = ConvertUnityPosToWinpos(bottomLeft);
-                Vector2 end = ConvertUnityPosToWinpos(topRight);
-
-                // 최종 캡처 영역 계산
-                float x = start.x;
-                float y = Screen.height - start.y;
-                int width = (int)(end.x - start.x);
-                int height = (int)(start.y - end.y);
-                Debug.Log("capture to memory:"+x+"/"+y+"/"+width+"/"+height);
-                
-                // 5단계: 메모리에 캡처
-                imageBytes = CaptureDesktopAreaToMemory((int)x, (int)y, width, height);
-            }
-            finally
-            {
-                // 6단계: 후처리 - 예외 발생 여부와 관계없이 반드시 실행
-                if (shouldExcludeUnity)
-                {
-                    SetCaptureExclusion(false);
-                }
-                else if (shouldUseLayerDeactivation)
-                {
-                    if (deactivatedCharObjects != null || deactivatedUIObjects != null)
-                    {
-                        ReactivateLayersAfterCapture(deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates);
-                    }
-                }
-            }
-            
-            // 7단계: 콜백 호출
-            callback?.Invoke(imageBytes);
-        }
-        else
+        // 유효성 검사
+        if (!IsScreenshotAreaSet())
         {
             Debug.LogWarning("Screenshot area not set.");
             callback?.Invoke(null);
+            yield break;
         }
+        
+        // 전처리
+        CaptureState state = PrepareCapture("[Screenshot Memory]");
+        
+        byte[] imageBytes = null;
+        try
+        {
+            // 렌더링 대기
+            yield return WaitForCapture(state);
+            
+            // 좌표 계산
+            var (x, y, width, height) = CalculateCaptureArea();
+            Debug.Log($"capture to memory: {x}/{y}/{width}/{height}");
+            
+            // 메모리에 캡처
+            imageBytes = CaptureDesktopAreaToMemory(x, y, width, height);
+        }
+        finally
+        {
+            // 후처리 - 예외 발생 여부와 관계없이 반드시 실행
+            CleanupCapture(state);
+        }
+        
+        // 콜백 호출
+        callback?.Invoke(imageBytes);
     }
 
     // 메모리에 캡처 + 영역 정보 반환 (OCR용)
     public IEnumerator CaptureScreenshotToMemoryWithInfo(System.Action<byte[], int, int, int, int> callback)
     {
-        // 1단계: 스크린샷 영역 유효성 검사
-        RectTransform panelRectTransform = screenshotArea.GetComponent<RectTransform>();
-
-        if (panelRectTransform.sizeDelta.x > 0 && panelRectTransform.sizeDelta.y > 0)
-        {
-            // 2단계: 캡처 제외 설정 판단
-            bool shouldIncludeChar = SettingManager.Instance.settings.includeCharInScreenshot;
-            bool shouldIncludeUI = SettingManager.Instance.settings.includeUIInScreenshot;
-            
-            // 3단계: 캡처 제외 처리 (Fallback 포함)
-            bool shouldExcludeUnity = !shouldIncludeChar && !shouldIncludeUI;
-            bool shouldUseLayerDeactivation = (!shouldIncludeChar && shouldIncludeUI) || (shouldIncludeChar && !shouldIncludeUI);
-            
-            List<GameObject> deactivatedCharObjects = null;
-            List<GameObject> deactivatedUIObjects = null;
-            Dictionary<GameObject, bool> uiWidgetVisibleStates = null;
-            
-            // 전처리
-            if (shouldExcludeUnity)
-            {
-                Debug.Log("[OCR Screenshot] 모드: Unity 창 전체 제외 시도 (SetCaptureExclusion)");
-                bool exclusionSuccess = SetCaptureExclusion(true);
-                
-                if (!exclusionSuccess)
-                {
-                    Debug.LogWarning("[OCR Screenshot] SetCaptureExclusion 실패, 레이어 비활성화 방식으로 폴백");
-                    shouldExcludeUnity = false;
-                    shouldUseLayerDeactivation = true;
-                    (deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates) = DeactivateLayersForCapture();
-                }
-            }
-            else if (shouldUseLayerDeactivation)
-            {
-                Debug.Log("[OCR Screenshot] 모드: 레이어별 선택적 비활성화 (SetActive)");
-                (deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates) = DeactivateLayersForCapture();
-            }
-            else
-            {
-                Debug.Log("[OCR Screenshot] 모드: 전체 포함 (로직 없음)");
-            }
-            
-            // try-finally로 예외 안전성 확보
-            byte[] imageBytes = null;
-            int x = 0, y = 0, width = 0, height = 0;
-            
-            try
-            {
-                // 렌더링 대기
-                if (shouldExcludeUnity)
-                {
-                    yield return new WaitForEndOfFrame();
-                    yield return new WaitForEndOfFrame();
-                    yield return new WaitForSeconds(0.05f);
-                }
-                else if (shouldUseLayerDeactivation && 
-                         ((deactivatedCharObjects != null && deactivatedCharObjects.Count > 0) || 
-                          (deactivatedUIObjects != null && deactivatedUIObjects.Count > 0)))
-                {
-                    yield return new WaitForEndOfFrame();
-                    yield return new WaitForEndOfFrame();
-                }
-                
-                // 4단계: 좌표 계산
-                Vector2 bottomLeft = new Vector2(
-                    panelRectTransform.anchoredPosition.x - panelRectTransform.sizeDelta.x / 2,
-                    panelRectTransform.anchoredPosition.y + panelRectTransform.sizeDelta.y / 2
-                );
-
-                Vector2 topRight = new Vector2(
-                    panelRectTransform.anchoredPosition.x + panelRectTransform.sizeDelta.x / 2,
-                    panelRectTransform.anchoredPosition.y - panelRectTransform.sizeDelta.y / 2
-                );
-
-                // Local -> Windows 좌표 변환
-                Vector2 start = ConvertUnityPosToWinpos(bottomLeft);
-                Vector2 end = ConvertUnityPosToWinpos(topRight);
-
-                // 최종 캡처 영역 계산
-                x = (int)start.x;
-                y = (int)(Screen.height - start.y);
-                width = (int)(end.x - start.x);
-                height = (int)(start.y - end.y);
-                Debug.Log($"[OCR] Capture area: x={x}, y={y}, width={width}, height={height}");
-                
-                // 5단계: 메모리에 캡처
-                imageBytes = CaptureDesktopAreaToMemory(x, y, width, height);
-            }
-            finally
-            {
-                // 6단계: 후처리 - 예외 발생 여부와 관계없이 반드시 실행
-                if (shouldExcludeUnity)
-                {
-                    SetCaptureExclusion(false);
-                }
-                else if (shouldUseLayerDeactivation)
-                {
-                    if (deactivatedCharObjects != null || deactivatedUIObjects != null)
-                    {
-                        ReactivateLayersAfterCapture(deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates);
-                    }
-                }
-            }
-            
-            // 7단계: 이미지 바이트 + 영역 정보 반환
-            callback?.Invoke(imageBytes, x, y, width, height);
-        }
-        else
+        // 유효성 검사
+        if (!IsScreenshotAreaSet())
         {
             Debug.LogWarning("Screenshot area not set.");
             callback?.Invoke(null, 0, 0, 0, 0);
+            yield break;
         }
+        
+        // 전처리
+        CaptureState state = PrepareCapture("[OCR Screenshot]");
+        
+        byte[] imageBytes = null;
+        int x = 0, y = 0, width = 0, height = 0;
+        
+        try
+        {
+            // 렌더링 대기
+            yield return WaitForCapture(state);
+            
+            // 좌표 계산
+            (x, y, width, height) = CalculateCaptureArea();
+            Debug.Log($"[OCR] Capture area: x={x}, y={y}, width={width}, height={height}");
+            
+            // 메모리에 캡처
+            imageBytes = CaptureDesktopAreaToMemory(x, y, width, height);
+        }
+        finally
+        {
+            // 후처리 - 예외 발생 여부와 관계없이 반드시 실행
+            CleanupCapture(state);
+        }
+        
+        // 이미지 바이트 + 영역 정보 반환
+        callback?.Invoke(imageBytes, x, y, width, height);
     }
 
     // 메모리에 직접 캡처하는 메서드
@@ -820,61 +720,15 @@ public class ScreenshotManager : MonoBehaviour
     // 전체 화면 캡처 (Hybrid 방식 적용)
     public IEnumerator CaptureFullScreenToMemory(System.Action<byte[]> callback)
     {
-        // 캡처 제외 설정 판단
-        bool shouldIncludeChar = SettingManager.Instance.settings.includeCharInScreenshot;
-        bool shouldIncludeUI = SettingManager.Instance.settings.includeUIInScreenshot;
-        
-        // 캡처 제외 처리 (Fallback 포함)
-        bool shouldExcludeUnity = !shouldIncludeChar && !shouldIncludeUI;
-        bool shouldUseLayerDeactivation = (!shouldIncludeChar && shouldIncludeUI) || (shouldIncludeChar && !shouldIncludeUI);
-        
-        List<GameObject> deactivatedCharObjects = null;
-        List<GameObject> deactivatedUIObjects = null;
-        Dictionary<GameObject, bool> uiWidgetVisibleStates = null;
-        
         // 전처리
-        if (shouldExcludeUnity)
-        {
-            Debug.Log("[Screenshot FullScreen] 모드: Unity 창 전체 제외 시도 (SetCaptureExclusion)");
-            bool exclusionSuccess = SetCaptureExclusion(true);
-            
-            if (!exclusionSuccess)
-            {
-                Debug.LogWarning("[Screenshot FullScreen] SetCaptureExclusion 실패, 레이어 비활성화 방식으로 폴백");
-                shouldExcludeUnity = false;
-                shouldUseLayerDeactivation = true;
-                (deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates) = DeactivateLayersForCapture();
-            }
-        }
-        else if (shouldUseLayerDeactivation)
-        {
-            Debug.Log("[Screenshot FullScreen] 모드: 레이어별 선택적 비활성화 (SetActive)");
-            (deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates) = DeactivateLayersForCapture();
-        }
-        else
-        {
-            Debug.Log("[Screenshot FullScreen] 모드: 전체 포함 (로직 없음)");
-        }
+        CaptureState state = PrepareCapture("[Screenshot FullScreen]");
         
-        // try-finally로 예외 안전성 확보
         byte[] imageBytes = null;
         
         try
         {
             // 렌더링 대기
-            if (shouldExcludeUnity)
-            {
-                yield return new WaitForEndOfFrame();
-                yield return new WaitForEndOfFrame();
-                yield return new WaitForSeconds(0.05f);
-            }
-            else if (shouldUseLayerDeactivation && 
-                     ((deactivatedCharObjects != null && deactivatedCharObjects.Count > 0) || 
-                      (deactivatedUIObjects != null && deactivatedUIObjects.Count > 0)))
-            {
-                yield return new WaitForEndOfFrame();
-                yield return new WaitForEndOfFrame();
-            }
+            yield return WaitForCapture(state);
             
             // 전체 화면 캡처
             int width = GetSystemMetrics(SM_CXSCREEN);
@@ -886,17 +740,7 @@ public class ScreenshotManager : MonoBehaviour
         finally
         {
             // 후처리 - 예외 발생 여부와 관계없이 반드시 실행
-            if (shouldExcludeUnity)
-            {
-                SetCaptureExclusion(false);
-            }
-            else if (shouldUseLayerDeactivation)
-            {
-                if (deactivatedCharObjects != null || deactivatedUIObjects != null)
-                {
-                    ReactivateLayersAfterCapture(deactivatedCharObjects, deactivatedUIObjects, uiWidgetVisibleStates);
-                }
-            }
+            CleanupCapture(state);
         }
         
         // 콜백 호출
