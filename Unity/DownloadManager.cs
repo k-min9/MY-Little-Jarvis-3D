@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System;
 using System.Threading;
+using System.Threading.Tasks;
 
 public class DownloadManager : MonoBehaviour
 {
@@ -140,16 +141,20 @@ public class DownloadManager : MonoBehaviour
                 return uiLanguage == "ko" ? "계산 중..." :
                        uiLanguage == "jp" ? "計算中..." : "Calculating...";
                        
+            case "file_progress":
+                return uiLanguage == "ko" ? "파일 {0}/{1}" :
+                       uiLanguage == "jp" ? "ファイル {0}/{1}" : "File {0}/{1}";
+                       
             default:
                 return key;
         }
     }
 
     // 모델 다운로드 요청
-    public void RequestDownload()
+    public async void RequestDownload()
     {
         // Full 버전 이상인지 확인
-        if (!InstallStatusManager.Instance.CheckAndOperateFull())
+        if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
         {
             return;
         }
@@ -166,44 +171,148 @@ public class DownloadManager : MonoBehaviour
         }
 
         string modelType = SettingManager.Instance.settings.model_name_Local;
-        var model =ModelDataLocal.ModelOptions.Find(m => m.Id == modelType);
+        var model = ModelDataLocal.ModelOptions.Find(m => m.Id == modelType);
         if (model == null)
         {
             Debug.LogWarning($"[DownloadManager] Unknown model ID: {modelType}");
             return;
         }
 
-        string exeDirectory = Path.GetDirectoryName(Application.dataPath);
-        string savePath = Path.Combine(exeDirectory, "model", model.FileName);
+        // 파일명 목록 생성 (다이얼로그 표시용)
+        string fileListText = "";
+        for (int i = 0; i < model.FileInfos.Count; i++)
+        {
+            fileListText += $"  {i + 1}. {model.FileInfos[i].FileName} ({model.FileInfos[i].FileSizeText})\n";
+        }
 
 #if UNITY_EDITOR
         bool proceed = UnityEditor.EditorUtility.DisplayDialog(
             GetLocalizedText("model_download"),
             $"'{model.DisplayName}' {GetLocalizedText("download_confirm_msg")}\n" +
-            $"{GetLocalizedText("filename")}: {model.FileName}\n" +
-            $"{GetLocalizedText("required_space")}: {model.FileSizeText}",
+            $"{GetLocalizedText("required_space")}: {model.TotalSizeText}\n\n" +
+            $"{GetLocalizedText("filename")}:\n{fileListText}",
             GetLocalizedText("download"), 
             GetLocalizedText("cancel"));
 
         if (!proceed) return;
 #endif
 
-        StartCoroutine(ParallelDownloadCoroutine(model.DownloadUrl, savePath, model.DisplayName, model.FileSizeText));
+        StartCoroutine(SequentialDownloadCoroutine(model));
     }
 
-    // 병렬 다운로드 메인 코루틴
-    private IEnumerator ParallelDownloadCoroutine(string url, string savePath, string displayName, string totalSizeText)
+    public void RequestDownloadCustom()
+    {
+        
+    }
+
+    // 순차 다운로드 메인 코루틴
+    private IEnumerator SequentialDownloadCoroutine(ModelDataLocal.ModelOption model)
     {
         isDownloading = true;
         modelDownloadGameObject.SetActive(true);
+        
+        string exeDirectory = Path.GetDirectoryName(Application.dataPath);
+        
+        // 다운로드 속도 측정 초기화 (전체 시간 측정)
+        downloadStopwatch = System.Diagnostics.Stopwatch.StartNew();
+        
+        // 파일 크기 검증 (FileSizeBytes가 0인 경우 HEAD 요청으로 확인)
+        yield return StartCoroutine(ValidateFileSizes(model.FileInfos));
+        
+        // 순차적으로 각 파일 다운로드
+        for (int i = 0; i < model.FileInfos.Count; i++)
+        {
+            var fileInfo = model.FileInfos[i];
+            string savePath = Path.Combine(exeDirectory, "model", fileInfo.FileName);
+            
+            Debug.Log($"[DownloadManager] Starting file {i + 1}/{model.FileInfos.Count}: {fileInfo.FileName}");
+            
+            bool downloadSuccess = false;
+            yield return StartCoroutine(ParallelDownloadCoroutine(
+                fileInfo.DownloadUrl, 
+                savePath, 
+                model.DisplayName, 
+                fileInfo.FileSizeText,
+                i + 1,
+                model.FileInfos.Count,
+                success => downloadSuccess = success));
+            
+            if (!downloadSuccess)
+            {
+                Debug.LogError($"[DownloadManager] Failed to download file {i + 1}/{model.FileInfos.Count}: {fileInfo.FileName}");
+                downloadStopwatch.Stop();
+                modelDownloadGameObject.SetActive(false);
+                isDownloading = false;
+                yield break;
+            }
+        }
+        
+        // 모든 파일 다운로드 완료
+        downloadStopwatch.Stop();
+        float totalTimeSeconds = downloadStopwatch.ElapsedMilliseconds / 1000f;
+        
+        // 전체 크기 계산 (평균 속도 계산용)
+        long totalBytes = 0;
+        foreach (var fileInfo in model.FileInfos)
+        {
+            totalBytes += fileInfo.FileSizeBytes;
+        }
+        float avgSpeedMBps = (totalBytes / (1024f * 1024f)) / totalTimeSeconds;
+        
+        Debug.Log($"[DownloadManager] All files downloaded in {totalTimeSeconds:F1}s at {avgSpeedMBps:F1} MB/s");
+        
+        // 다운로드 완료 후 버튼 활성화를 위해 UI 업데이트
+        string fileName = model.FileInfos[0].FileName;
+        SettingManager.Instance.SetServerUIFromServerModel(fileName);
+        
+    #if UNITY_EDITOR
+        UnityEditor.EditorUtility.DisplayDialog(
+            GetLocalizedText("download_complete"),
+            $"'{model.DisplayName}' {GetLocalizedText("download_complete_msg")}\n" +
+            $"{GetLocalizedText("elapsed_time")}: {totalTimeSeconds:F1}{GetLocalizedText("seconds")}\n" +
+            $"{GetLocalizedText("average_speed")}: {avgSpeedMBps:F1} MB/s",
+            GetLocalizedText("confirm"));
+    #endif
+        
+        modelDownloadGameObject.SetActive(false);
+        isDownloading = false;
+    }
+
+    // 파일 크기 검증 (FileSizeBytes가 0인 경우 HEAD 요청으로 확인)
+    private IEnumerator ValidateFileSizes(List<ModelDataLocal.ModelFileInfo> fileInfos)
+    {
+        for (int i = 0; i < fileInfos.Count; i++)
+        {
+            if (fileInfos[i].FileSizeBytes == 0)
+            {
+                Debug.Log($"[DownloadManager] Validating file size for: {fileInfos[i].FileName}");
+                
+                long validatedSize = 0;
+                yield return StartCoroutine(GetFileSizeCoroutine(fileInfos[i].DownloadUrl, size => validatedSize = size));
+                
+                if (validatedSize > 0)
+                {
+                    fileInfos[i].FileSizeBytes = validatedSize;
+                    Debug.Log($"[DownloadManager] File size validated: {fileInfos[i].FileName} = {validatedSize} bytes");
+                }
+                else
+                {
+                    Debug.LogWarning($"[DownloadManager] Could not validate file size for: {fileInfos[i].FileName}");
+                }
+            }
+        }
+    }
+
+    // 병렬 다운로드 메인 코루틴
+    private IEnumerator ParallelDownloadCoroutine(string url, string savePath, string displayName, string fileSizeText, int fileIndex, int totalFiles, System.Action<bool> onComplete)
+    {
         modelDownloadImage.fillAmount = 0f;
 
-        // 다운로드 속도 측정 초기화
-        downloadStopwatch = System.Diagnostics.Stopwatch.StartNew();
+        // 다운로드 속도 측정 초기화 (개별 파일 속도)
         lastBytesDownloaded = 0;
         lastSpeedCheckTime = Time.time;
 
-        Debug.Log($"[DownloadManager] Starting parallel download: {url}");
+        Debug.Log($"[DownloadManager] Starting parallel download [{fileIndex}/{totalFiles}]: {url}");
 
         long totalSize = 0;
 
@@ -213,6 +322,7 @@ public class DownloadManager : MonoBehaviour
         {
             Debug.LogError("[DownloadManager] Could not determine file size");
             ShowErrorDialog(GetLocalizedText("file_size_error"));
+            onComplete?.Invoke(false);
             yield break;
         }
 
@@ -243,7 +353,7 @@ public class DownloadManager : MonoBehaviour
 
             // 현재 다운로드된 바이트 수 계산 및 UI 업데이트
             long downloadedBytes = CalculateDownloadedBytes(chunkData);
-            UpdateUI(downloadedBytes, totalSize, totalSizeText);
+            UpdateUI(downloadedBytes, totalSize, fileSizeText, fileIndex, totalFiles);
 
             // 모든 청크가 완료되었는지 확인
             bool allChunksCompleted = true;
@@ -268,34 +378,16 @@ public class DownloadManager : MonoBehaviour
         {
             Debug.LogError($"[DownloadManager] Download incomplete: {finalDownloadedBytes}/{totalSize} bytes");
             ShowErrorDialog(GetLocalizedText("download_incomplete"));
+            onComplete?.Invoke(false);
             yield break;
         }
 
         // 6. 파일 병합
         yield return StartCoroutine(MergeChunksToFile(chunkData, savePath));
 
-        // 7. 완료 처리 및 통계 출력
-        downloadStopwatch.Stop();
-        float totalTimeSeconds = downloadStopwatch.ElapsedMilliseconds / 1000f;
-        float avgSpeedMBps = (totalSize / (1024f * 1024f)) / totalTimeSeconds;
-
-        Debug.Log($"[DownloadManager] Download completed in {totalTimeSeconds:F1}s at {avgSpeedMBps:F1} MB/s");
-
-        // 다운로드 완료 후 버튼 활성화를 위해 UI 업데이트
-        string fileName = Path.GetFileName(savePath);
-        SettingManager.Instance.SetServerUIFromServerModel(fileName);
-
-    #if UNITY_EDITOR
-        UnityEditor.EditorUtility.DisplayDialog(
-            GetLocalizedText("download_complete"),
-            $"'{displayName}' {GetLocalizedText("download_complete_msg")}\n" +
-            $"{GetLocalizedText("elapsed_time")}: {totalTimeSeconds:F1}{GetLocalizedText("seconds")}\n" +
-            $"{GetLocalizedText("average_speed")}: {avgSpeedMBps:F1} MB/s",
-            GetLocalizedText("confirm"));
-    #endif
-
-        modelDownloadGameObject.SetActive(false);
-        isDownloading = false;
+        // 7. 완료 처리
+        Debug.Log($"[DownloadManager] File [{fileIndex}/{totalFiles}] download completed");
+        onComplete?.Invoke(true);
     }
 
     // 파일 크기 확인
@@ -406,7 +498,7 @@ public class DownloadManager : MonoBehaviour
     }
 
     // UI 업데이트
-    private void UpdateUI(long downloadedBytes, long totalSize, string totalSizeText)
+    private void UpdateUI(long downloadedBytes, long totalSize, string totalSizeText, int fileIndex, int totalFiles)
     {
         float percent = (float)downloadedBytes / totalSize;
         float downloadedGB = downloadedBytes / (1024f * 1024f * 1024f);
@@ -434,7 +526,15 @@ public class DownloadManager : MonoBehaviour
         }
 
         modelDownloadImage.fillAmount = percent;
-        modelDownloadText.text = $"{downloadedGB:F2} GB / {totalSizeText} ({percent * 100f:F1}%)\n" +
+        
+        // 파일 진행률 표시
+        string fileProgressText = "";
+        if (totalFiles > 1)
+        {
+            fileProgressText = string.Format(GetLocalizedText("file_progress"), fileIndex, totalFiles) + " - ";
+        }
+        
+        modelDownloadText.text = $"{fileProgressText}{downloadedGB:F2} GB / {totalSizeText} ({percent * 100f:F1}%)\n" +
                                 $"{GetLocalizedText("speed")}: {speedText} | {GetLocalizedText("time")}: {etaText}";
     }
 
