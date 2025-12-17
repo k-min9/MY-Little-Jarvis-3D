@@ -62,10 +62,10 @@ public class VADController : MonoBehaviour
 
     public void CheckVAD()
     {
-        Debug.Log("CheckVAD start");
+        // Debug.Log("CheckVAD start");
         // lets check current mic position time
         var micPos = Microphone.GetPosition(microphoneDevice);
-        Debug.Log(micPos);
+        // Debug.Log(micPos);
         if (micPos < _lastMicPos)
         {
             _madeLoopLap = true;
@@ -74,7 +74,7 @@ public class VADController : MonoBehaviour
 
         UpdateChunks(micPos);
         UpdateVad(micPos);
-        Debug.Log("CheckVAD end");
+        // Debug.Log("CheckVAD end");
     }
 
     void UpdateChunks(int micPos)
@@ -113,7 +113,7 @@ public class VADController : MonoBehaviour
 
         var data = GetMicBufferLast(micPos, vadContextSec);
         var vad = AudioUtils.SimpleVad(data, _clip.frequency, vadLastSec, vadThd, vadFreqThd);
-        Debug.Log(vad + " : " + micPos + "/" + data.Length + "/" + _clip.frequency);
+        // Debug.Log(vad + " : " + micPos + "/" + data.Length + "/" + _clip.frequency);
 
         // raise event if vad has changed
         if (vad != IsVoiceDetected)
@@ -291,8 +291,21 @@ public class VADController : MonoBehaviour
             fileStream.Write(wavData, 0, wavData.Length);
         }
 
-        // wav 전송 API 호출
-        StartCoroutine(SendWavFile(filePath, "ko", "normal"));
+        // STT Server 사용 여부에 따라 분기
+        if (SettingManager.Instance.settings.isSTTServer)
+        {
+            // 외부 서버 STT 사용 (wav 전송 API 호출)
+            Debug.Log("Using external server STT...");
+            StartCoroutine(STTUtil.SendWavFileToSTT(this, wavData, "ko", "normal", true));
+        }
+        else
+        {
+            // 내부 Unity Whisper STT 사용
+            Debug.Log("Using internal Unity Whisper STT...");
+            StartCoroutine(WhisperSTTManager.Instance.ProcessSTTFromWavData(wavData));
+        }
+
+
     }
 
     private byte[] ConvertToWav(float[] samples, int channels, int sampleRate)
@@ -405,101 +418,4 @@ public class VADController : MonoBehaviour
         }
     }
 
-    // 반환 타입
-[System.Serializable]
-public class SttResponse
-{
-    public string text;
-    public string lang;
-    public string chatIdx;
-}
-
-// 변수 세개 다 현재 안쓰임
-public IEnumerator SendWavFile(string filePath, string sttLang, string sttLevel)
-{
-
-// 직접 wavdata 구성시 사용
-// #if UNITY_ANDROID && !UNITY_EDITOR
-//     // Android에서는 UnityWebRequest로 파일 읽기
-//     string uri = "file://" + filePath;
-//     using (UnityWebRequest fileRequest = UnityWebRequest.Get(uri))
-//     {
-//         yield return fileRequest.SendWebRequest();
-
-//         if (fileRequest.result != UnityWebRequest.Result.Success)
-//         {
-//             Debug.LogError($"Error reading WAV file on Android: {fileRequest.error}");
-//             yield break;
-//         }
-//         wavData = fileRequest.downloadHandler.data;
-//     }
-// #else
-//     // 다른 플랫폼에서는 File.ReadAllBytes 사용
-//     if (!File.Exists(filePath))
-//     {
-//         Debug.LogError($"File not found: {filePath}");
-//         yield break;
-//     }
-//     wavData = File.ReadAllBytes(filePath);
-// #endif
-
-    // UnityWebRequest로 서버에 데이터 업로드
-    // API 호출을 위한 URL 구성
-    string baseUrl = "";
-#if UNITY_ANDROID && !UNITY_EDITOR
-    if (APIManager.Instance.ngrokUrl == null) {
-        baseUrl = "https://minmin496969.loca.lt";
-    } else {
-        baseUrl = APIManager.Instance.ngrokUrl;  // ex) https://8e5c-1-237-90-223.ngrok-free.app
-    }
-#else
-    baseUrl = "http://127.0.0.1:5000";
-#endif
-    string url = baseUrl+"/stt"; // http://localhost:5000/stt
-    
-    GameManager.Instance.chatIdx += 1;
-
-    WWWForm formData = new WWWForm();
-    // formData.AddBinaryData("file", wavData, Path.GetFileName(filePath), "audio/wav");
-    formData.AddBinaryData("file", wavData, "stt.wav", "audio/wav");
-    formData.AddField("lang", "ko");
-    formData.AddField("level", "small");
-    formData.AddField("chatIdx", GameManager.Instance.chatIdx);
-
-    UnityWebRequest request = UnityWebRequest.Post(url, formData);
- 
-    // 요청 전송
-    yield return request.SendWebRequest();
-
-    // 결과 처리
-    if (request.result != UnityWebRequest.Result.Success)
-    {
-        Debug.LogError($"Error uploading WAV file: {request.error}");
-    }
-    else
-    {
-        // Debug.Log($"Upload successful! Response: {request.downloadHandler.text}");
-        try
-        {
-            // JSON 응답 파싱
-            string responseText = request.downloadHandler.text;
-
-            var responseJson = JsonUtility.FromJson<SttResponse>(responseText);
-            // Debug.Log($"STT Text: {responseJson.text}");
-            // Debug.Log($"Detected Language: {responseJson.lang}");
-            // Debug.Log($"ChatIdx: {responseJson.chatIdx}");
-
-            string query = responseJson.text ?? "";
-
-            NoticeBalloonManager.Instance.ModifyNoticeBalloonText(query);
-
-            // 대화 시작
-            APIManager.Instance.CallConversationStream(query, responseJson.chatIdx);
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"Error parsing JSON response: {ex.Message}");
-        }
-    }
-}
 }
