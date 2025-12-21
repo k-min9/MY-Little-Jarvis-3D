@@ -39,8 +39,6 @@ public class APIManager : MonoBehaviour
 
     // 싱글톤 인스턴스
     private static APIManager instance;
-
-    // 싱글톤 인스턴스에 접근하는 속성
     public static APIManager Instance
     {
         get
@@ -55,17 +53,6 @@ public class APIManager : MonoBehaviour
 
     private void Awake()
     {
-        // 싱글톤 패턴 구현
-        if (instance == null)
-        {
-            instance = this;
-        }
-        else
-        {
-            // Destroy(gameObject);
-            return;
-        }
-
         // 로그 파일 경로 생성 (날짜와 시간 기반으로)
         string dateTime = DateTime.Now.ToString("yyyyMMdd_HHmmss");
         logFilePath = Path.Combine(Application.persistentDataPath, $"log/api_{dateTime}.txt");
@@ -92,13 +79,13 @@ public class APIManager : MonoBehaviour
         if ((now - lastSmallTalkCallTime).TotalSeconds < 3)
         {
             Debug.Log("[SmallTalk] 호출 간격 부족 (3초 미경과)");
-            EmotionBalloonManager.Instance.ShowNoEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), 2f);
+            EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), "No", 2f);
             return;
         }
         if (isSmallTalkWaiting && (now - lastSmallTalkCallTime).TotalSeconds < 10)
         {
             Debug.Log("[SmallTalk] 답변 대기 중 (10초 미경과)");
-            EmotionBalloonManager.Instance.ShowNoEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), 2f);
+            EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), "No", 2f);
             return;
         }
         lastSmallTalkCallTime = now;
@@ -1088,17 +1075,103 @@ public class APIManager : MonoBehaviour
                             Debug.Log("Skipping OnFinalResponseReceived for system type (asking_intent/trigger)");
                         }
                     }
-
+                }
+            }
+        }
+        catch (WebException ex)
+        {
+            Debug.LogError($"WebException: {ex.Message}");
+            if (ex.Response != null)
+            {
+                using (Stream errorStream = ex.Response.GetResponseStream())
+                using (StreamReader errorReader = new StreamReader(errorStream))
+                {
+                    string errorResponse = await errorReader.ReadToEndAsync();
+                    Debug.LogError($"Error Response: {errorResponse}");
                 }
             }
         }
         catch (Exception ex)
         {
-            Debug.Log($"Exception: {ex.Message}");
+            Debug.LogError($"Exception: {ex.Message}");
         }
-        finally
+    }
+    
+    // === Furigana 변환 API ===
+    
+    [System.Serializable]
+    public class FuriganaResponse
+    {
+        public string type;
+        public string furigana;
+        public string original;
+        public string time;
+    }
+    
+    // Furigana 변환 API 호출
+    public void CallFuriganaAPI(string text, System.Action<string> callback)
+    {
+        StartCoroutine(CallFuriganaAPICoroutine(text, callback));
+    }
+    
+    private IEnumerator CallFuriganaAPICoroutine(string text, System.Action<string> callback)
+    {
+        if (string.IsNullOrWhiteSpace(text))
         {
-            DestroyQuestionBalloon();
+            Debug.LogWarning("[APIManager] Furigana: Empty text provided");
+            callback?.Invoke(text);
+            yield break;
+        }
+        
+        // Base URL 가져오기
+        var tcs = new TaskCompletionSource<string>();
+        ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
+        yield return new WaitUntil(() => tcs.Task.IsCompleted);
+        string baseUrl = tcs.Task.Result;
+        
+        string url = baseUrl + "/furigana";
+        Debug.Log($"[APIManager] Calling Furigana API: {url}");
+        
+        // Form 데이터 생성
+        WWWForm form = new WWWForm();
+        form.AddField("text", text);
+        
+        using (UnityWebRequest request = UnityWebRequest.Post(url, form))
+        {
+            yield return request.SendWebRequest();
+            
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                // 스트리밍 응답 파싱
+                string[] lines = request.downloadHandler.text.Split('\n');
+                string furiganaResult = null;
+                
+                foreach (string line in lines)
+                {
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    
+                    try
+                    {
+                        var response = JsonUtility.FromJson<FuriganaResponse>(line);
+                        if (response.type == "reply" && !string.IsNullOrEmpty(response.furigana))
+                        {
+                            furiganaResult = response.furigana;
+                            Debug.Log($"[APIManager] Furigana result: {furiganaResult}");
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogWarning($"[APIManager] Failed to parse furigana response line: {e.Message}");
+                    }
+                }
+                
+                callback?.Invoke(furiganaResult ?? text);
+            }
+            else
+            {
+                Debug.LogError($"[APIManager] Furigana API error: {request.error}");
+                callback?.Invoke(text);  // 실패 시 원본 텍스트 반환
+            }
         }
     }
 
@@ -2053,7 +2126,19 @@ public class APIManager : MonoBehaviour
     }
 
     // PaddleOCR API 호출
-    public async void CallPaddleOCR(byte[] imageBytes, System.Action<OCRResult> callback)
+    public async void CallPaddleOCR(
+        byte[] imageBytes, 
+        string targetLang = "en", 
+        bool autoDetect = false, 
+        bool useTranslate = false,
+        string originLang = "ja",
+        bool isFormality = true,
+        bool isSentence = true,
+        int mergeThreshold = 0,
+        bool saveResult = true,
+        bool saveImage = true,
+        bool isDebug = true,
+        System.Action<OCRResult> callback = null)
     {
         if (imageBytes == null || imageBytes.Length == 0)
         {
@@ -2080,7 +2165,38 @@ public class APIManager : MonoBehaviour
             }
             
             string url = baseUrl + "/paddle/ocr";
-            Debug.Log($"[PaddleOCR] URL: {url}");
+            Debug.Log($"[PaddleOCR] URL: {url}, useTranslate: {useTranslate}, origin_lang: {originLang}, target_lang: {targetLang}");
+
+            // 파라미터 Dictionary 구성 (사용자 선호 스타일!)
+            var parameters = new Dictionary<string, string>
+            {
+                { "use_translate", useTranslate ? "true" : "false" },
+                { "save_result", saveResult ? "true" : "false" },
+                { "save_image", saveImage ? "true" : "false" },
+                { "is_debug", isDebug ? "true" : "false" },
+                { "is_sentence", isSentence ? "true" : "false" },
+                { "merge_threshold", mergeThreshold.ToString() }
+            };
+
+            // 번역 사용 시 추가 파라미터
+            if (useTranslate)
+            {
+                parameters["target_lang"] = targetLang;
+                parameters["origin_lang"] = originLang;
+                parameters["is_formality"] = isFormality ? "true" : "false";
+            }
+            else
+            {
+                // 번역 미사용 시 origin_lang 설정
+                if (!autoDetect)
+                {
+                    parameters["origin_lang"] = originLang;
+                }
+                else
+                {
+                    parameters["origin_lang_auto_detect"] = "true";
+                }
+            }
 
             string boundary = "----WebKitFormBoundary" + DateTime.Now.Ticks.ToString("x");
             string contentType = "multipart/form-data; boundary=" + boundary;
@@ -2093,7 +2209,7 @@ public class APIManager : MonoBehaviour
             using (MemoryStream memStream = new MemoryStream())
             using (StreamWriter writer = new StreamWriter(memStream, Encoding.UTF8, 1024, true))
             {
-                // 이미지 파일만 전송 (PaddleOCR은 tasks 파라미터 불필요)
+                // 이미지 파일 전송
                 writer.WriteLine($"--{boundary}");
                 writer.WriteLine($"Content-Disposition: form-data; name=\"image\"; filename=\"fullscreen.png\"");
                 writer.WriteLine("Content-Type: image/png");
@@ -2102,6 +2218,15 @@ public class APIManager : MonoBehaviour
 
                 memStream.Write(imageBytes, 0, imageBytes.Length);
                 writer.WriteLine();
+
+                // Dictionary 파라미터들을 multipart로 전송
+                foreach (var param in parameters)
+                {
+                    writer.WriteLine($"--{boundary}");
+                    writer.WriteLine($"Content-Disposition: form-data; name=\"{param.Key}\"");
+                    writer.WriteLine();
+                    writer.WriteLine(param.Value);
+                }
 
                 // 마지막 boundary
                 writer.WriteLine($"--{boundary}--");
@@ -2203,168 +2328,6 @@ public class APIManager : MonoBehaviour
         }
     }
 
-    // PaddleOCR + 번역 API 호출
-    public async void CallPaddleOCRWithTranslate(byte[] imageBytes, string targetLang, System.Action<OCRWithTranslateResult> callback)
-    {
-        if (imageBytes == null || imageBytes.Length == 0)
-        {
-            Debug.LogError("[PaddleOCR+Translate] Image bytes is null or empty");
-            callback?.Invoke(null);
-            return;
-        }
-
-        try
-        {
-            // dev_ocr_translate 서버 URL 가져오기
-            var tcs = new TaskCompletionSource<string>();
-            ServerManager.Instance.GetServerUrlFromServerId("dev_ocr_translate", (url) =>
-            {
-                tcs.SetResult(url);
-            });
-            string baseUrl = await tcs.Task;
-            
-            if (string.IsNullOrEmpty(baseUrl))
-            {
-                Debug.LogError("[PaddleOCR+Translate] dev_ocr_translate 서버 URL을 가져올 수 없습니다.");
-                callback?.Invoke(null);
-                return;
-            }
-            
-            string url = baseUrl + "/paddle/ocr_with_translate";
-            Debug.Log($"[PaddleOCR+Translate] URL: {url}, target_lang: {targetLang}");
-
-            string boundary = "----WebKitFormBoundary" + DateTime.Now.Ticks.ToString("x");
-            string contentType = "multipart/form-data; boundary=" + boundary;
-
-            // 요청 준비
-            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-            request.Method = "POST";
-            request.ContentType = contentType;
-
-            using (MemoryStream memStream = new MemoryStream())
-            using (StreamWriter writer = new StreamWriter(memStream, Encoding.UTF8, 1024, true))
-            {
-                // 이미지 파일 전송
-                writer.WriteLine($"--{boundary}");
-                writer.WriteLine($"Content-Disposition: form-data; name=\"image\"; filename=\"screenshot.png\"");
-                writer.WriteLine("Content-Type: image/png");
-                writer.WriteLine();
-                writer.Flush();
-
-                memStream.Write(imageBytes, 0, imageBytes.Length);
-                writer.WriteLine();
-
-                // target_lang 파라미터
-                writer.WriteLine($"--{boundary}");
-                writer.WriteLine($"Content-Disposition: form-data; name=\"target_lang\"");
-                writer.WriteLine();
-                writer.WriteLine(targetLang);
-
-                // 마지막 boundary
-                writer.WriteLine($"--{boundary}--");
-                writer.Flush();
-
-                // 본문 전송
-                request.ContentLength = memStream.Length;
-                using (Stream requestStream = await request.GetRequestStreamAsync())
-                {
-                    memStream.Seek(0, SeekOrigin.Begin);
-                    await memStream.CopyToAsync(requestStream);
-                }
-            }
-
-            Debug.Log("[PaddleOCR+Translate] Request sent, waiting for response...");
-
-            // 응답 받기
-            using (WebResponse response = await request.GetResponseAsync())
-            using (Stream responseStream = response.GetResponseStream())
-            using (StreamReader reader = new StreamReader(responseStream))
-            {
-                string responseText = await reader.ReadToEndAsync();
-                Debug.Log($"[PaddleOCR+Translate] Response received: {responseText.Substring(0, Math.Min(500, responseText.Length))}...");
-
-                try
-                {
-                    var jsonResponse = JObject.Parse(responseText);
-                    
-                    // 응답 파싱
-                    if (jsonResponse["status"]?.ToString() == "success" && jsonResponse["ocr_with_region"] != null)
-                    {
-                        var ocrData = jsonResponse["ocr_with_region"];
-                        var ocrDataOrigin = jsonResponse["ocr_with_region_origin"];
-                        
-                        OCRWithTranslateResult result = new OCRWithTranslateResult
-                        {
-                            labels = new List<string>(),
-                            labels_origin = new List<string>(),
-                            quad_boxes = new List<List<List<float>>>()
-                        };
-
-                        // labels 파싱 (번역된 텍스트)
-                        if (ocrData["labels"] != null)
-                        {
-                            foreach (var label in ocrData["labels"])
-                            {
-                                result.labels.Add(label.ToString());
-                            }
-                        }
-
-                        // labels_origin 파싱 (원문 텍스트)
-                        if (ocrDataOrigin != null && ocrDataOrigin["labels"] != null)
-                        {
-                            foreach (var label in ocrDataOrigin["labels"])
-                            {
-                                result.labels_origin.Add(label.ToString());
-                            }
-                        }
-
-                        // quad_boxes 파싱 및 형식 변환
-                        if (ocrData["quad_boxes"] != null)
-                        {
-                            foreach (var quadBox in ocrData["quad_boxes"])
-                            {
-                                List<List<float>> quad = new List<List<float>>();
-                                
-                                List<float> coords = new List<float>();
-                                foreach (var coord in quadBox)
-                                {
-                                    coords.Add((float)coord);
-                                }
-                                
-                                if (coords.Count >= 8)
-                                {
-                                    for (int i = 0; i < 8; i += 2)
-                                    {
-                                        List<float> point = new List<float> { coords[i], coords[i + 1] };
-                                        quad.Add(point);
-                                    }
-                                    result.quad_boxes.Add(quad);
-                                }
-                            }
-                        }
-
-                        Debug.Log($"[PaddleOCR+Translate] Parsed {result.labels.Count} text regions (translated to {targetLang})");
-                        callback?.Invoke(result);
-                    }
-                    else
-                    {
-                        Debug.LogWarning("[PaddleOCR+Translate] No ocr_with_region data in response or status is not success");
-                        callback?.Invoke(null);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError($"[PaddleOCR+Translate] Failed to parse response: {ex.Message}");
-                    callback?.Invoke(null);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"[PaddleOCR+Translate] Exception: {ex.Message}");
-            callback?.Invoke(null);
-        }
-    }
 
 }
 
