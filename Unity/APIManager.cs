@@ -28,6 +28,12 @@ public class APIManager : MonoBehaviour
 
     private DateTime lastSmallTalkCallTime = DateTime.MinValue;
     private bool isSmallTalkWaiting = false;
+
+    // SmallTalk 트리거 관련
+    private string pendingSmallTalkContent = "";  // 대기 중인 잡담 내용
+    private DateTime smallTalkTimestamp = DateTime.MinValue;  // 잡담 발생 시간
+    private bool isSmallTalkPending = false;  // 트리거 활성 상태
+
     private GameObject questionEmotionBalloonInstance;
     
     // 스크린샷 전송 방식 (true: 캡처→전송→저장, false: 기존 파일 전송)
@@ -237,6 +243,11 @@ public class APIManager : MonoBehaviour
                                 // 시스템 메시지로 저장
                                 currentMemoryType = "system";
                             }
+                            else if (replyType == "final")
+                            {
+                                // final 응답 : Trigger 기동을 위해 ProcessReply 호출하지 않고 다음 응답으로
+                                continue;
+                            }
                             else // reply
                             {
                                 if (!isResponsedStarted)
@@ -318,11 +329,30 @@ public class APIManager : MonoBehaviour
 
                 if (resolvedChatIdx == GameManager.Instance.chatIdxSuccess)
                 {
-                    // asking_intent나 trigger의 경우 실제 reply가 없으므로 메모리 저장하지 않음
-                    // 시스템 메시지는 ScenarioUtil.Narration이나 선택지에서 이미 저장됨
                     if (currentMemoryType != "system")
                     {
-                        OnFinalResponseReceived();
+                        // SmallTalk은 메모리에 저장하지 않음 (연관 응답 시에만 저장)
+                        // OnFinalResponseReceived() 호출 제거
+
+                        // SmallTalk 트리거 설정 - UI 언어에 맞는 내용 저장
+                        string smalltalkText = string.Join(" ", replyListEn);  // 기본값
+                        if (SettingManager.Instance.settings.ui_language == "ko")
+                        {
+                            smalltalkText = string.Join(" ", replyListKo);
+                        }
+                        else if (SettingManager.Instance.settings.ui_language == "ja" ||
+                                 SettingManager.Instance.settings.ui_language == "jp")
+                        {
+                            smalltalkText = string.Join(" ", replyListJp);
+                        }
+
+                        if (!string.IsNullOrEmpty(smalltalkText))
+                        {
+                            pendingSmallTalkContent = smalltalkText;
+                            smallTalkTimestamp = DateTime.Now;
+                            isSmallTalkPending = true;
+                            Debug.Log($"[SmallTalk] Trigger activated: {smalltalkText}");
+                        }
                     }
                     else
                     {
@@ -921,6 +951,11 @@ public class APIManager : MonoBehaviour
                 {
                     string line;
                     string currentMemoryType = "conversation"; // 응답 타입 추적
+
+                    // SmallTalk 연관성 판단 결과 저장
+                    string latestIntentSmallTalkAnswer = "off";
+                    string latestSmallTalkQuery = "";
+
                     while ((line = await reader.ReadLineAsync()) != null)
                     {
                         if (!string.IsNullOrEmpty(line))
@@ -941,6 +976,20 @@ public class APIManager : MonoBehaviour
                                     Debug.Log("jsonObject Start");
                                     Debug.Log(jsonObject.ToString());
                                     Debug.Log("jsonObject End");
+
+                                    // intent_info에서 SmallTalk 연관성 저장
+                                    try
+                                    {
+                                        if (jsonObject["intent_info"] != null)
+                                        {
+                                            latestIntentSmallTalkAnswer = jsonObject["intent_info"]["is_intent_smalltalk_answer"]?.ToString() ?? "off";
+                                            latestSmallTalkQuery = jsonObject["intent_info"]["smalltalk_query"]?.ToString() ?? "";
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Debug.Log($"[SmallTalk] Failed to parse intent_info: {ex.Message}");
+                                    }
 
                                     // 생각중 등등의 답변타입체크
                                     string replyType = jsonObject["type"]?.ToString() ?? "reply";
@@ -1064,10 +1113,22 @@ public class APIManager : MonoBehaviour
 
                     if (curChatIdx == GameManager.Instance.chatIdxSuccess)
                     {
-                        // asking_intent나 trigger의 경우 실제 reply가 없으므로 메모리 저장하지 않음
-                        // 시스템 메시지는 ScenarioUtil.Narration이나 선택지에서 이미 저장됨
                         if (currentMemoryType != "system")
                         {
+                            // SmallTalk 연관성이 있으면 잡담을 먼저 메모리에 저장
+                            if (latestIntentSmallTalkAnswer == "on" && !string.IsNullOrEmpty(latestSmallTalkQuery))
+                            {
+                                Debug.Log("[SmallTalk] Related conversation detected. Saving smalltalk first.");
+                                MemoryManager.Instance.SaveConversationMemory(
+                                    "character",
+                                    "assistant",
+                                    latestSmallTalkQuery,
+                                    latestSmallTalkQuery,
+                                    latestSmallTalkQuery,
+                                    latestSmallTalkQuery
+                                );
+                            }
+
                             OnFinalResponseReceived(); // 최종 반환 완료 시 함수 호출
                         }
                         else
@@ -1178,6 +1239,14 @@ public class APIManager : MonoBehaviour
     // chatHandler에서 호출
     public async void CallConversationStream(string query, string chatIdx = "-1", string ai_lang_in = "")
     {
+        // 빈 쿼리 체크 (방어적 프로그래밍)
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            Debug.LogWarning("[APIManager] Query is empty or whitespace. Showing empty query scenario.");
+            StartCoroutine(ScenarioCommonManager.Instance.Run_C99_EmptyQuery());
+            return;
+        }
+
         // 공용변수 최신화
         if (chatIdx != "-1")
         {
@@ -1363,6 +1432,33 @@ public class APIManager : MonoBehaviour
         
         string server_local_mode = SettingManager.Instance.settings.server_local_mode ?? "GPU";
 
+        // SmallTalk 트리거 조건 체크
+        string intent_smalltalk_answer = "off";
+        string query_smalltalk = "";
+
+        if (isSmallTalkPending)
+        {
+            double secondsSinceSmallTalk = (DateTime.Now - smallTalkTimestamp).TotalSeconds;
+
+            if (secondsSinceSmallTalk <= 30)
+            {
+                intent_smalltalk_answer = "on";
+                query_smalltalk = pendingSmallTalkContent;
+                Debug.Log($"[SmallTalk] Trigger sent. Elapsed: {secondsSinceSmallTalk:F1}s");
+            }
+            else
+            {
+                Debug.Log($"[SmallTalk] Trigger expired. Elapsed: {secondsSinceSmallTalk:F1}s");
+            }
+
+            // 최초 1회 후 무조건 리셋
+            pendingSmallTalkContent = "";
+            smallTalkTimestamp = DateTime.MinValue;
+            isSmallTalkPending = false;
+        }
+
+
+
         // 요청 데이터 구성
         var requestData = new Dictionary<string, string>
         {
@@ -1392,7 +1488,9 @@ public class APIManager : MonoBehaviour
             { "model_name_OpenRouter", model_name_OpenRouter},
             { "model_name_ChatGPT", model_name_ChatGPT},
             { "model_name_Custom", model_name_Custom},
-            { "server_local_mode", server_local_mode}
+            { "server_local_mode", server_local_mode},
+            { "intent_smalltalk_answer", intent_smalltalk_answer},  // SmallTalk 연관성 플래그
+            { "query_smalltalk", query_smalltalk}
         };
 
         await FetchStreamingData(streamUrl, requestData, screenshotBytes);
