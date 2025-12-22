@@ -4,6 +4,20 @@ using TMPro;
 
 public class AskBalloonManager : MonoBehaviour
 {
+    // 싱글톤 인스턴스
+    private static AskBalloonManager instance;
+    public static AskBalloonManager Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = FindObjectOfType<AskBalloonManager>();
+            }
+            return instance;
+        }
+    }
+
     [SerializeField] private Canvas _canvas; // askBalloon 이미지
     [SerializeField] private GameObject askBalloon; // askBalloon 이미지
     [SerializeField] private TextMeshProUGUI askText; // askBalloon이 하위의 TMP 텍스트
@@ -52,33 +66,8 @@ public class AskBalloonManager : MonoBehaviour
         });
     }
 
-    // 싱글톤 인스턴스
-    private static AskBalloonManager instance;
-    public static AskBalloonManager Instance
-    {
-        get
-        {
-            if (instance == null)
-            {
-                instance = FindObjectOfType<AskBalloonManager>();
-            }
-            return instance;
-        }
-    }
-
     private void Awake()
     {
-        // 싱글톤 패턴 구현
-        if (instance == null)
-        {
-            instance = this;
-        }
-        else
-        {
-            // Destroy(gameObject);
-            return;
-        }
-
         InitializeQuestions();  // question 정보 등록
         HideAskBalloon(); // 시작 시 askBalloon 숨기기
     }

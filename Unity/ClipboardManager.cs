@@ -5,6 +5,20 @@ using UnityEngine;
 
 public class ClipboardManager : MonoBehaviour
 {
+    // 싱글톤 인스턴스
+    private static ClipboardManager instance;
+    public static ClipboardManager Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = FindObjectOfType<ClipboardManager>();
+            }
+            return instance;
+        }
+    }
+
     // Windows API 선언
     [DllImport("user32.dll")]
     private static extern bool OpenClipboard(IntPtr hWndNewOwner);
@@ -66,36 +80,6 @@ public class ClipboardManager : MonoBehaviour
     private uint lastClipboardSequence = 0;
     private float clipboardCheckInterval = 0.5f; // 0.5초마다 체크
     private float clipboardCheckTimer = 0f;
-
-    // 싱글톤 인스턴스
-    private static ClipboardManager instance;
-
-    private void Awake()
-    {
-        // 싱글톤 패턴 구현
-        if (instance == null)
-        {
-            instance = this;
-        }
-        else
-        {
-            // Destroy(gameObject);
-            return;
-        }
-    }
-
-    // 싱글톤 인스턴스에 접근하는 속성
-    public static ClipboardManager Instance
-    {
-        get
-        {
-            if (instance == null)
-            {
-                instance = FindObjectOfType<ClipboardManager>();
-            }
-            return instance;
-        }
-    }
 
     private void Update()
     {

@@ -5,6 +5,20 @@ using System;
 
 public class AnswerBalloonSimpleManager : MonoBehaviour
 {
+    // 싱글톤 인스턴스
+    private static AnswerBalloonSimpleManager instance;
+    public static AnswerBalloonSimpleManager Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = FindObjectOfType<AnswerBalloonSimpleManager>();
+            }
+            return instance;
+        }
+    }
+
     [SerializeField] private Canvas _canvas; // AnswerBalloonSimple 이미지
     [SerializeField] private GameObject answerBalloonSimple; // AnswerBalloonSimple 이미지
     [SerializeField] private TextMeshProUGUI answerText; // AnswerBalloonSimple 하위의 TMP 텍스트
@@ -18,22 +32,8 @@ public class AnswerBalloonSimpleManager : MonoBehaviour
     private string textJp = "";
     private string textEn = "";
 
-    // 싱글톤 인스턴스
-    private static AnswerBalloonSimpleManager instance;
-
     private void Awake()
     {
-        // 싱글톤 패턴 구현
-        if (instance == null)
-        {
-            instance = this;
-        }
-        else
-        {
-            // Destroy(gameObject);
-            return;
-        }
-
         HideAnswerBalloonSimple(); // 시작 시 AnswerBalloonSimple 숨기기
     }
 
@@ -60,20 +60,6 @@ public class AnswerBalloonSimpleManager : MonoBehaviour
         if (StatusManager.Instance.IsPicking || StatusManager.Instance.IsListening || StatusManager.Instance.IsAsking )
         {
             HideAnswerBalloonSimple();
-        }
-    }
-
-
-    // 싱글톤 인스턴스에 접근하는 속성
-    public static AnswerBalloonSimpleManager Instance
-    {
-        get
-        {
-            if (instance == null)
-            {
-                instance = FindObjectOfType<AnswerBalloonSimpleManager>();
-            }
-            return instance;
         }
     }
 
