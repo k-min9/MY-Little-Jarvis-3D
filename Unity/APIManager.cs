@@ -34,6 +34,7 @@ public class APIManager : MonoBehaviour
     private DateTime smallTalkTimestamp = DateTime.MinValue;  // 잡담 발생 시간
     private bool isSmallTalkPending = false;  // 트리거 활성 상태
 
+    private GameObject webEmotionBalloonInstance;
     private GameObject questionEmotionBalloonInstance;
     
     // 스크린샷 전송 방식 (true: 캡처→전송→저장, false: 기존 파일 전송)
@@ -97,6 +98,9 @@ public class APIManager : MonoBehaviour
         lastSmallTalkCallTime = now;
         isSmallTalkWaiting = true;
         ShowQuestionBalloon();
+
+        // SmallTalk 타이머 리셋 (요청 시작 시)
+        GlobalTimeVariableManager.Instance.smallTalkTimer = 0f;
 
         // baseUrl을 비동기로 가져오기
         var tcs = new TaskCompletionSource<string>();
@@ -246,6 +250,8 @@ public class APIManager : MonoBehaviour
                             else if (replyType == "final")
                             {
                                 // final 응답 : Trigger 기동을 위해 ProcessReply 호출하지 않고 다음 응답으로
+                                // SmallTalk 타이머 리셋 (대화 종료 시점)
+                                GlobalTimeVariableManager.Instance.smallTalkTimer = 0f;
                                 continue;
                             }
                             else // reply
@@ -364,11 +370,26 @@ public class APIManager : MonoBehaviour
         catch (Exception ex)
         {
             Debug.Log($"SmallTalkStream Exception: {ex.Message}");
+
+            // 잡담 실패 오류
+            EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), "No", 2f);
         }
         finally
         {
+            // 잡담 최종 종료
             isSmallTalkWaiting = false;
+            isCompleted = true;
             DestroyQuestionBalloon();
+            AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteNormal();
+            
+            // 말풍선이 현재 활성화되어 있을 때만 30초 후 자동 종료 설정
+            if (StatusManager.Instance.IsAnswering)
+            {
+                AnswerBalloonManager.Instance.hideTimer = 30f;
+            }
+            
+            // SmallTalk 타이머 리셋 (응답 완료 시)
+            GlobalTimeVariableManager.Instance.smallTalkTimer = 0f;
         }
     }
 
@@ -839,6 +860,145 @@ public class APIManager : MonoBehaviour
         }
     }
 
+    // GeminiDirect 전용 ProcessReply (최초 수신 시 UI 초기화 포함)
+    private void ProcessReplyGeminiDirect(JObject jsonObject)
+    {
+        // 최초 수신 시 UI 초기화 및 리스트 초기화
+        if (!isResponsedStarted)
+        {
+            // 리스트 초기화 (최초 1회만)
+            replyListKo = new List<string>();
+            replyListJp = new List<string>();
+            replyListEn = new List<string>();
+            
+            // 생각 중 말풍선 숨기기
+            AnswerBalloonSimpleManager.Instance.HideAnswerBalloonSimple();
+
+            // 안내 말풍선 숨기기
+            NoticeManager.Instance.DeleteNoticeBalloonInstance();
+
+            // 전송시작 말풍선 제거
+            if (webEmotionBalloonInstance != null)
+            {
+                Destroy(webEmotionBalloonInstance);
+                webEmotionBalloonInstance = null;
+            }
+
+            AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
+            AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();
+            isResponsedStarted = true;
+
+            // AI Info 내용 갱신
+            try
+            {
+                string ai_info_server_type = jsonObject["ai_info"]["server_type"]?.ToString() ?? "Google-Direct";
+                string ai_info_model = jsonObject["ai_info"]["model"]?.ToString() ?? "gemma-3-27b-it";
+                string ai_info_prompt = "gemma";
+                string ai_info_lang_used = jsonObject["ai_info"]["lang_used"]?.ToString() ?? "";
+                string ai_info_translator = "N/A";
+                string ai_info_time = jsonObject["ai_info"]["time"]?.ToString() ?? "0 sec";
+                string ai_info_intent = "";
+                SettingManager.Instance.RefreshAIInfoText(ai_info_server_type, ai_info_model, ai_info_prompt, ai_info_lang_used, ai_info_translator, ai_info_time, ai_info_intent);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[GeminiDirect] Failed to refresh AI info: {ex.Message}");
+            }
+
+            // 표정은 기본값으로 (Gemini에서 감정 분석 미지원)
+            EmotionManager.Instance.ShowEmotionFromEmotion("Neutral");
+
+            // Web/Image 의도는 비활성화
+            AnswerBalloonManager.Instance.HideWebImage();
+        }
+
+        // chatIdx 체크
+        string chatIdx = jsonObject["chat_idx"]?.ToString() ?? "-1";
+        ai_language_out = jsonObject["ai_language_out"]?.ToString() ?? "";
+        
+        if (chatIdx != GameManager.Instance.chatIdxSuccess.ToString())
+        {
+            Debug.Log("chatIdx Too Old : " + chatIdx + "/" + GameManager.Instance.chatIdxSuccess.ToString());
+            return;
+        }
+
+        // reply_list에서 문장 추가 (누적)
+        JToken replyToken = jsonObject["reply_list"];
+        if (replyToken != null && replyToken.Type == JTokenType.Array)
+        {
+            string answerVoice = null;
+            foreach (var reply in replyToken)
+            {
+                string answerJp = reply["answer_jp"]?.ToString() ?? string.Empty;
+                string answerKo = reply["answer_ko"]?.ToString() ?? string.Empty;
+                string answerEn = reply["answer_en"]?.ToString() ?? string.Empty;
+
+                // 각각의 답변을 리스트에 누적 추가
+                if (!string.IsNullOrEmpty(answerJp))
+                {
+                    replyListJp.Add(answerJp);
+                    if (SettingManager.Instance.settings.sound_language == "jp")
+                    {
+                        answerVoice = answerJp;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(answerKo))
+                {
+                    replyListKo.Add(answerKo);
+                    if (SettingManager.Instance.settings.sound_language == "ko")
+                    {
+                        answerVoice = answerKo;
+                    }
+                }
+                
+                if (!string.IsNullOrEmpty(answerEn))
+                {
+                    replyListEn.Add(answerEn);
+                    if (SettingManager.Instance.settings.sound_language == "en")
+                    {
+                        answerVoice = answerEn;
+                    }
+                }
+            }
+            
+            // AnswerBalloon 갱신 (누적된 전체 내용)
+            string replyKo = string.Join(" ", replyListKo);
+            string replyJp = string.Join(" ", replyListJp);
+            string replyEn = string.Join(" ", replyListEn);
+
+            AnswerBalloonManager.Instance.ModifyAnswerBalloonTextInfo(replyKo, replyJp, replyEn);
+            AnswerBalloonManager.Instance.ModifyAnswerBalloonText();
+
+            // 음성 API 호출
+            if (answerVoice != null)
+            {
+                // 기존 로직은 번역이 없어서 사용 불가. 향후 보강 필요.
+                // if (SettingManager.Instance.settings.sound_language == "ko" || SettingManager.Instance.settings.sound_language == "en")
+                // {
+                //     GetKoWavFromAPI(answerVoice, chatIdx);
+                // }
+                // if (SettingManager.Instance.settings.sound_language == "jp")
+                // {
+                //     GetJpWavFromAPI(answerVoice, chatIdx);
+                // }
+                
+                // GeminiDirect 음성 호출 (기존 로직 대체용)
+                // TODO` : 향후 언어로직감지 구현시우선 (현재 번역모듈 없음)
+                string answerVoiceLang = SettingManager.Instance.settings.ui_language ?? "en";
+                // Debug.Log("answerVoiceLang : " + answerVoiceLang);
+                if (answerVoiceLang == "ko" || answerVoiceLang == "en")
+                {
+                    GetKoWavFromAPI(answerVoice, chatIdx);
+                }
+                if (answerVoiceLang == "jp")
+                {
+                    GetJpWavFromAPI(answerVoice, chatIdx);
+                }
+            }
+        }
+    }
+
     // 최종 반환 완료 시 호출될 함수
     private void OnFinalResponseReceived()
     {
@@ -896,6 +1056,14 @@ public class APIManager : MonoBehaviour
 
         string boundary = "----WebKitFormBoundary" + DateTime.Now.Ticks.ToString("x");
         string contentType = "multipart/form-data; boundary=" + boundary;
+
+        // 전송시작 말풍선
+        if (webEmotionBalloonInstance != null)
+        {
+            Destroy(webEmotionBalloonInstance);
+            webEmotionBalloonInstance = null;
+        }
+        webEmotionBalloonInstance = EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), "Question");
 
         try
         {
@@ -995,6 +1163,13 @@ public class APIManager : MonoBehaviour
                                     string replyType = jsonObject["type"]?.ToString() ?? "reply";
                                     if (replyType == "thinking") // "생각 중" 상태
                                     {
+                                        // 기존의 풍선 있을경우 파괴
+                                        if (webEmotionBalloonInstance != null)
+                                        {
+                                            Destroy(webEmotionBalloonInstance);
+                                            webEmotionBalloonInstance = null;
+                                        }
+                                        
                                         NoticeManager.Instance.Notice("thinking");
                                     }
                                     else if (replyType == "webSearch")
@@ -1026,6 +1201,7 @@ public class APIManager : MonoBehaviour
                                     }
                                     else  // replyType == "reply"
                                     {
+                                        // 최초 수신
                                         if (!isResponsedStarted)
                                         {
                                             // 생각 중 말풍선 숨기기
@@ -1033,6 +1209,13 @@ public class APIManager : MonoBehaviour
 
                                             // 안내 말풍선 숨기기
                                             NoticeManager.Instance.DeleteNoticeBalloonInstance();
+
+                                            // 전송시작 말풍선 제거
+                                            if (webEmotionBalloonInstance != null)
+                                            {
+                                                Destroy(webEmotionBalloonInstance);
+                                                webEmotionBalloonInstance = null;
+                                            }
 
                                             AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
                                             AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();  // 대답중 sprite
@@ -1151,10 +1334,32 @@ public class APIManager : MonoBehaviour
                     Debug.LogError($"Error Response: {errorResponse}");
                 }
             }
+
+            // 오류 안내 말풍선      
+            if (webEmotionBalloonInstance != null)
+            {
+                Destroy(webEmotionBalloonInstance);
+                webEmotionBalloonInstance = null;
+            }
+
+            Debug.Log("API error");
+            EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), "No", 2f);
+            return;
         }
         catch (Exception ex)
         {
             Debug.LogError($"Exception: {ex.Message}");
+
+            // 오류 안내 말풍선      
+            if (webEmotionBalloonInstance != null)
+            {
+                Destroy(webEmotionBalloonInstance);
+                webEmotionBalloonInstance = null;
+            }
+
+            Debug.Log("API error");
+            EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), "No", 2f);
+            return;
         }
     }
     
@@ -1257,17 +1462,23 @@ public class APIManager : MonoBehaviour
 
         // 일단 안드로이드판은 server_type sample로...
 #if UNITY_ANDROID
-            await CallConversationStreamGemini(query, chatIdx, ai_lang_in);
+            await CallConversationStreamGeminiDirect(query, chatIdx, ai_lang_in);
             return;
 #endif
-
-        // // server_type이 2 (Google)인 경우 Gemini 전용 함수 호출
-        // int server_type_idx = SettingManager.Instance.settings.server_type_idx;  // 0: Auto, 1: Local, 2: Google, 3: OpenRouter
-        // if (server_type_idx == 2 || server_type_idx == 0)
+        // Test용 : 공개시점 0.8.0 + TODO : 외부제어로 끌 수 있는법 검토해야 함. 버전 업데이터와 함께 고민할 것.
+        // if (true)
         // {
-        //     await CallConversationStreamGemini(query, chatIdx, ai_lang_in);
+        //     await CallConversationStreamGeminiDirect(query, chatIdx, ai_lang_in);
         //     return;
         // }
+
+        // server_type이 2 (Google)인 경우 Gemini 전용 함수 호출 [TODO : Sample용. 차후 제거.]
+        int server_type_idx = SettingManager.Instance.settings.server_type_idx;  // 0: Auto, 1: Local, 2: Google, 3: OpenRouter
+        if (server_type_idx == 2 || server_type_idx == 0)
+        {
+            await CallConversationStreamGemini(query, chatIdx, ai_lang_in);
+            return;
+        }
 
 
         // baseUrl을 비동기로 가져오기
@@ -1496,7 +1707,7 @@ public class APIManager : MonoBehaviour
         await FetchStreamingData(streamUrl, requestData, screenshotBytes);
     }
 
-    // Gemini 전용 대화 스트림 호출 함수
+    // // Gemini 전용 대화 스트림 호출 함수(For Sample/Deprecated)
     public async Task CallConversationStreamGemini(string query, string chatIdx = "-1", string ai_lang_in = "")
     {
         // 공용변수 최신화
@@ -1511,31 +1722,6 @@ public class APIManager : MonoBehaviour
         var tcs = new TaskCompletionSource<string>();
         ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
         string baseUrl = await tcs.Task;
-
-        // dev_voice 서버 사용 여부 확인 (Android 또는 DevSound 토글 활성화시)
-        if (SettingManager.Instance.IsDevSoundEnabled())
-        {
-            // TaskCompletionSource를 사용하여 콜백을 async/await로 변환
-            var tcsDevVoice = new TaskCompletionSource<string>();
-            
-            ServerManager.Instance.GetServerUrlFromServerId("dev_voice", (url) =>
-            {
-                tcsDevVoice.SetResult(url);
-            });
-            
-            // dev_voice 서버 URL을 기다림
-            string devVoiceUrl = await tcsDevVoice.Task;
-            
-            if (!string.IsNullOrEmpty(devVoiceUrl))
-            {
-                Debug.Log("dev_voice 서버 URL: " + devVoiceUrl);
-                baseUrl = devVoiceUrl;
-            }
-            else
-            {
-                Debug.LogWarning("dev_voice 서버 URL을 가져올 수 없습니다. 기본 URL을 사용합니다.");
-            }
-        }
 
         string streamUrl = baseUrl + "/conversation_stream_gemini";
         Debug.Log("Gemini streamUrl : " + streamUrl);
@@ -1611,6 +1797,102 @@ public class APIManager : MonoBehaviour
 
         await FetchStreamingData(streamUrl, requestData, screenshotBytes);
     }
+
+    public async Task CallConversationStreamGeminiDirect(string query, string chatIdx = "-1", string ai_lang_in = "")
+    {
+        // 공용변수 최신화
+        if (chatIdx != "-1")
+        {
+            GameManager.Instance.chatIdxSuccess = chatIdx;
+        }
+        // 애니메이션 재생 초기화
+        AnimationManager.Instance.Idle();
+        
+        // 요청 전 초기화 (FetchStreamingData와 동일)
+        isCompleted = false;
+        isResponsedStarted = false;
+        query_origin = query;
+        query_trans = "";
+        
+        // 전송시작 말풍선
+        if (webEmotionBalloonInstance != null)
+        {
+            Destroy(webEmotionBalloonInstance);
+            webEmotionBalloonInstance = null;
+        }
+        webEmotionBalloonInstance = EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), "Question");
+
+        // 닉네임 가져오기
+        string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
+        string player_name = SettingManager.Instance.settings.player_name;
+        string ai_language = SettingManager.Instance.settings.ai_language ?? "";
+        string ai_language_in = ai_lang_in;  // stt 에서 가져온 언어 있으면 사용
+        string ai_language_out = SettingManager.Instance.settings.ai_language_out ?? "";
+
+        // 메모리, 가이드라인, 상황 정보 가져오기
+        var memory = MemoryManager.Instance.GetAllConversationMemory();
+        
+        // JSON을 List로 변환
+        List<Dictionary<string, string>> memoryList = new List<Dictionary<string, string>>();
+        foreach (var mem in memory)
+        {
+            memoryList.Add(new Dictionary<string, string>
+            {
+                { "speaker", mem.speaker },
+                { "message", mem.message }
+            });
+        }
+        
+        // 가이드라인 리스트 변환
+        string guidelineJson = UIUserCardManager.Instance.GetGuidelineListJson();
+        List<string> guidelineList = new List<string>();
+        try
+        {
+            var guidelineArray = JArray.Parse(guidelineJson);
+            foreach (var item in guidelineArray)
+            {
+                guidelineList.Add(item.ToString());
+            }
+        }
+        catch
+        {
+            Debug.LogWarning("[GeminiDirect] Failed to parse guideline list");
+        }
+        
+        // 상황 정보 변환
+        string situationJson = UIChatSituationManager.Instance.GetCurUIChatSituationInfoJson();
+        Dictionary<string, object> situationDict = new Dictionary<string, object>();
+        if (!string.IsNullOrEmpty(situationJson))
+        {
+            try
+            {
+                var situationObj = JObject.Parse(situationJson);
+                foreach (var prop in situationObj.Properties())
+                {
+                    situationDict[prop.Name] = prop.Value.ToObject<object>();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[GeminiDirect] Failed to parse situation dict: {ex.Message}");
+            }
+        }
+
+        // ApiGeminiDirectClient 호출
+        await ApiGeminiDirectClient.Instance.CallGeminiStreamDirect(
+            query: query,
+            playerName: player_name,
+            charName: nickname,
+            aiLanguage: ai_language,
+            memoryList: memoryList,
+            guidelineList: guidelineList,
+            situationDict: situationDict,
+            chatIdx: chatIdx,
+            onChunkReceived: ProcessReplyGeminiDirect,
+            onComplete: () => OnFinalResponseReceived()
+        );
+    }
+
 
     // 로컬 서버 모델 Release 호출
     public async void CallReleaseModel()
@@ -1750,6 +2032,40 @@ public class APIManager : MonoBehaviour
         var tcs = new TaskCompletionSource<string>();
         ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
         string baseUrl = await tcs.Task;
+
+        // dev_voice 사용 여부 (설치 상태 또는 DevSound 토글)
+        bool shouldUseDevServer = SettingManager.Instance.GetInstallStatus() < 2   // no install, lite
+                                || SettingManager.Instance.IsDevSoundEnabled();    // DevSound 토글 또는 Android
+        if (shouldUseDevServer)
+        {
+            // TaskCompletionSource를 사용하여 콜백을 async/await로 변환
+            var tcs2 = new TaskCompletionSource<string>();
+            
+            ServerManager.Instance.GetServerUrlFromServerId("dev_voice", (url) =>
+            {
+                tcs2.SetResult(url);
+            });
+            
+            // dev_voice 서버 URL을 기다림
+            string devVoiceUrl = await tcs2.Task;
+            
+            if (!string.IsNullOrEmpty(devVoiceUrl))
+            {
+                Debug.Log("dev_voice 서버 URL: " + devVoiceUrl);
+                baseUrl = devVoiceUrl;
+            }
+            else
+            {
+                Debug.LogWarning("dev_voice 서버 URL을 가져올 수 없습니다. 기본 URL을 사용합니다.");
+            }
+        }
+        
+        // baseUrl 유효성 체크
+        if (string.IsNullOrEmpty(baseUrl))
+        {
+            Debug.LogError("[GetKoWavFromAPI] baseUrl이 비어있습니다. 음성 합성을 건너뜁니다.");
+            return;
+        }
         
         // API 호출을 위한 URL 구성
         string url = baseUrl + "/getSound/ko"; // GET + Uri.EscapeDataString(text);
@@ -1769,7 +2085,8 @@ public class APIManager : MonoBehaviour
         {
             { "text", text},
             { "char", nickname},
-            { "lang", SettingManager.Instance.settings.sound_language.ToString() },
+            { "lang", "ko" },  // 현재 두 함수를 합치지 못하는 이유. 서버쪽은 주소 하나로 통합해서 lang으로 ja인지 아닌지만 판단 중.
+            // { "lang", SettingManager.Instance.settings.sound_language.ToString() },
             { "speed", SettingManager.Instance.settings.sound_speedMaster.ToString()},
             { "chatIdx", chatIdx}
         };
@@ -1860,6 +2177,13 @@ public class APIManager : MonoBehaviour
             {
                 Debug.LogWarning("dev_voice 서버 URL을 가져올 수 없습니다. 기본 URL을 사용합니다.");
             }
+        }
+
+        // baseUrl 유효성 체크
+        if (string.IsNullOrEmpty(baseUrl))
+        {
+            Debug.LogError("[GetJpWavFromAPI] baseUrl이 비어있습니다. 음성 합성을 건너뜁니다.");
+            return;
         }
 
         string url = baseUrl + "/getSound/jp"; // GET + Uri.EscapeDataString(text);
@@ -2179,6 +2503,7 @@ public class APIManager : MonoBehaviour
         if (questionEmotionBalloonInstance != null)
         {
             Destroy(questionEmotionBalloonInstance);
+            questionEmotionBalloonInstance = null;
         }
         questionEmotionBalloonInstance = EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), "Question");
     }
