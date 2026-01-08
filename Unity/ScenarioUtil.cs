@@ -7,6 +7,10 @@ public static class ScenarioUtil
     // 대사를 보여주고 wav 재생하고 길이 반환.
     public static float Narration(string scenarioId, string dialogue)
     {
+        // 시스템 메시지로 메모리에 저장 (시나리오 안내)
+        // 번역 없이 주어진 dialogue를 모든 언어 필드에 저장
+        MemoryManager.Instance.SaveSystemMemory("character", "assistant", dialogue, dialogue, dialogue, dialogue);
+        
         // 현재캐릭터가 아로나일 경우와 아닐경우에서 분기
         string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
         if (nickname == "arona")

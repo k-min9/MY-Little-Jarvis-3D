@@ -185,6 +185,16 @@ public class MemoryManager : MonoBehaviour
         File.WriteAllText(targetFile, JsonConvert.SerializeObject(new List<Conversation>(), Formatting.Indented));
     }
 
+    // 대화 내용 초기화 및 안내
+    public void ResetConversationMemoryAndGuide(string filename = null)
+    {
+        ResetConversationMemory(filename);
+        AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+        AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Memory Erased");
+        UIChatHistoryManager.Instance.ClearChatHistory();
+        GlobalTimeVariableManager.Instance.smallTalkTimer = 0f;
+    }
+
     // 최대 길이만큼의 대화 가져오기
     public (List<Conversation>, int, int) GetTruncatedConversationMemory(int maxLen = 2048, string filename = null)
     {
