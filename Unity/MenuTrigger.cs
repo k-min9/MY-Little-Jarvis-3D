@@ -198,15 +198,7 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
             (LanguageData.Translate("Guideline", targetLang), delegate { UIManager.Instance.ShowGuideLine(); }), 
             (LanguageData.Translate("Situation", targetLang), delegate { UIManager.Instance.ShowUIChatSituation(); }), 
             (LanguageData.Translate("New Chat", targetLang), delegate {
-                MemoryManager.Instance.ResetConversationMemory();
-                AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
-                AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Memory Erased");
-                // 채팅 시간 리셋 및 스몰톡 타이머 초기화
-                if (GlobalTimeVariableManager.Instance != null)
-                {
-                    GlobalTimeVariableManager.Instance.StartNewChat();
-                    GlobalTimeVariableManager.Instance.ResetSmallTalkTimer();
-                }
+                MemoryManager.Instance.ResetConversationMemoryAndGuide();
             }),
             (LanguageData.Translate("Chat History", targetLang), delegate { UIManager.Instance.ShowChatHistory(); }),
         });
@@ -229,7 +221,31 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
                         NoticeBalloonManager.Instance.ShowNoticeBalloon();
                     }
                 }
-            )
+            ),
+            (LanguageData.Translate("Set Screenshot Area", targetLang), async delegate {
+                // Full 버전 이상인지 확인
+                if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+                {
+                    return;
+                }
+
+                ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+                if (sm != null) sm.ToggleScreenshotArea();
+            }),
+            (LanguageData.Translate("OCR", targetLang), delegate {
+                OCROptions options = OCRManager.Instance.GetCurrentOptions();                    
+                // Screenshot 영역이 설정되어 있으면 영역 OCR, 아니면 전체 화면 OCR
+                if (ScreenshotManager.Instance.IsScreenshotAreaSet())
+                {
+                    Debug.Log("Screenshot 영역이 설정되어 있음 - 영역 OCR 실행");
+                    ScreenshotOCRManager.Instance.ExecuteAreaOCR(options);
+                }
+                else
+                {
+                    Debug.Log("Screenshot 영역이 설정되지 않음 - 전체 화면 OCR 실행");
+                    ScreenshotOCRManager.Instance.ExecuteFullScreenOCR(options);
+                }
+            }),
         });
 
         // Screen - 화면 : 조금 더 고급화 해서 돌아오자.
@@ -253,7 +269,7 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Talk", targetLang), new List<(string, UnityAction)>
         {
             (LanguageData.Translate("Edition 튜토리얼", targetLang), delegate { ScenarioInstallerManager.Instance.StartInstaller(); }),
-            (LanguageData.Translate("Setting 튜토리얼", targetLang), delegate { ScenarioTutorialManager.Instance.StartTutorial(); }),
+            // (LanguageData.Translate("Setting 튜토리얼", targetLang), delegate { ScenarioTutorialManager.Instance.StartTutorial(); }),
             (LanguageData.Translate("Idle Talk", targetLang), async delegate { 
                 // Full 버전 이상인지 확인
                 if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
@@ -265,6 +281,103 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
             }), // 잡담
         });
 
+        // // Util
+        // m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Experiment", targetLang), new List<(string, UnityAction)>
+        // {
+        //     // (LanguageData.Translate("Alarm", targetLang), true ? null : delegate { Debug.Log("[Alarm] 알람 기능 호출됨"); }),
+        //     (LanguageData.Translate("20 Questions Game", targetLang), async delegate {
+        //         // Full 버전 이상인지 확인
+        //         if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+        //         {
+        //             return;
+        //         }
+
+        //         // 스무고개 게임 모드 토글
+        //         MiniGame20QManager.Instance.Toggle20QMode();
+        //         string status = MiniGame20QManager.Instance.Is20QMode() ? "활성화" : "비활성화";
+        //         Debug.Log($"[20Q] 스무고개 게임 모드 {status}");
+                
+        //         // 상태 표시
+        //         if (MiniGame20QManager.Instance.Is20QMode())
+        //         {
+        //             // 게임 시작 메시지는 서버에서 오므로 여기서는 표시만
+        //             // AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+        //             // AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("스무고개 게임 시작...");
+
+        //             // Panel 표시
+        //             UIGame20QPanelManager.Instance.ShowPanel();
+        //         }
+        //         else
+        //         {
+        //             AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+        //             AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("스무고개 게임 종료됨");
+
+        //             // Panel 숨기기
+        //             UIGame20QPanelManager.Instance.HidePanel();
+        //         }
+        //      }),
+        //     (LanguageData.Translate("AROPLA CHANNEL", targetLang), async delegate {
+        //         // Full 버전 이상인지 확인
+        //         if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+        //         {
+        //             return;
+        //         }
+
+        //         // 아로프라 채널 모드 토글
+        //         if (APIAroPlaManager.Instance != null)
+        //         {
+        //             APIAroPlaManager.Instance.ToggleAroplaMode();
+        //             string status = APIAroPlaManager.Instance.IsAroplaMode() ? "활성화" : "비활성화";
+        //             Debug.Log($"아로프라 채널 모드 {status}");
+                    
+        //             // 상태 표시
+        //             AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+        //             AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText($"아로프라 채널 {status}됨");
+        //         }
+        //         else
+        //         {
+        //             Debug.LogError("APIAroPlaManager 인스턴스를 찾을 수 없습니다.");
+        //         }
+        //      }),
+        //     (LanguageData.Translate("Set Screenshot Area", targetLang), async delegate {
+        //         // Full 버전 이상인지 확인
+        //         if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+        //         {
+        //             return;
+        //         }
+
+        //         ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+        //         if (sm != null) sm.ToggleScreenshotArea();
+        //     }),
+        //     (LanguageData.Translate("Show Screenshot Result", targetLang), async delegate {
+        //         // Full 버전 이상인지 확인
+        //         if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+        //         {
+        //             return;
+        //         }
+
+        //         ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+        //         if (sm != null) {
+        //             sm.ShowScreenshotImage();
+        //         }
+        //     }),
+        //     (LanguageData.Translate("Save and Show Screenshot", targetLang), async delegate {
+        //         // Full 버전 이상인지 확인
+        //         if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+        //         {
+        //             return;
+        //         }
+
+        //         ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+        //         if (sm != null) {
+        //             sm.SaveAndShowScreenshot();
+        //         }
+        //     })
+        // });
+
+        // Dev - UNITY_EDITOR이거나 DevMode가 활성화된 경우에만 표시
+        if (isDevModeEnabled)
+        {
         // Util
         m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Experiment", targetLang), new List<(string, UnityAction)>
         {
@@ -323,16 +436,6 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
                     Debug.LogError("APIAroPlaManager 인스턴스를 찾을 수 없습니다.");
                 }
              }),
-            (LanguageData.Translate("Set Screenshot Area", targetLang), async delegate {
-                // Full 버전 이상인지 확인
-                if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
-                {
-                    return;
-                }
-
-                ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
-                if (sm != null) sm.SetScreenshotArea();
-            }),
             (LanguageData.Translate("Show Screenshot Result", targetLang), async delegate {
                 // Full 버전 이상인지 확인
                 if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
@@ -356,12 +459,10 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
                 if (sm != null) {
                     sm.SaveAndShowScreenshot();
                 }
-            })
+            }),
         });
 
-        // Dev - UNITY_EDITOR이거나 DevMode가 활성화된 경우에만 표시
-        if (isDevModeEnabled)
-        {
+
         m_ContextMenu.AddMenuItem(LanguageData.Translate("Debug", targetLang), delegate
         {
             // EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), 10.0f);
@@ -395,62 +496,170 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
                     Debug.LogError("APIAroPlaManager 인스턴스를 찾을 수 없습니다.");
                 }
             }),
-                (LanguageData.Translate("Test3", targetLang), delegate {
-                    Debug.Log("Test3 실행");
+            (LanguageData.Translate("Test3", targetLang), delegate {
+                Debug.Log("Test3 실행 - 전체화면 OCR");
 
-                    // 전체화면 OCR 실행
-                    ScreenshotOCRManager ocrManager = FindObjectOfType<ScreenshotOCRManager>();
-                    if (ocrManager != null)
-                    {
-                        ocrManager.ExecuteFullScreenOCR();
-                    }
-                    else
-                    {
-                        Debug.LogError("ScreenshotOCRManager 인스턴스를 찾을 수 없습니다.");
-                    }
-                }),
-                (LanguageData.Translate("Test4", targetLang), delegate {
-                    Debug.Log("Test4 실행 - 영역 OCR");
+                // OCROptions 생성 (전체화면 OCR)
+                OCROptions options = new OCROptions
+                {
+                    useTranslate = false,
+                    displayResults = true,
+                    displayOrigin = false,
+                    useTTS = false,
+                    useAutoClick = false,
+                    targetLang = "",
+                    targetLangAutoDetect = false
+                };
+                
+                ScreenshotOCRManager.Instance.ExecuteFullScreenOCR(options);
+            }),
+            (LanguageData.Translate("Test4", targetLang), delegate {
+                Debug.Log("Test4 실행 - 영역 OCR");
 
-                    // 영역 OCR 실행 (ScreenshotManager에서 설정한 영역)
-                    ScreenshotOCRManager ocrManager = FindObjectOfType<ScreenshotOCRManager>();
-                    if (ocrManager != null)
-                    {
-                        ocrManager.ExecuteAreaOCR();
-                    }
-                    else
-                    {
-                        Debug.LogError("ScreenshotOCRManager 인스턴스를 찾을 수 없습니다.");
-                    }
-                }),
-                (LanguageData.Translate("Test5", targetLang), delegate {
-                    Debug.Log("Test5 실행 - 전체화면 OCR + 번역");
+                // OCROptions 생성 (영역 OCR)
+                OCROptions options = new OCROptions
+                {
+                    useTranslate = false,
+                    displayResults = true,
+                    displayOrigin = false,
+                    useTTS = false,
+                    useAutoClick = false,
+                    targetLang = "",
+                    targetLangAutoDetect = false
+                };
+                
+                ScreenshotOCRManager.Instance.ExecuteAreaOCR(options);
+            }),
+            (LanguageData.Translate("Test5", targetLang), delegate {
+                Debug.Log("Test5 실행 - 전체화면 OCR + 번역");
 
-                    // 전체화면 OCR + 번역 실행
-                    ScreenshotOCRManager ocrManager = FindObjectOfType<ScreenshotOCRManager>();
-                    if (ocrManager != null)
-                    {
-                        ocrManager.ExecuteFullScreenOCRWithTranslate("ko");
-                    }
-                    else
-                    {
-                        Debug.LogError("ScreenshotOCRManager 인스턴스를 찾을 수 없습니다.");
-                    }
-                }),
-                (LanguageData.Translate("Test6", targetLang), delegate {
-                    Debug.Log("Test6 실행 - 영역 OCR + 번역");
+                // OCROptions 생성 (전체화면 OCR + 번역)
+                OCROptions options = new OCROptions
+                {
+                    useTranslate = true,
+                    displayResults = true,
+                    displayOrigin = false,
+                    useTTS = false,
+                    useAutoClick = false,
+                    targetLang = "ko",
+                    originLang = "ja",
+                    isFormality = true,
+                    isSentence = true,
+                    mergeThreshold = -1
+                };
+                
+                ScreenshotOCRManager.Instance.ExecuteFullScreenOCR(options);
+            }),
+            (LanguageData.Translate("Test6", targetLang), delegate {
+                Debug.Log("Test6 실행 - 영역 OCR + 번역");
 
-                    // 영역 OCR + 번역 실행 (ScreenshotManager에서 설정한 영역)
-                    ScreenshotOCRManager ocrManager = FindObjectOfType<ScreenshotOCRManager>();
-                    if (ocrManager != null)
-                    {
-                        ocrManager.ExecuteAreaOCRWithTranslate("ko");
-                    }
-                    else
-                    {
-                        Debug.LogError("ScreenshotOCRManager 인스턴스를 찾을 수 없습니다.");
-                    }
-                })
+                // OCROptions 생성 (영역 OCR + 번역)
+                OCROptions options = new OCROptions
+                {
+                    useTranslate = true,
+                    displayResults = true,
+                    displayOrigin = false,
+                    useTTS = false,
+                    useAutoClick = false,
+                    targetLang = "ko",
+                    originLang = "ja",
+                    isFormality = true,
+                    isSentence = true,
+                    mergeThreshold = -1
+                };
+                
+                ScreenshotOCRManager.Instance.ExecuteAreaOCR(options);
+            }),
+            (LanguageData.Translate("Test7", targetLang), delegate {
+                Debug.Log("Test7 실행 - 영역 OCR → TTS (일본어)");
+
+                // dev_voice 활성화
+                if (SettingManager.Instance != null && SettingManager.Instance.settings != null)
+                {
+                    SettingManager.Instance.settings.isDevSound = true;
+                    Debug.Log("Test7: dev_voice 활성화");
+                }
+
+                // OCROptions 생성 (영역 OCR + TTS 일본어)
+                OCROptions options = new OCROptions
+                {
+                    useTranslate = false,
+                    displayResults = false,
+                    displayOrigin = false,
+                    useTTS = true,
+                    actorTypeIdx = 0,
+                    actorType = "Auto",
+                    ttsAutoDetectLang = false,
+                    useAutoClick = false,
+                    targetLang = "ja",
+                    targetLangAutoDetect = false
+                };
+                
+                ScreenshotOCRManager.Instance.ExecuteAreaOCR(options);
+            }),
+            (LanguageData.Translate("Test8", targetLang), delegate {
+                Debug.Log("Test8 실행 - 영역 OCR → TTS (자동 언어 감지)");
+
+                // dev_voice 활성화
+                if (SettingManager.Instance != null && SettingManager.Instance.settings != null)
+                {
+                    SettingManager.Instance.settings.isDevSound = true;
+                    Debug.Log("Test8: dev_voice 활성화");
+                }
+
+                // OCROptions 생성 (영역 OCR + TTS 자동 언어 감지)
+                OCROptions options = new OCROptions
+                {
+                    useTranslate = false,
+                    displayResults = false,
+                    displayOrigin = false,
+                    useTTS = true,
+                    actorTypeIdx = 0,
+                    actorType = "Auto",
+                    ttsAutoDetectLang = true,
+                    useAutoClick = false,
+                    targetLang = "",
+                    targetLangAutoDetect = true
+                };
+                
+                ScreenshotOCRManager.Instance.ExecuteAreaOCR(options);
+            }),
+            (LanguageData.Translate("Test9", targetLang), delegate {
+                Debug.Log("Test9 실행 - 전체화면 OCR → '안녕' 텍스트 자동 클릭");
+                
+                // OCROptions 생성 (전체화면 OCR + 자동 클릭)
+                OCROptions options = new OCROptions
+                {
+                    useTranslate = false,
+                    displayResults = false,
+                    displayOrigin = false,
+                    useTTS = false,
+                    useAutoClick = true,
+                    clickExactMatch = true,
+                    clickWhitelist = new List<string> { "안녕" },
+                    clickBlacklist = new List<string>(),
+                    targetLang = "",
+                    targetLangAutoDetect = false
+                };
+                
+                ScreenshotOCRManager.Instance.ExecuteFullScreenOCR(options);
+            }),
+            (LanguageData.Translate("OCR", targetLang), delegate {
+                Debug.Log("OCR");
+                
+                OCROptions options = OCRManager.Instance.GetCurrentOptions();                    
+                // Screenshot 영역이 설정되어 있으면 영역 OCR, 아니면 전체 화면 OCR
+                if (ScreenshotManager.Instance.IsScreenshotAreaSet())
+                {
+                    Debug.Log("Screenshot 영역이 설정되어 있음 - 영역 OCR 실행");
+                    ScreenshotOCRManager.Instance.ExecuteAreaOCR(options);
+                }
+                else
+                {
+                    Debug.Log("Screenshot 영역이 설정되지 않음 - 전체 화면 OCR 실행");
+                    ScreenshotOCRManager.Instance.ExecuteFullScreenOCR(options);
+                }
+            })
             });
         }
 
