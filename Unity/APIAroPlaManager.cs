@@ -60,18 +60,15 @@ public class APIAroPlaManager : MonoBehaviour
     private bool isAroplaMode = false;
     private bool isProcessing = false;
     private string logFilePath;
+    private string previousCharCode;  // 아로프라 채널 시작 전 캐릭터 코드
     
     // 아로프라 캐릭터 관리 (CharManager 방식 참고)
     [Header("Aropla Channel Settings")]
-    public GameObject aronaPrefab;   // 인스펙터에서 설정할 아로나 프리팹
     public GameObject planaPrefab;   // 인스펙터에서 설정할 프라나 프리팹
-    private GameObject aronaInstance;  // 생성된 아로나 인스턴스
     private GameObject planaInstance;  // 생성된 프라나 인스턴스
     private Canvas canvas;
 
-    // 캐릭터 배치 상수
-    private const float ARONA_OFFSET_X = -300f;  // 아로나는 왼쪽으로
-    private const float ARONA_OFFSET_Y = 150f;   // 상단으로
+    // 서브 캐릭터(프라나) 배치 상수
     private const float PLANA_OFFSET_X = 300f;   // 프라나는 오른쪽으로  
     private const float PLANA_OFFSET_Y = 150f;   // 상단으로
 
@@ -178,7 +175,32 @@ public class APIAroPlaManager : MonoBehaviour
         
         LogToFile("Aropla Channel Mode Started");
         
-        // UI 초기화 - 아로나와 프라나 표시
+        // 현재 캐릭터 저장 (나중에 복원용)
+        GameObject currentChar = CharManager.Instance.GetCurrentCharacter();
+        if (currentChar != null)
+        {
+            CharAttributes attr = currentChar.GetComponent<CharAttributes>();
+            previousCharCode = attr != null ? attr.charcode : "arona";
+        }
+        else
+        {
+            previousCharCode = "arona";
+        }
+        
+        AroplaLog($"Previous character saved: {previousCharCode}");
+        
+        // 메인 캐릭터를 아로나로 변경
+        bool aronaChanged = CharManager.Instance.ChangeCharacterFromCharCode("arona");
+        if (!aronaChanged)
+        {
+            AroplaLogError("Failed to change main character to Arona");
+            isAroplaMode = false;
+            return;
+        }
+        
+        AroplaLog("Main character changed to Arona");
+        
+        // 프라나를 서브 캐릭터로 생성
         ShowAroplaChannelUI();
         
         // 항상 인사말 시작 (APIManager 방식과 동일)
@@ -191,14 +213,22 @@ public class APIAroPlaManager : MonoBehaviour
         isAroplaMode = false;
         LogToFile("Aropla Channel Mode Stopped");
         
-        // 시스템 메시지로 아로프라 채널 종료를 기록
-        // SaveAroplaConversationMemory("system", "system", "아로프라 채널이 종료되었습니다.", 
-        //     "아로프라 채널이 종료되었습니다.", 
-        //     "アロプラチャンネルが終了されました。", 
-        //     "Aropla Channel has been stopped.");
-        
-        // 기존 단일 캐릭터 모드로 복귀
+        // 프라나 인스턴스 제거
         HideAroplaChannelUI();
+        
+        // 이전 캐릭터로 복원
+        if (!string.IsNullOrEmpty(previousCharCode))
+        {
+            bool restored = CharManager.Instance.ChangeCharacterFromCharCode(previousCharCode);
+            if (restored)
+            {
+                AroplaLog($"Main character restored to: {previousCharCode}");
+            }
+            else
+            {
+                AroplaLogWarning($"Failed to restore character to: {previousCharCode}");
+            }
+        }
     }
 
     // 초기 인사말 시작 (아로나가 먼저 시작)
@@ -417,7 +447,7 @@ public class APIAroPlaManager : MonoBehaviour
                 break;
                 
             case "arona":
-                // 아로나 전용 말풍선 표시 (다국어 지원)
+                // 아로나(메인 캐릭터) 말풍선 표시 (다국어 지원)
                 ShowAronaMessage(message, messageKo, messageJp, messageEn);
                 break;
                 
@@ -458,12 +488,13 @@ public class APIAroPlaManager : MonoBehaviour
         switch (speaker)
         {
             case "arona":
-                // 아로나 인스턴스가 있으면 해당 닉네임 사용, 없으면 기본값
-                if (aronaInstance != null)
+                // 메인 캐릭터(아로나) 닉네임 사용
+                GameObject mainChar = CharManager.Instance.GetCurrentCharacter();
+                if (mainChar != null)
                 {
-                    string aronaNickname = CharManager.Instance.GetNickname(aronaInstance);
-                    if (!string.IsNullOrEmpty(aronaNickname))
-                        return aronaNickname;
+                    string mainNickname = CharManager.Instance.GetNickname(mainChar);
+                    if (!string.IsNullOrEmpty(mainNickname))
+                        return mainNickname;
                 }
                 return "arona"; // 기본값
                 
@@ -857,10 +888,10 @@ public class APIAroPlaManager : MonoBehaviour
     // UI 관련 메서드들 (CharManager 방식 참고)
     private void ShowAroplaChannelUI()
     {
-        // 프리팹들이 설정되지 않은 경우 경고
-        if (aronaPrefab == null || planaPrefab == null)
+        // 프리팹이 설정되지 않은 경우 경고
+        if (planaPrefab == null)
         {
-            AroplaLogWarning("Arona 또는 Plana Prefab이 설정되지 않았습니다. 인스펙터에서 설정해주세요.");
+            AroplaLogWarning("Plana Prefab이 설정되지 않았습니다. 인스펙터에서 설정해주세요.");
             return;
         }
 
@@ -870,50 +901,15 @@ public class APIAroPlaManager : MonoBehaviour
             canvas = FindObjectOfType<Canvas>();
             if (canvas == null)
             {
-                AroplaLogError("Canvas를 찾을 수 없어 캐릭터들을 생성할 수 없습니다.");
+                AroplaLogError("Canvas를 찾을 수 없어 프라나를 생성할 수 없습니다.");
                 return;
             }
         }
 
-        // 아로나 생성
-        CreateAronaInstance();
-        
-        // 프라나 생성
+        // 프라나 생성 (서브 캐릭터)
         CreatePlanaInstance();
 
-        AroplaLog("아로프라 채널 UI 표시 - 아로나, 프라나 캐릭터 생성됨");
-    }
-
-    // 아로나 인스턴스 생성
-    private void CreateAronaInstance()
-    {
-        // 이미 아로나가 생성되어 있으면 제거
-        if (aronaInstance != null)
-        {
-            Destroy(aronaInstance);
-            aronaInstance = null;
-        }
-
-        // 아로나 위치 계산 (왼쪽 상단)
-        Vector3 aronaPosition = CalculateSubCharacterPosition(ARONA_OFFSET_X, ARONA_OFFSET_Y);
-
-        // 아로나 인스턴스 생성
-        aronaInstance = Instantiate(aronaPrefab, aronaPosition, aronaPrefab.transform.rotation, canvas.transform);
-
-        // RectTransform 위치 설정
-        RectTransform aronaRect = aronaInstance.GetComponent<RectTransform>();
-        if (aronaRect != null)
-        {
-            aronaRect.anchoredPosition3D = aronaPosition;
-        }
-
-        // 아로나 크기를 메인 캐릭터와 동일하게 설정
-        SetAronaSize();
-
-        // 아로나 핸들러 설정
-        SetAronaHandlers();
-
-        LogToFile($"Arona instance created at position: {aronaPosition}");
+        AroplaLog("아로프라 채널 UI 표시 - 메인(아로나), 서브(프라나) 구성 완료");
     }
 
     // 프라나 인스턴스 생성
@@ -950,14 +946,6 @@ public class APIAroPlaManager : MonoBehaviour
 
     private void HideAroplaChannelUI()
     {
-        // 아로나 인스턴스 제거
-        if (aronaInstance != null)
-        {
-            Destroy(aronaInstance);
-            aronaInstance = null;
-            LogToFile("Arona instance destroyed");
-        }
-
         // 프라나 인스턴스 제거
         if (planaInstance != null)
         {
@@ -966,48 +954,34 @@ public class APIAroPlaManager : MonoBehaviour
             LogToFile("Plana instance destroyed");
         }
 
-        AroplaLog("아로프라 채널 UI 숨기기 - 아로나, 프라나 캐릭터 제거됨");
+        AroplaLog("아로프라 채널 UI 숨기기 - 프라나 제거됨");
     }
 
-    // 아로나 크기 설정 (CharManager.setCharSize 방식 참고)
-    private void SetAronaSize()
-    {
-        if (aronaInstance != null)
-        {
-            float char_size = SettingManager.Instance.settings.char_size;
-            float initialScale = aronaInstance.transform.localScale.x; // 프리팹의 초기 스케일
-            float scaleFactor = initialScale * char_size / 100f; // 퍼센트를 비율로 변환
-            
-            aronaInstance.transform.localScale = new Vector3(scaleFactor, scaleFactor, scaleFactor);
-            LogToFile($"Arona size set to: {char_size}%");
-        }
-    }
-
-    // 프라나 크기 설정 (CharManager.setCharSize 방식 참고)
+    // 프라나 크기 설정 (메인 캐릭터와 동일하게 설정)
     private void SetPlanaSize()
     {
         if (planaInstance != null)
         {
-            float char_size = SettingManager.Instance.settings.char_size;
-            float initialScale = planaInstance.transform.localScale.x; // 프리팹의 초기 스케일
-            float scaleFactor = initialScale * char_size / 100f; // 퍼센트를 비율로 변환
-            
-            planaInstance.transform.localScale = new Vector3(scaleFactor, scaleFactor, scaleFactor);
-            LogToFile($"Plana size set to: {char_size}%");
+            GameObject mainChar = CharManager.Instance.GetCurrentCharacter();
+            if (mainChar != null)
+            {
+                // 메인 캐릭터의 스케일을 그대로 사용
+                Vector3 mainScale = mainChar.transform.localScale;
+                planaInstance.transform.localScale = mainScale;
+                
+                LogToFile($"Plana size set to match main character: {mainScale}");
+            }
+            else
+            {
+                // 메인 캐릭터가 없으면 SettingManager 기준으로 설정
+                float char_size = SettingManager.Instance.settings.char_size;
+                float initialScale = planaInstance.transform.localScale.x;
+                float scaleFactor = initialScale * char_size / 100f;
+                
+                planaInstance.transform.localScale = new Vector3(scaleFactor, scaleFactor, scaleFactor);
+                LogToFile($"Plana size set to: {char_size}%");
+            }
         }
-    }
-
-    // 아로나 핸들러 설정 (CharManager의 핸들러 설정 방식 참고)
-    private void SetAronaHandlers()
-    {
-        if (aronaInstance == null) return;
-
-        // CharManager의 핸들러 설정 로직 참고하여 아로나에 필요한 핸들러들 설정
-        SetAronaDragHandlerVar();
-        SetAronaClickHandlerVar();
-        SetAronaEmotionFaceController();
-
-        LogToFile("Arona handlers configured");
     }
 
     // 프라나 핸들러 설정 (CharManager의 핸들러 설정 방식 참고)
@@ -1018,80 +992,9 @@ public class APIAroPlaManager : MonoBehaviour
         // CharManager의 핸들러 설정 로직 참고하여 프라나에 필요한 핸들러들 설정
         SetPlanaDragHandlerVar();
         SetPlanaClickHandlerVar();
-        // SetPlanaPhysicsManagerVar(); // 프라나는 물리 적용 안함
-        // 말풍선 관련은 ShowPlanaMessage에서 동적으로 처리
         SetPlanaEmotionFaceController();
 
         LogToFile("Plana handlers configured");
-    }
-
-    // 아로나 DragHandler 변수 설정 (CharManager.setDragHandlerVar 방식 참고)
-    private void SetAronaDragHandlerVar()
-    {
-        DragHandler dragHandler = aronaInstance.GetComponentInChildren<DragHandler>();
-        if (dragHandler != null)
-        {
-            // Canvas 할당
-            dragHandler._canvas = canvas ?? FindObjectOfType<Canvas>();
-
-            // 부모(아로나) 캐릭터의 Animator 할당
-            Animator aronaAnimator = aronaInstance.GetComponent<Animator>();
-            if (aronaAnimator != null)
-            {
-                dragHandler._animator = aronaAnimator;
-            }
-            else
-            {
-                AroplaLogWarning("Arona에서 Animator를 찾을 수 없습니다.");
-            }
-            
-            LogToFile("Arona DragHandler variables set");
-        }
-        else
-        {
-            AroplaLogWarning("Arona에서 DragHandler를 찾을 수 없습니다.");
-        }
-    }
-
-    // 아로나 ClickHandler 변수 설정 (CharManager.setClickHandlerVar 방식과 동일)
-    private void SetAronaClickHandlerVar()
-    {
-        // 아로나의 하위에 있는 ClickHandler를 찾아 설정
-        ClickHandler clickHandler = aronaInstance.GetComponentInChildren<ClickHandler>();
-
-        if (clickHandler != null)
-        {
-            // 부모(아로나) 캐릭터의 Animator를 _animator에 할당
-            Animator aronaAnimator = aronaInstance.GetComponent<Animator>();
-            if (aronaAnimator != null)
-            {
-                clickHandler._animator = aronaAnimator;
-                LogToFile("Arona ClickHandler variables set");
-            }
-            else
-            {
-                AroplaLogWarning("Arona에서 Animator를 찾을 수 없습니다.");
-            }
-        }
-        else
-        {
-            AroplaLogWarning("Arona에서 ClickHandler를 찾을 수 없습니다.");
-        }
-    }
-
-    // 아로나 EmotionFaceController 설정 
-    private void SetAronaEmotionFaceController()
-    {
-        EmotionFaceController emotionFaceController = aronaInstance.GetComponentInChildren<EmotionFaceController>();
-        if (emotionFaceController != null)
-        {
-            emotionFaceController.SetCharType("Sub"); // Sub 캐릭터로 설정
-            LogToFile("Arona EmotionFaceController set to Sub type");
-        }
-        else
-        {
-            AroplaLogWarning("Arona에서 EmotionFaceController를 찾을 수 없습니다.");
-        }
     }
 
     // 프라나 DragHandler 변수 설정 (CharManager.setDragHandlerVar 방식 참고)
@@ -1283,8 +1186,6 @@ public class APIAroPlaManager : MonoBehaviour
     }
 
     // 아로프라 전용 메모리 관리 메서드들
-    
-    // 대화 개수 반환 (MemoryManager 기반)
     public int GetAroplaConversationCount()
     {
         return MemoryManager.Instance.GetAllConversationMemory(filename: GetFileName()).Count;
@@ -1326,64 +1227,16 @@ public class APIAroPlaManager : MonoBehaviour
         }
         return messages;
     }
-    
-    // 특정 발화자의 메시지만 가져오기
-    public List<Conversation> GetAroplaMessagesBySpeaker(string speaker)
-    {
-        try
-        {
-            return MemoryManager.Instance.GetMessagesBySpeaker(speaker, filename: GetFileName());
-        }
-        catch (Exception ex)
-        {
-            AroplaLogError($"Error getting messages by speaker {speaker}: {ex.Message}");
-            return new List<Conversation>();
-        }
-    }
-    
-    // 아로프라 메모리 통계 정보
-    public (int user, int assistant, int system, int total) GetAroplaMemoryStats()
-    {
-        try
-        {
-            return MemoryManager.Instance.GetMemoryStats(filename: GetFileName());
-        }
-        catch (Exception ex)
-        {
-            AroplaLogError($"Error getting memory stats: {ex.Message}");
-            return (0, 0, 0, 0);
-        }
-    }
-    
+        
     // 전체 대화 히스토리 가져오기
     public List<Conversation> GetConversationHistory()
     {
         // 아로프라 방식: MemoryManager를 통해 대화 히스토리 반환
-        return MemoryManager.Instance.GetAllConversationMemory(filename: GetFileName());
+        return MemoryManager.Instance.GetAllConversationMemory(GetFileName());
     }
     
-    // 프라나 인스턴스 가져오기
-    public GameObject GetPlanaInstance()
-    {
-        return planaInstance;
-    }
-
-    // 아로나 위치 업데이트 (캐릭터 변경시 등에 사용)
-    public void UpdateAronaPosition()
-    {
-        if (!isAroplaMode || aronaInstance == null) return;
-
-        // 아로나 위치 재계산
-        Vector3 newAronaPosition = CalculateSubCharacterPosition(ARONA_OFFSET_X, ARONA_OFFSET_Y);
-
-        RectTransform aronaRect = aronaInstance.GetComponent<RectTransform>();
-        if (aronaRect != null)
-        {
-            aronaRect.anchoredPosition3D = newAronaPosition;
-        }
-
-        LogToFile($"Arona position updated to: {newAronaPosition}");
-    }
+    // 아로나 위치 업데이트 (캐릭터 변경시 등에 사용) - 메인 캐릭터이므로 불필요
+    // public void UpdateAronaPosition() - 제거됨 (아로나는 이제 메인 캐릭터)
 
     // 프라나 위치 업데이트 (캐릭터 변경시 등에 사용)
     public void UpdatePlanaPosition()
@@ -1402,12 +1255,8 @@ public class APIAroPlaManager : MonoBehaviour
         LogToFile($"Plana position updated to: {newPlanaPosition}");
     }
 
-    // 아로나 크기 업데이트 (캐릭터 크기 변경시 등에 사용)
-    public void UpdateAronaSize()
-    {
-        if (!isAroplaMode || aronaInstance == null) return;
-        SetAronaSize();
-    }
+    // 아로나 크기 업데이트 - 메인 캐릭터이므로 CharManager 사용
+    // public void UpdateAronaSize() - 제거됨 (CharManager.setCharSize() 사용)
 
     // 프라나 크기 업데이트 (캐릭터 크기 변경시 등에 사용)  
     public void UpdatePlanaSize()
@@ -1416,16 +1265,14 @@ public class APIAroPlaManager : MonoBehaviour
         SetPlanaSize();
     }
 
-    // 아로나 인스턴스 가져오기
-    public GameObject GetAronaInstance()
-    {
-        return aronaInstance;
-    }
+    // 아로나 인스턴스 가져오기 - 메인 캐릭터는 CharManager 사용
+    // public GameObject GetAronaInstance() - 제거됨 (CharManager.GetCurrentCharacter() 사용)
 
     // 아로프라 모드에서 캐릭터들이 활성화되어 있는지 확인
     public bool IsAronaActive()
     {
-        return isAroplaMode && aronaInstance != null;
+        // 아로나는 메인 캐릭터이므로 CharManager로 확인
+        return isAroplaMode && CharManager.Instance.GetCurrentCharacter() != null;
     }
 
     public bool IsPlanaActive()
@@ -1435,16 +1282,11 @@ public class APIAroPlaManager : MonoBehaviour
 
     public bool IsAroplaInstancesActive()
     {
-        return isAroplaMode && aronaInstance != null && planaInstance != null;
+        return isAroplaMode && CharManager.Instance.GetCurrentCharacter() != null && planaInstance != null;
     }
 
-    // 아로나 핸들러 재설정 (캐릭터 변경시 등에 사용)
-    public void UpdateAronaHandlers()
-    {
-        if (!isAroplaMode || aronaInstance == null) return;
-        SetAronaHandlers();
-        LogToFile("Arona handlers updated");
-    }
+    // 아로나 핸들러 재설정 - 메인 캐릭터는 CharManager에서 관리
+    // public void UpdateAronaHandlers() - 제거됨
 
     // 프라나 핸들러 재설정 (캐릭터 변경시 등에 사용)
     public void UpdatePlanaHandlers()
@@ -1454,17 +1296,8 @@ public class APIAroPlaManager : MonoBehaviour
         LogToFile("Plana handlers updated");
     }
 
-    // 아로나 완전 재초기화 (위치, 크기, 핸들러 모두 업데이트)
-    public void RefreshAronaInstance()
-    {
-        if (!isAroplaMode || aronaInstance == null) return;
-        
-        UpdateAronaPosition();
-        UpdateAronaSize();
-        UpdateAronaHandlers();
-        
-        LogToFile("Arona instance fully refreshed");
-    }
+    // 아로나 완전 재초기화 - 메인 캐릭터는 CharManager에서 관리
+    // public void RefreshAronaInstance() - 제거됨
 
     // 프라나 완전 재초기화 (위치, 크기, 핸들러 모두 업데이트)
     public void RefreshPlanaInstance()
@@ -1483,13 +1316,13 @@ public class APIAroPlaManager : MonoBehaviour
     {
         if (!isAroplaMode) return;
         
-        RefreshAronaInstance();
+        // 메인 캐릭터(아로나)는 CharManager.setCharSize() 등으로 관리
         RefreshPlanaInstance();
         
         LogToFile("All Aropla instances fully refreshed");
     }
 
-    // 아로나 메시지 표시
+    // 아로나 메시지 표시 (메인 캐릭터의 말풍선 사용)
     private void ShowAronaMessage(string message, string messageKo = "", string messageJp = "", string messageEn = "")
     {
         // APIManager와 동일한 방식으로 다국어 메시지 처리
@@ -1497,39 +1330,17 @@ public class APIAroPlaManager : MonoBehaviour
         string displayJp = !string.IsNullOrEmpty(messageJp) ? messageJp : message;
         string displayEn = !string.IsNullOrEmpty(messageEn) ? messageEn : message;
         
-        // 아로나 인스턴스가 있는 경우 해당 위치 기준으로 말풍선 표시
-        if (aronaInstance != null)
-        {
-            // SubAnswerBalloonManager를 사용하여 아로나 위치에 말풍선 표시
-            RectTransform aronaRect = aronaInstance.GetComponent<RectTransform>();
-            if (aronaRect != null)
-            {
-                SubAnswerBalloonManager.Instance.ModifyAnswerBalloonTextInfo(displayKo, displayJp, displayEn);
-                SubAnswerBalloonManager.Instance.ModifyAnswerBalloonText();
-                SubAnswerBalloonManager.Instance.ShowAnswerBalloonInfAtCharacter(aronaRect);
-                // 음성 로딩 대기 후 오디오 길이에 맞춰 자동 닫기
-                // StartCoroutine(HideAfterAudioLoaded());
-            }
-            else
-            {
-                // RectTransform을 찾을 수 없는 경우 기본 표시
-                SubAnswerBalloonManager.Instance.ModifyAnswerBalloonTextInfo(displayKo, displayJp, displayEn);
-                SubAnswerBalloonManager.Instance.ModifyAnswerBalloonText();
-                SubAnswerBalloonManager.Instance.ShowAnswerBalloonInf();
-                // 음성 로딩 대기 후 오디오 길이에 맞춰 자동 닫기
-                // StartCoroutine(HideAfterAudioLoaded());
-            }
-        }
-        else
-        {
-            // 아로나 인스턴스가 없으면 기본 방식 사용
-            SubAnswerBalloonManager.Instance.ModifyAnswerBalloonTextInfo(displayKo, displayJp, displayEn);
-            SubAnswerBalloonManager.Instance.ModifyAnswerBalloonText();
-            SubAnswerBalloonManager.Instance.ShowAnswerBalloonInf();
-            // 음성 로딩 대기 후 오디오 길이에 맞춰 자동 닫기
-            // StartCoroutine(HideAfterAudioLoaded());
-        }
+        // 아로나는 메인 캐릭터이므로 AnswerBalloonManager 사용
+        AnswerBalloonManager.Instance.ModifyAnswerBalloonTextInfo(displayKo, displayJp, displayEn);
+        AnswerBalloonManager.Instance.ModifyAnswerBalloonText();
+        AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
         
-        AroplaLog($"Arona Message: {message}");
+        AroplaLog($"Arona Message (Main Character): {message}");
+    }
+
+    // 프라나 인스턴스 가져오기
+    public GameObject GetPlanaInstance()
+    {
+        return planaInstance;
     }
 }
