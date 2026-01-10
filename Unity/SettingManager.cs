@@ -23,16 +23,24 @@ public class SettingManager : MonoBehaviour
     [SerializeField] private Toggle isShowTutorialOnChatToggle;
     [SerializeField] private Toggle isStartServerOnInitToggle;
     [SerializeField] private Toggle isSTTServerToggle;
+    [SerializeField] private Toggle editSttInChatInputToggle;
     [SerializeField] private Toggle enableEditionUpdateSuggestionToggle;
 
     [Header("Character")]
     [SerializeField] private Slider charSizeSlider;
     [SerializeField] private Slider charSpeedSlider;
     [SerializeField] private Slider charMobilitySlider;
+    [SerializeField] private Toggle isCharAutoSmallTalk;
+    [SerializeField] private TMP_Text charAutoSmallTalkIntervalText; // "Auto Small Talk : x sec"
+    [SerializeField] private Slider charAutoSmallTalkSlider;
+    [SerializeField] private GameObject charAutoSmallTalkSliderObject; // 슬라이더를 포함한 부모 GameObject
     [SerializeField] private Toggle isGravityToggle;
     [SerializeField] private Toggle isWindowsCollisionToggle;
     [SerializeField] private Toggle isStartWithLastCharToggle;
     [SerializeField] private Toggle isRememberCharOutfitsToggle;
+
+    [Header("Hotkey")]
+    [SerializeField] private Toggle hotKeyGlobalInputToggle;
 
     [Header("Sound")]
     [SerializeField] private Dropdown soundLanguageDropdown;
@@ -114,10 +122,20 @@ public class SettingManager : MonoBehaviour
     [SerializeField] private Toggle devHowlingToggle;
     [SerializeField] private Toggle devSoundToggle;
 
+    [Header("OCR")]
+    [SerializeField] private Button ocrOption1Button;
+    [SerializeField] private Button ocrOption2Button;
+    [SerializeField] private Button ocrOption3Button;
+    [SerializeField] private Image ocrOption1Image;
+    [SerializeField] private Image ocrOption2Image;
+    [SerializeField] private Image ocrOption3Image;
+    [SerializeField] private Sprite ocrOptionActiveSprite;
+    [SerializeField] private Sprite ocrOptionInactiveSprite;
+
     // 기타 표시용 UI
     [Header("Extra UI")]
     public Text soundSpeedMasterText;
-    public Text serverInfoText;  // Auto용??
+    // public Text serverInfoText;  // Auto용??
     public Text charSizeText;
 
     // 설정 데이터 클래스
@@ -139,12 +157,15 @@ public class SettingManager : MonoBehaviour
         public bool isTutorialCompleted;
         public bool isStartServerOnInit;
         public bool isSTTServer;
+        public bool editSttinChatInput;
         public bool enableEditionUpdateSuggestion;
 
         public string char_lastUsed;
         public float char_size;
         public float char_mobility;
         public float char_speed;
+        public bool isCharAutoSmallTalk;
+        public float charAutoSmallTalkInterval; // 초 단위
         public bool isGravity;
         public bool isWindowsCollision;
         public bool isStartWithLastChar;
@@ -191,6 +212,12 @@ public class SettingManager : MonoBehaviour
         public bool isDevHowling;
         public bool isDevSound;  // dev_voice 서버 사용 여부 (저장 안함)
 
+        // Hotkey
+        public bool hotKeyGlobalInputEnabled;
+
+        // OCR
+        public string ocrOptionType = "Options1";  // "Options1", "Options2", "Options3"
+
         // UI외 데이터
         public bool wantFreeServer;  // 무료서버연결의향
     }
@@ -228,13 +255,16 @@ public class SettingManager : MonoBehaviour
     public void SetIsShowChatBoxOnClick(bool value) {settings.isShowChatBoxOnClick = value; SaveSettings(); }
     public void SetIsShowTutorialOnChat(bool value) {settings.isShowTutorialOnChat = value; settings.isTutorialCompleted = !value; SaveSettings(); }
     public void SetIsisStartServerOnInit(bool value) {settings.isStartServerOnInit = value; SaveSettings(); }
-    public void SetIsSTTServer(bool value) { value = getIsSTTServerFilterScenario(value); isSTTServerToggle.isOn = value; settings.isSTTServer = value; SaveSettings(); }
+    public async void SetIsSTTServer(bool value) { value = await getIsSTTServerFilterScenarioAsync(value); isSTTServerToggle.isOn = value; settings.isSTTServer = value; SaveSettings(); }
+    public void SetEditSttinChatInput(bool value) { settings.editSttinChatInput = value; SaveSettings(); }
     public void SetEnableEditionUpdateSuggestion(bool value) { settings.enableEditionUpdateSuggestion = value; SaveSettings(); }
 
     public void SetCharLastUsed(string value) { settings.char_lastUsed = value; SaveSettings(); }
     public void SetCharSize(float value) { settings.char_size = value; CharManager.Instance.setCharSize(); SaveSettings(); charSizeText.text="Size ("+(int)settings.char_size+")";}
     public void SetCharSpeed(float value) { settings.char_speed = value; SaveSettings(); }
     public void SetCharMobility(float value) { settings.char_mobility = value; SaveSettings(); }
+    public async void SetIsCharAutoSmallTalk(bool value) { value = await getIsCharAutoSmallTalkFilterScenarioAsync(value); isCharAutoSmallTalk.isOn = value; settings.isCharAutoSmallTalk = value; UpdateAutoSmallTalkUI(); SaveSettings(); }
+    public void SetCharAutoSmallTalkInterval(float value) { settings.charAutoSmallTalkInterval = value; UpdateAutoSmallTalkIntervalText(); SaveSettings(); GlobalTimeVariableManager.Instance.smallTalkTimer = 0f; }
     public void SetIsGravity(bool value) { settings.isGravity = value; SaveSettings(); }
     public void SetIsWindowsCollision(bool value) { settings.isWindowsCollision = value; WindowCollisionManager.Instance.SetWindowsRectChecking(value); SaveSettings(); }
     public void SetIsStartWithLastChar(bool value) { settings.isStartWithLastChar = value; SaveSettings(); }
@@ -244,12 +274,12 @@ public class SettingManager : MonoBehaviour
     public void SetSoundVolumeMaster(float value) { settings.sound_volumeMaster = value; SaveSettings(); }
     public void SetSoundSpeedMaster(float value) { settings.sound_speedMaster = value; SaveSettings(); soundSpeedMasterText.text="Speed (" + (int)settings.sound_speedMaster + "%)";}
 
-    public void SetServerType() 
+    public async void SetServerType() 
     { 
         int dropdownIndex = serverTypeDropdown.value;
         int serverTypeIdx = DropdownIndexToServerTypeIdx[dropdownIndex];
         
-        serverTypeIdx = getServerTypeFilterScenario(serverTypeIdx);
+        serverTypeIdx = await getServerTypeFilterScenarioAsync(serverTypeIdx);
         
         // 필터링 후 다시 드롭다운에 반영
         if (ServerTypeIdxToDropdownIndex.ContainsKey(serverTypeIdx))
@@ -265,9 +295,9 @@ public class SettingManager : MonoBehaviour
         LanguageManager.Instance.SetUILanguage();
     }
     
-    public void SetServerTypeByValue(int serverTypeIdx) 
+    public async void SetServerTypeByValue(int serverTypeIdx) 
     { 
-        serverTypeIdx = getServerTypeFilterScenario(serverTypeIdx);
+        serverTypeIdx = await getServerTypeFilterScenarioAsync(serverTypeIdx);
         
         // server_type_idx를 드롭다운 인덱스로 변환
         if (ServerTypeIdxToDropdownIndex.ContainsKey(serverTypeIdx))
@@ -370,10 +400,84 @@ public class SettingManager : MonoBehaviour
     public void SetAiLanguage() { int value=aiLangDropdown.value; settings.ai_language_idx = value; settings.ai_language=getAiLangFromIdx(value); SaveSettings(); }
     public async void SetAIEmotion() { int value=aiEmotionDropdown.value; value = await getAiEmotionFilterScenarioAsync(value); aiEmotionDropdown.value = value; settings.ai_emotion_idx = value; settings.ai_emotion = getONOFFTypeFromIdx(value); SaveSettings(); }
     public void SetAiVoiceFilter() { int value=aiVoiceFilterDropdown.value; value = getAiVoiceFilterScenario(value); aiVoiceFilterDropdown.value = value; settings.ai_voice_filter_idx = value; SaveSettings(); }
+    public void SetHotKeyGlobalInput(bool value) 
+    { 
+        // 윈도우가 아닐 경우 필터링
+        value = getHotKeyGlobalInputFilterScenario(value);
+        hotKeyGlobalInputToggle.isOn = value;
+        
+        settings.hotKeyGlobalInputEnabled = value; 
+        
+        // HotkeyManager에 전역 핫키 활성화/비활성화 알림
+        if (HotkeyManager.Instance != null)
+        {
+            HotkeyManager.Instance.SetGlobalHotkeyEnabled(value);
+        }
+        
+        SaveSettings(); 
+    }
 
     public void SetIsDevModeToggle(bool value) { settings.isDevMode = value; DevManager.Instance.SetInteractableDev(value);}
     public void SetIsDevHowlingToggle(bool value) { settings.isDevHowling = value; SaveSettings(); }
     public void SetIsDevSoundToggle(bool value) { settings.isDevSound = value; }  // dev_voice 서버 사용 여부 (저장 안함)
+    
+    // Auto Small Talk UI 업데이트
+    private void UpdateAutoSmallTalkUI() { charAutoSmallTalkSliderObject.SetActive(settings.isCharAutoSmallTalk); UpdateAutoSmallTalkIntervalText(); }
+    private void UpdateAutoSmallTalkIntervalText()
+    {
+        if (settings.isCharAutoSmallTalk)
+        {
+            int intervalSec = (int)settings.charAutoSmallTalkInterval;
+            charAutoSmallTalkIntervalText.text = "Auto Small Talk : " + intervalSec + " sec";
+        }
+        else
+        {
+            charAutoSmallTalkIntervalText.text = "Auto Small Talk";
+        }
+    }
+    
+    // OCR 옵션 관련
+    public void SetOCROption1() { SetOCROptionType("Options1"); }
+    public void SetOCROption2() { SetOCROptionType("Options2"); }
+    public void SetOCROption3() { SetOCROptionType("Options3"); }
+
+    // OCR 탭 열릴 때 호출 (Unity에서 탭 버튼에 연결)
+    public void OnOCRTabOpened()
+    {
+        UpdateOCROptionToggles();
+        OCRManager.Instance.InitializeFromSettings(settings.ocrOptionType);
+        
+        Debug.Log($"[SettingManager] OCR Tab opened - ocrOptionType: {settings.ocrOptionType}");
+    }
+    
+    private void SetOCROptionType(string optionType)
+    {     
+        settings.ocrOptionType = optionType;
+        
+        // 슬롯 번호 결정 (Options1 -> 1, Options2 -> 2, Options3 -> 3)
+        int slotNumber = 1;
+        if (optionType == "Options2")
+            slotNumber = 2;
+        else if (optionType == "Options3")
+            slotNumber = 3;
+        
+        // OCRManager에 슬롯 변경 알림
+        OCRManager.Instance.SetActiveSlot(slotNumber);
+        
+        // UI 갱신 - 버튼 상태
+        UpdateOCROptionToggles();
+        SaveSettings();
+             
+        Debug.Log($"[SettingManager] OCR Option changed to {optionType} (Slot {slotNumber})");
+    }
+    
+    private void UpdateOCROptionToggles()
+    {     
+        // 이미지 스프라이트만 업데이트
+        ocrOption1Image.sprite = settings.ocrOptionType == "Options1" ? ocrOptionActiveSprite : ocrOptionInactiveSprite;
+        ocrOption2Image.sprite = settings.ocrOptionType == "Options2" ? ocrOptionActiveSprite : ocrOptionInactiveSprite;
+        ocrOption3Image.sprite = settings.ocrOptionType == "Options3" ? ocrOptionActiveSprite : ocrOptionInactiveSprite;
+    }
     
     // dev_voice 서버 사용 여부 반환 (Android 또는 DevSound 토글 활성화시 true)
     public bool IsDevSoundEnabled()
@@ -386,7 +490,7 @@ public class SettingManager : MonoBehaviour
     }
     
     // 표시용
-    public void SetServerInfoText(string text) { serverInfoText.text = text; }
+    // public void SetServerInfoText(string text) { serverInfoText.text = text; }
     public void RefreshAIInfoText(string ai_info_server_type, string ai_info_model, string ai_info_prompt, string ai_info_lang_used, string ai_info_translator, string ai_info_time, string ai_info_intent) {
     aiInfoServerType.text = ai_info_server_type;
     aiInfoModel.text = ai_info_model;
@@ -400,7 +504,7 @@ public class SettingManager : MonoBehaviour
     private string configFilePath;
 
     void Awake()
-    {
+    {     
         // Devmode 초기화
         devModeToggle.isOn = false;
         devSoundToggle.isOn = false;
@@ -414,7 +518,9 @@ public class SettingManager : MonoBehaviour
         {
             Directory.CreateDirectory(directoryPath);
         }
+        
         LoadSettings();
+             
         SetUIAfterLoading();
 
         Debug.Log("###1");
@@ -425,7 +531,7 @@ public class SettingManager : MonoBehaviour
     }
 
     void Start()
-    {
+    {     
         // 현재 플랫폼 세팅
         SetPlatformInfoDropdown();
         SetServerModelDropdownOptions();
@@ -445,11 +551,8 @@ public class SettingManager : MonoBehaviour
         SetServerModelType();
         SetGeminiModelType();
 
-        Debug.Log("###2");
-
-
         // 최상위에 두는지 확인하고 세팅
-        WindowManager.SetWindowAlwaysOnTop(settings.isAlwaysOnTop); 
+        WindowManager.SetWindowAlwaysOnTop(settings.isAlwaysOnTop);
     }
     
     private void SetPlatformInfoDropdown()
@@ -725,6 +828,29 @@ public class SettingManager : MonoBehaviour
         return value;
     }
 
+    private async Task<bool> getIsCharAutoSmallTalkFilterScenarioAsync(bool value)
+    {
+        // DEV MODE 일경우 로그 출력 후 value return
+        if (settings.isDevMode)
+        {   
+            Debug.Log($"[SettingManager] getIsCharAutoSmallTalkFilterScenarioAsync - DEV MODE로 통과");
+            return value;
+        }
+
+        // Auto Small Talk 기능 키려는데 현재 Sample 버전일 경우 버전업 요구
+        if (value)
+        {
+            bool chk = await InstallStatusManager.Instance.CheckAndOperateFullAsync();
+            if (!chk) 
+            {
+                // 안내했을 경우, false로 반환
+                return false;
+            }
+        }
+
+        return value;
+    }
+
     private int getOperatorTypeFilterScenario(int value)
     {
         // DEV MODE 일경우 로그 출력 후 value return
@@ -745,19 +871,19 @@ public class SettingManager : MonoBehaviour
     }
 
     // Local은 최소 Lite 버전 이상 필요 (서버 설치 여부 확인)
-    private int getServerTypeFilterScenario(int value)
+    private async Task<int> getServerTypeFilterScenarioAsync(int value)
     {
         // DEV MODE 일경우 로그 출력 후 value return
         if (settings.isDevMode)
         {   
-            Debug.Log($"[SettingManager] getServerTypeFilterScenario - DEV MODE로 통과");
+            Debug.Log($"[SettingManager] getServerTypeFilterScenarioAsync - DEV MODE로 통과");
             return value;
         }
 
         // Local 기능 키려는데 현재 Sample 버전일 경우 버전업 요구
         if (value == 1)
         {
-            bool chk = InstallStatusManager.Instance.CheckAndOperateLite();
+            bool chk = await InstallStatusManager.Instance.CheckAndOperateLiteAsync();
             if (!chk) 
             {
                 // 안내했을 경우, 0(Auto)로 반환
@@ -836,11 +962,32 @@ public class SettingManager : MonoBehaviour
         return value;
     }
 
+    // 글로벌 핫키 설정 필터 (Windows 전용)
+    private bool getHotKeyGlobalInputFilterScenario(bool value)
+    {
+        // DEV MODE 일경우 로그 출력 후 value return
+        if (settings.isDevMode)
+        {   
+            Debug.Log($"[SettingManager] getHotKeyGlobalInputFilterScenario - DEV MODE로 통과");
+            return value;
+        }
+
+        // 글로벌 핫키 활성화 시도 시, Windows가 아닐 경우 안내
+        if (value)
+        {
+#if !(UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN)
+            StartCoroutine(ScenarioCommonManager.Instance.Run_C99_WindowsOnly());
+            return false;
+#endif
+        }
+        return value;
+    }
+
     // STT Server 설정 필터 (Lite 이상 필요)
-    private bool getIsSTTServerFilterScenario(bool value)
+    private async Task<bool> getIsSTTServerFilterScenarioAsync(bool value)
     {
         // STT Server 기능 키려는데 현재 Sample 버전일 경우 버전업 요구
-        if (!InstallStatusManager.Instance.CheckAndOperateLite())
+        if (!await InstallStatusManager.Instance.CheckAndOperateLiteAsync())
         {
             return false;
         }
@@ -1065,11 +1212,15 @@ public class SettingManager : MonoBehaviour
         isShowTutorialOnChatToggle.isOn = settings.isShowTutorialOnChat;
         isStartServerOnInitToggle.isOn = settings.isStartServerOnInit;
         isSTTServerToggle.isOn = settings.isSTTServer;
+        editSttInChatInputToggle.isOn = settings.editSttinChatInput;
         enableEditionUpdateSuggestionToggle.isOn = settings.enableEditionUpdateSuggestion;
+        hotKeyGlobalInputToggle.isOn = settings.hotKeyGlobalInputEnabled;
 
         charSizeSlider.value = settings.char_size;
         charSpeedSlider.value = settings.char_speed;
         charMobilitySlider.value = settings.char_mobility;
+        isCharAutoSmallTalk.isOn = settings.isCharAutoSmallTalk;
+        charAutoSmallTalkSlider.value = settings.charAutoSmallTalkInterval;
         isGravityToggle.isOn = settings.isGravity;
         isWindowsCollisionToggle.isOn = settings.isWindowsCollision;
         isStartWithLastCharToggle.isOn = settings.isStartWithLastChar;
@@ -1111,10 +1262,15 @@ public class SettingManager : MonoBehaviour
         devModeToggle.isOn = false; // DevMode는 저장과 무관하게 항상 false
         devSoundToggle.isOn = false; // DevSound는 저장과 무관하게 항상 false
 
+        UpdateOCROptionToggles();
+
         // Text 계열
         soundSpeedMasterText.text = "Speed (" + (int)settings.sound_speedMaster + "%)";
         charSizeText.text = "Size (" + (int)settings.char_size + "%)";
         RefreshAIInfoText("", "", "", "", "", "", "");
+        
+        // Auto Small Talk UI 업데이트
+        UpdateAutoSmallTalkUI();
 
         // 초기값일 경우 UI가 반영되지 않으므로 한번 더 호출
         LanguageManager.Instance.SetUILanguage();
@@ -1265,16 +1421,25 @@ public class SettingManager : MonoBehaviour
         settings.isTutorialCompleted = false;
         settings.isStartServerOnInit = true;
         settings.isSTTServer = false;
+        settings.editSttinChatInput = true;
         settings.enableEditionUpdateSuggestion = true;
 
         settings.char_size = 100;
         settings.char_lastUsed = "mari";
         settings.char_mobility = 5;
         settings.char_speed = 100;
+        settings.isCharAutoSmallTalk = false;
+        settings.charAutoSmallTalkInterval = 60; // 기본값 60초
         settings.isGravity = true;
         settings.isWindowsCollision = false;
         settings.isStartWithLastChar = true;
         settings.isRememberCharOutfits = false;
+
+        // 글로벌 핫키 기본값 (윈도우만 true, 나머지는 false)
+        settings.hotKeyGlobalInputEnabled = true;
+#if !(UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN)
+        settings.hotKeyGlobalInputEnabled = false;
+#endif
 
         // 사운드 언어는 기본값으로 일본어 음성 사용 (가장 품질이 좋음)
         settings.sound_language_idx = 1;  // jp
@@ -1295,23 +1460,26 @@ public class SettingManager : MonoBehaviour
         settings.model_name_ChatGPT = "";
         settings.model_name_Custom = "";
         settings.ai_web_search_idx = 0;  // 0 : off, 1 : on, 2: force
-        settings.ai_web_search = "OFF";
+        settings.ai_web_search = "off";
         settings.ai_use_image_idx = 0;  // 0 : off, 1 : on, 2: force
-        settings.ai_use_image = "OFF";
+        settings.ai_use_image = "off";
         settings.ai_ask_intent_idx = 0;  // 0 : off, 1 : on
-        settings.ai_ask_intent = "OFF";
+        settings.ai_ask_intent = "off";
         settings.ai_emotion_idx = 0;  // 0 : off, 1 : on
-        settings.ai_emotion = "OFF";
+        settings.ai_emotion = "off";
         settings.isAskedTurnOnServer = true;
         settings.isAPITest = false;
         settings.confirmUserIntent = false;
         settings.includeCharInScreenshot = false;
-        settings.includeUIInScreenshot = true;
-        settings.isAskChangeToMultimodal = false;
+        settings.includeUIInScreenshot = false;
+        settings.isAskChangeToMultimodal = true;
 
         settings.isDevHowling = false;
 
         settings.wantFreeServer = false;  // 무료서버연결의향
+        
+        // OCR
+        settings.ocrOptionType = "Options1";  // 기본값: Options1
     }
 
     public void AskReturnToDefaultValues()
