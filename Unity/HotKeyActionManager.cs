@@ -35,6 +35,9 @@ public enum HotKeyActionType
     [DisplayText("Change Char")]
     ActionChangeChar,
     
+    [DisplayText("New Chat")]
+    ActionNewChat,
+
     [DisplayText("Chat History")]
     ActionShowChatHistory,
     
@@ -49,21 +52,30 @@ public enum HotKeyActionType
     
     [DisplayText("Set Area")]
     ActionSetArea,
+    
+    [DisplayText("Cancel Area")]
+    ActionCancelArea,
 
     [DisplayText("Show Screenshot")]
     ActionExecuteAreaScreenshot,
-    
-    [DisplayText("Area OCR+TL")]
-    ActionExecuteAreaOCR,
 
-    [DisplayText("Area OCR+TTS")]
-    ActionExecuteAreaOCR_TTS,
+    [DisplayText("OCR")]
+    ActionOCR,
 
-    [DisplayText("Area OCR+TTS Auto")]
-    ActionExecuteAreaOCR_TTS_Auto,
+    [DisplayText("OCR1")]
+    ActionOCR1,
+
+    [DisplayText("OCR2")]
+    ActionOCR2,
+
+    [DisplayText("OCR3")]
+    ActionOCR3,
 
     [DisplayText("Dev Mode")]
     ActionDevMode,
+
+    [DisplayText("Stop Meme")]
+    ActionStopMeme,
 
     // 동작 없음 (항상 맨 뒤)
     [DisplayText("None")]
@@ -140,6 +152,12 @@ public class HotKeyActionManager : MonoBehaviour
             UIManager.Instance.ToggleCharChange();
         };
 
+        // 채팅내역초기화
+        actions["ActionNewChat"] = () =>
+        {
+            MemoryManager.Instance.ResetConversationMemoryAndGuide();
+        };
+
         // 채팅 이력 보기
         actions["ActionShowChatHistory"] = () =>
         {
@@ -186,6 +204,13 @@ public class HotKeyActionManager : MonoBehaviour
             ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
             if (sm != null) sm.SetScreenshotArea();
         };
+        
+        // 영역 설정 취소
+        actions["ActionCancelArea"] = () =>
+        {
+            ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+            if (sm != null) sm.CancelScreenshotArea();
+        };
 
         // 영역 스크린 샷 및 보여주기
         actions["ActionExecuteAreaScreenshot"] = () =>
@@ -202,77 +227,89 @@ public class HotKeyActionManager : MonoBehaviour
             }
         };
 
-        // 영역 OCR 실행
-        actions["ActionExecuteAreaOCR"] = () =>
+        // OCR 실행 (현재 활성 슬롯 옵션 사용)
+        actions["ActionOCR"] = () =>
         {
-            Debug.Log("영역 OCR + 번역 실행");
-
-            // OCROptions 생성 (영역 OCR + 번역)
-            OCROptions options = new OCROptions
+            Debug.Log("OCR 실행 - 현재 활성 슬롯 옵션 사용");            
+            OCROptions options = OCRManager.Instance.GetCurrentOptions();                    
+            // Screenshot 영역이 설정되어 있으면 영역 OCR, 아니면 전체 화면 OCR
+            if (ScreenshotManager.Instance.IsScreenshotAreaSet())
             {
-                useTranslate = true,
-                displayResults = true,
-                displayOrigin = false,
-                useTTS = false,
-                useAutoClick = false,
-                targetLang = "ko",
-                originLang = "ja",
-                isFormality = true,
-                isSentence = true,
-                mergeThreshold = -1
-            };
-            
-            ScreenshotOCRManager.Instance.ExecuteAreaOCR(options);
+                Debug.Log("Screenshot 영역이 설정되어 있음 - 영역 OCR 실행");
+                ScreenshotOCRManager.Instance.ExecuteAreaOCR(options);
+            }
+            else
+            {
+                Debug.Log("Screenshot 영역이 설정되지 않음 - 전체 화면 OCR 실행");
+                ScreenshotOCRManager.Instance.ExecuteFullScreenOCR(options);
+            }
         };
 
-        // 영역 OCR → TTS 실행 (일본어 고정)
-        actions["ActionExecuteAreaOCR_TTS"] = () =>
+        // OCR1 실행 (슬롯 1 옵션 사용)
+        actions["ActionOCR1"] = () =>
         {
-            Debug.Log("영역 OCR → TTS (일본어) 실행");
-
-            // OCROptions 생성 (영역 OCR + TTS 일본어)
-            OCROptions options = new OCROptions
+            Debug.Log("OCR1 실행 - 슬롯 1 옵션 사용");            
+            OCROptions options = OCRManager.Instance.GetOptions(1);                    
+            if (ScreenshotManager.Instance.IsScreenshotAreaSet())
             {
-                useTranslate = false,
-                displayResults = false,
-                displayOrigin = false,
-                useTTS = true,
-                detectActor = true,
-                ttsAutoDetectLang = false,
-                useAutoClick = false,
-                targetLang = "ja",
-                targetLangAutoDetect = false
-            };
-            
-            ScreenshotOCRManager.Instance.ExecuteAreaOCR(options);
+                Debug.Log("Screenshot 영역이 설정되어 있음 - 영역 OCR 실행");
+                ScreenshotOCRManager.Instance.ExecuteAreaOCR(options);
+            }
+            else
+            {
+                Debug.Log("Screenshot 영역이 설정되지 않음 - 전체 화면 OCR 실행");
+                ScreenshotOCRManager.Instance.ExecuteFullScreenOCR(options);
+            }
         };
 
-        // 영역 OCR → TTS 실행 (자동 언어 감지)
-        actions["ActionExecuteAreaOCR_TTS_Auto"] = () =>
+        // OCR2 실행 (슬롯 2 옵션 사용)
+        actions["ActionOCR2"] = () =>
         {
-            Debug.Log("영역 OCR → TTS (자동 언어 감지) 실행");
-
-            // OCROptions 생성 (영역 OCR + TTS 자동 언어 감지)
-            OCROptions options = new OCROptions
+            Debug.Log("OCR2 실행 - 슬롯 2 옵션 사용");            
+            OCROptions options = OCRManager.Instance.GetOptions(2);                    
+            if (ScreenshotManager.Instance.IsScreenshotAreaSet())
             {
-                useTranslate = false,
-                displayResults = false,
-                displayOrigin = false,
-                useTTS = true,
-                detectActor = true,
-                ttsAutoDetectLang = true,
-                useAutoClick = false,
-                targetLang = "",
-                targetLangAutoDetect = true
-            };
-            
-            ScreenshotOCRManager.Instance.ExecuteAreaOCR(options);
+                Debug.Log("Screenshot 영역이 설정되어 있음 - 영역 OCR 실행");
+                ScreenshotOCRManager.Instance.ExecuteAreaOCR(options);
+            }
+            else
+            {
+                Debug.Log("Screenshot 영역이 설정되지 않음 - 전체 화면 OCR 실행");
+                ScreenshotOCRManager.Instance.ExecuteFullScreenOCR(options);
+            }
         };
+
+        // OCR3 실행 (슬롯 3 옵션 사용)
+        actions["ActionOCR3"] = () =>
+        {
+            Debug.Log("OCR3 실행 - 슬롯 3 옵션 사용");            
+            OCROptions options = OCRManager.Instance.GetOptions(3);                    
+            if (ScreenshotManager.Instance.IsScreenshotAreaSet())
+            {
+                Debug.Log("Screenshot 영역이 설정되어 있음 - 영역 OCR 실행");
+                ScreenshotOCRManager.Instance.ExecuteAreaOCR(options);
+            }
+            else
+            {
+                Debug.Log("Screenshot 영역이 설정되지 않음 - 전체 화면 OCR 실행");
+                ScreenshotOCRManager.Instance.ExecuteFullScreenOCR(options);
+            }
+        };
+
 
         // Dev Mode 토글
         actions["ActionDevMode"] = () =>
         {
             DevManager.Instance.ToggleShowSettingDevTab();
+        };
+
+        // Stop Meme (스톱 밈 효과)
+        actions["ActionStopMeme"] = () =>
+        {
+            if (AnimationPlayerManager.Instance != null)
+            {
+                AnimationPlayerManager.Instance.StopAtRandomMoment();
+            }
         };
 
         // 동작 없음

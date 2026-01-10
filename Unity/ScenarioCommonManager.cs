@@ -40,6 +40,18 @@ public class ScenarioCommonManager : MonoBehaviour
                     StartCoroutine(Scenario_C02_2_DeclineStart());
                 }
                 break;
+            case "C92_mic_not_detected":
+                // <응>
+                if (index == 0)
+                {
+                    StartCoroutine(Scenario_C92_1_TryMic());
+                }
+                // <아니>
+                else
+                {
+                    StartCoroutine(Scenario_C92_2_SkipMic());  // 건너뛰기
+                }
+                break;
             case "C98_confirm_return_to_default_proceed_check":
                 // <네>
                 if (index == 0)
@@ -186,6 +198,38 @@ public class ScenarioCommonManager : MonoBehaviour
         yield return new WaitForSeconds(d1);
     }
 
+    // C92 - 마이크 미검지 대응 (타이밍과 방식의 문제 - Tikitaka에만 적용?)
+    public IEnumerator Run_C92_MicNotDetected()
+    {
+        float d1 = ScenarioUtil.Narration("C92_mic_not_detected_1", "마이크가 감지되지 않아요 선생님. 일단 시도는 해볼까요?");
+        ScenarioUtil.ShowEmotion("question");
+        yield return new WaitForSeconds(d1);
+
+        yield return new WaitForSeconds(0.2f);
+        ChoiceManager.Instance.ShowChoice(2, "C92_mic_not_detected");  // <응>, <아니>
+    }
+
+    private IEnumerator Scenario_C92_1_TryMic()
+    {
+        if (Microphone.devices.Length > 0)
+        {
+            float d1 = ScenarioUtil.Narration("C92_mic_not_detected_success_1", "네, 이대로 진행할게요.");
+            ScenarioUtil.ShowEmotion("star");
+            yield return new WaitForSeconds(d1);
+
+            MicrophoneManager.Instance.StartRecording();
+        }
+        else
+        {
+            yield break;
+        }
+    }
+
+    private IEnumerator Scenario_C92_2_SkipMic()
+    {
+        yield break;
+    }
+
     // C98 - 진행 확인(설정 초기화, Return To Default)
     public IEnumerator Run_C98_confirm_return_to_default_proceed()
     {
@@ -248,6 +292,22 @@ public class ScenarioCommonManager : MonoBehaviour
         float d2 = ScenarioUtil.Narration("C99_not_ready_2", "곧 지원할 예정이에요. 기다려주세요 선생님!");
         ScenarioUtil.ShowEmotion("><");
         yield return new WaitForSeconds(d2);
+    }
+
+    // 윈도우 전용 기능 안내
+    public IEnumerator Run_C99_WindowsOnly()
+    {
+        float d1 = ScenarioUtil.Narration("C99_windows_only", "선생님, 이 기능은 Windows에서만 사용할 수 있어요.");
+        ScenarioUtil.ShowEmotion("confused");
+        yield return new WaitForSeconds(d1);
+    }
+
+    // 빈 쿼리 안내
+    public IEnumerator Run_C99_EmptyQuery()
+    {
+        float d1 = ScenarioUtil.Narration("C99_empty_query", "뭔가 말씀하셨나요? 전달된 내용이 없어요 선생님.");
+        ScenarioUtil.ShowEmotion("confused");
+        yield return new WaitForSeconds(d1);
     }
 
 }

@@ -29,9 +29,7 @@ public class SampleServerManager : MonoBehaviour
         // 자동 시작 제거 - InstallStatusManager에서 수동으로 호출
     }
 
-    /// <summary>
-    /// InstallStatusManager에서 호출할 초기화 함수
-    /// </summary>
+    // InstallStatusManager에서 호출할 초기화 함수
     public void InitializeForSample()
     {
         UnityEngine.Debug.Log("[Jarvis_Sample] SettingManager Fixed");

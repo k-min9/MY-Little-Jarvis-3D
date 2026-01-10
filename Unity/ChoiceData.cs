@@ -114,6 +114,13 @@ public static class ChoiceData
             }
         },
         {
+            "C92_mic_not_detected", new List<Dictionary<string, string>>
+            {
+                new Dictionary<string, string> { { "ko", "응" }, { "jp", "うん" }, { "en", "Yes" } },
+                new Dictionary<string, string> { { "ko", "아니" }, { "jp", "いや" }, { "en", "No" } }
+            }
+        },
+        {
             "C98_confirm_return_to_default_proceed_check", new List<Dictionary<string, string>>
             {
                 new Dictionary<string, string> { { "ko", "네" }, { "jp", "はい" }, { "en", "Yes" } },
