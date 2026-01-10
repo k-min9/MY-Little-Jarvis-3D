@@ -24,6 +24,7 @@ public class EmotionBalloonManager : MonoBehaviour
     // X초 표시 같은데에도 사용
     public Sprite emotionSpriteYes;      // 긍정
     public Sprite emotionSpriteNo;       // 부정
+    public Sprite emotionSpriteCheck;    // 확인
     
     public Sprite emotionSpriteLove;     // 쓰다듬기
     public Sprite emotionSpriteRefresh;  // 재답변
@@ -35,9 +36,13 @@ public class EmotionBalloonManager : MonoBehaviour
     public Sprite emotionSpriteQuestion; // 물음표
     public Sprite emotionSpriteListen;   // 듣기
     public Sprite emotionSpriteWrite;    // 작성
+    public Sprite emotionSpriteImage;    // 이미지
 
     // Yes/No 전용 쿨타임 관리
     private Dictionary<GameObject, float> yesNoCooldownMap = new Dictionary<GameObject, float>();
+    
+    // Target별 활성 말풍선 관리 (누수 방지)
+    private Dictionary<GameObject, GameObject> activeBalloonMap = new Dictionary<GameObject, GameObject>();
 
     public void Start()
     {
@@ -87,16 +92,77 @@ public class EmotionBalloonManager : MonoBehaviour
         return emotionBalloonInstance;
     }
 
-    public GameObject ShowYesEmotionBalloonForSec(GameObject target, float duration = 3f, float cooltime = 5f)
+    public GameObject ShowEmotionBalloonForSec(GameObject target, string spriteName, float duration = 3f, float cooltime = 5f)
     {
         if (!CheckAndSetCooldown(target, cooltime)) return null;
-        return ShowEmotionBalloon(target, "Yes", duration);
+        return ShowEmotionBalloon(target, spriteName, duration);
     }
 
-    public GameObject ShowNoEmotionBalloonForSec(GameObject target, float duration = 3f, float cooltime = 5f)
+    // Target별로 하나의 말풍선만 유지 (덮어쓰기 방식)
+    public GameObject SetEmotionBalloonForTarget(GameObject target, string spriteName = "Love", float duration = 60f)
     {
-        if (!CheckAndSetCooldown(target, cooltime)) return null;
-        return ShowEmotionBalloon(target, "No", duration);
+        if (target == null)
+        {
+            Debug.LogWarning("[EmotionBalloon] target이 null입니다.");
+            return null;
+        }
+
+        // 기존 말풍선이 있으면 제거
+        if (activeBalloonMap.TryGetValue(target, out GameObject existingBalloon))
+        {
+            if (existingBalloon != null)
+            {
+                Destroy(existingBalloon);
+            }
+            activeBalloonMap.Remove(target);
+        }
+
+        // 새 말풍선 생성
+        GameObject newBalloon = ShowEmotionBalloon(target, spriteName, duration);
+        
+        if (newBalloon != null)
+        {
+            // Dictionary에 등록
+            activeBalloonMap[target] = newBalloon;
+            
+            // Controller에 target 참조 전달
+            EmotionBalloonController controller = newBalloon.GetComponent<EmotionBalloonController>();
+            if (controller != null)
+            {
+                controller.SetTarget(target);
+            }
+        }
+
+        return newBalloon;
+    }
+
+    // Target의 말풍선 제거 (SetEmotionBalloonForTarget의 remove 버전)
+    public void RemoveEmotionBalloonForTarget(GameObject target)
+    {
+        if (target == null)
+        {
+            Debug.LogWarning("[EmotionBalloon] target이 null입니다.");
+            return;
+        }
+
+        // 활성 말풍선이 있으면 제거
+        if (activeBalloonMap.TryGetValue(target, out GameObject existingBalloon))
+        {
+            if (existingBalloon != null)
+            {
+                Destroy(existingBalloon);
+            }
+            activeBalloonMap.Remove(target); // Dictionary에서 제거
+        }
+    }
+
+    // Controller의 OnDestroy에서 호출되어 Dictionary 정리
+    public void RemoveBalloonFromMap(GameObject target)
+    {
+        if (target != null && activeBalloonMap.ContainsKey(target))
+        {
+            activeBalloonMap.Remove(target);
+        }
     }
 
     private bool CheckAndSetCooldown(GameObject target, float cooltime)
@@ -133,8 +199,10 @@ public class EmotionBalloonManager : MonoBehaviour
             case "Question": return emotionSpriteQuestion;
             case "Yes": return emotionSpriteYes;
             case "No": return emotionSpriteNo;
+            case "Check": return emotionSpriteCheck;
             case "Listen": return emotionSpriteListen;
             case "Write": return emotionSpriteWrite;
+            case "Image": return emotionSpriteImage;
             default: return null;
         }
     }

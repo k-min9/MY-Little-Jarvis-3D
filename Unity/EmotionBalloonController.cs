@@ -6,6 +6,9 @@ public class EmotionBalloonController : MonoBehaviour
     private RectTransform balloonRect;
     private CapsuleCollider targetCollider;
     private float destroyTime;
+    
+    // Target별 말풍선 관리를 위한 참조
+    private GameObject targetObject;
 
     public void Initialize(GameObject target, float duration)
     {
@@ -28,6 +31,12 @@ public class EmotionBalloonController : MonoBehaviour
         destroyTime = Time.time + duration;
 
         UpdateBalloonPosition(); // 초기 위치 설정
+    }
+
+    // Target 참조 설정 (SetEmotionBalloonForTarget에서 호출)
+    public void SetTarget(GameObject target)
+    {
+        targetObject = target;
     }
 
     private void Update()
@@ -59,5 +68,14 @@ public class EmotionBalloonController : MonoBehaviour
     {
         Bounds bounds = targetCollider.bounds;
         return new Vector3(bounds.center.x, bounds.max.y, bounds.center.z);
+    }
+
+    // 말풍선 파괴 시 자동으로 Dictionary에서 제거
+    private void OnDestroy()
+    {
+        if (targetObject != null && EmotionBalloonManager.Instance != null)
+        {
+            EmotionBalloonManager.Instance.RemoveBalloonFromMap(targetObject);
+        }
     }
 }

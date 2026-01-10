@@ -196,7 +196,7 @@ public class ScreenshotOCRManager : MonoBehaviour
 
         // OCR 작업 시작 시 "Search" 말풍선 표시 (30초)
         GameObject currentChar = CharManager.Instance.GetCurrentCharacter();
-        GameObject searchBalloon = EmotionBalloonManager.Instance.SetEmotionBalloonForTarget(currentChar, "Search", 30f);
+        EmotionBalloonManager.Instance.SetEmotionBalloonForTarget(currentChar, "Search", 30f);
 
         bool apiCallCompleted = false;
         OCRResult result = null;
@@ -228,11 +228,8 @@ public class ScreenshotOCRManager : MonoBehaviour
         }
 
         // API 호출 완료 시 말풍선 제거
-        if (searchBalloon != null)
-        {
-            Destroy(searchBalloon);
-            Debug.Log("[ScreenshotOCR_new] Search balloon destroyed (API completed)");
-        }
+        EmotionBalloonManager.Instance.RemoveEmotionBalloonForTarget(currentChar);
+        Debug.Log("[ScreenshotOCR_new] Search balloon removed (API completed)");
 
         if (result == null)
         {
