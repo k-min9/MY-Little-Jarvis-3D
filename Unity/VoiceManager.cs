@@ -81,6 +81,23 @@ public class VoiceManager : MonoBehaviour
         }
 
     }
+    
+    public void PlayWavAudioFromPath(string audioPath)
+    {
+        // audioPath = "Sound/arona/Arona_Attendance_Enter_1.ogg";
+        try
+        {
+            // string fullPath = "file://" + Application.dataPath + audioPath;  // Assets 패키지화 할 경우 사용
+            // string fullPath = "file://" + Application.streamingAssetsPath  + audioPath;  // Assets>StreamingAssets 활용시 사용
+            string fullPath = Path.Combine(Application.streamingAssetsPath, audioPath);
+            StartCoroutine(LoadAudioWav(fullPath));
+        }
+        catch
+        {
+
+        }
+
+    }
 
     public void PlayWavFromPersistentPath()
     {
@@ -91,6 +108,7 @@ public class VoiceManager : MonoBehaviour
     // 오디오 파일을 로드하는 코루틴
     private IEnumerator LoadAudioOGG(string audioPath)
     {
+        // Debug.Log("audioPath: " + audioPath);
         using (UnityWebRequest uwr = UnityWebRequestMultimedia.GetAudioClip(audioPath, AudioType.OGGVORBIS))
         {
             yield return uwr.SendWebRequest(); // 요청 전송
@@ -105,9 +123,12 @@ public class VoiceManager : MonoBehaviour
                 AudioClip clip = DownloadHandlerAudioClip.GetContent(uwr); // 오디오 클립 가져오기
                 audioSource.clip = clip;
                 audioSource.volume = 1f; // 100%
-                try {
-                    audioSource.volume = SettingManager.Instance.settings.sound_volumeMaster/100;
-                } catch {
+                try
+                {
+                    audioSource.volume = SettingManager.Instance.settings.sound_volumeMaster / 100;
+                }
+                catch
+                {
                     Debug.Log("ogg volume change error");
                 }
                 audioSource.Play(); // 오디오 재생
@@ -131,12 +152,18 @@ public class VoiceManager : MonoBehaviour
                 AudioClip clip = DownloadHandlerAudioClip.GetContent(uwr); // 오디오 클립 가져오기
                 audioSource.clip = clip;
                 audioSource.volume = 1f; // 100%
-                try {
-                    audioSource.volume = SettingManager.Instance.settings.sound_volumeMaster/100;
-                } catch {
+                try
+                {
+                    audioSource.volume = SettingManager.Instance.settings.sound_volumeMaster / 100;
+                }
+                catch
+                {
                     Debug.Log("wav volume change error");
                 }
                 audioSource.Play(); // 오디오 재생
+
+                // 입 움직이기 시작
+                isQueuePlaying = true;
             }
         }
     }
