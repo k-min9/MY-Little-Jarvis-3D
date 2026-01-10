@@ -35,7 +35,7 @@ public class AnswerBalloonManager : MonoBehaviour
 
     [SerializeField] private GameObject webImage;  // 답변에 web검색 활용했는지 여부를 보여주는 이미지
 
-    private float hideTimer = 0f; // 타이머 변수 추가
+    public float hideTimer = 0f; // 타이머 변수 추가
 
     private string textKo = "";
     private string textJp = "";

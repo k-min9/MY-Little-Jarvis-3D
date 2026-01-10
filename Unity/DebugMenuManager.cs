@@ -27,17 +27,6 @@ public class DebugMenuManager : MonoBehaviour
 
     private void Awake()
     {
-        // 싱글톤 패턴 구현
-        if (instance == null)
-        {
-            instance = this;
-        }
-        else
-        {
-            // Destroy(gameObject);
-            return;
-        }
-
 // #if UNITY_EDITOR
 //         isShowing = true;
 // #endif

@@ -19,30 +19,6 @@ public class DebugBalloonManager : MonoBehaviour
 
     // 싱글톤 인스턴스
     private static DebugBalloonManager instance;
-
-    private void Awake()
-    {
-        // 싱글톤 패턴 구현
-        if (instance == null)
-        {
-            instance = this;
-            DontDestroyOnLoad(gameObject); // 씬 전환 시에도 유지
-        }
-        else
-        {
-            // Destroy(gameObject);
-            return;
-        }
-
-        debugBalloonText.text = string.Empty; // 텍스트 초기화
-
-        // 윈도우 비활성화?
-        #if UNITY_STANDALONE_WIN && !UNITY_EDITOR
-        HideDebugBalloon(); // 시작 시 DebugBalloon 숨기기
-        #endif
-    }
-
-    // 싱글톤 인스턴스에 접근하는 속성
     public static DebugBalloonManager Instance
     {
         get
@@ -54,6 +30,18 @@ public class DebugBalloonManager : MonoBehaviour
             return instance;
         }
     }
+    
+    private void Awake()
+    {
+        debugBalloonText.text = string.Empty; // 텍스트 초기화
+
+        // 윈도우 비활성화?
+        #if UNITY_STANDALONE_WIN && !UNITY_EDITOR
+        HideDebugBalloon(); // 시작 시 DebugBalloon 숨기기
+        #endif
+    }
+
+
 
     // hide, show 전환
     public void ToggleDebugBalloon()

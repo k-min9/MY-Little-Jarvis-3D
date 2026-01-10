@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -42,18 +43,6 @@ public class CharManager : MonoBehaviour
 
         // InitCharacter 호출해서 첫 번째 캐릭터를 생성
         InitCharacter();
-
-        // 싱글톤 설정
-        if (instance == null)
-        {
-            instance = this;
-            DontDestroyOnLoad(gameObject); // 씬이 바뀌어도 파괴되지 않도록 설정
-        }
-        else
-        {
-            // Destroy(gameObject);
-            // return;
-        }
     }
 
     void Start()
@@ -199,6 +188,7 @@ public class CharManager : MonoBehaviour
         setTalkMenuVar(currentCharacter);
         setStatusManagerVar(currentCharacter);
         setEmotionFaceController(currentCharacter);
+        AnimationPlayerManager.Instance.RegisterPlayer(currentCharacter);
 
         RectTransform rectTransform = currentCharacter.GetComponent<RectTransform>();
         if (rectTransform != null)
@@ -223,6 +213,8 @@ public class CharManager : MonoBehaviour
 
         string nickname = GetNickname(currentCharacter);
         Debug.Log(string.IsNullOrEmpty(nickname) ? "Initialized character has no nickname." : $"Initialized character: {nickname}");
+
+
     }
 
 
@@ -249,7 +241,7 @@ public class CharManager : MonoBehaviour
 
 
     // 캐릭터 교체 함수 (해당 인덱스의 캐릭터로 변경)
-    public void ChangeCharacter(int index)
+    public async void ChangeCharacter(int index)
     {
         // 인덱스 유효성 체크
         if (index < 0 || index >= charList.Count)
@@ -258,15 +250,16 @@ public class CharManager : MonoBehaviour
             return;
         }
 
-        // 아로나, 프라나 외의 캐릭터는 Lite 이상부터 가능
-        if (index > 2)
-        {
-            bool chk = InstallStatusManager.Instance.CheckAndOperateFull();
-            if (!chk)
-            {
-                return;
-            }
-        }
+        // 임시 해제
+        // // 아로나, 프라나 외의 캐릭터는 Lite 이상부터 가능
+        // if (index > 2)
+        // {
+        //     bool chk = await InstallStatusManager.Instance.CheckAndOperateFullAsync();
+        //     if (!chk)
+        //     {
+        //         return;
+        //     }
+        // }
 
         // 캐릭터 복장 기억 설정이 켜져 있으면 char_code 기반으로 idx 교체 시도
         if (SettingManager.Instance.settings.isRememberCharOutfits)
@@ -297,6 +290,12 @@ public class CharManager : MonoBehaviour
         // 기존의 answerballoon이 있을경우 Hide
         if (AnswerBalloonManager.Instance.isAnswered) AnswerBalloonManager.Instance.HideAnswerBalloon();
         AnswerBalloonSimpleManager.Instance.HideAnswerBalloonSimple();
+
+        // AnimationPlayerManager에서 기존 캐릭터 해제
+        if (AnimationPlayerManager.Instance != null && currentCharacter != null)
+        {
+            AnimationPlayerManager.Instance.UnregisterPlayer(currentCharacter);
+        }
 
         // 기존 캐릭터 제거 전 RectTransform 위치 저장
         Vector3 previousPosition = new Vector3(0, 0, -70); // 기본 위치는 (0, 0, -70)
@@ -334,6 +333,7 @@ public class CharManager : MonoBehaviour
         setTalkMenuVar(currentCharacter);
         setStatusManagerVar(currentCharacter);
         setEmotionFaceController(currentCharacter);
+        AnimationPlayerManager.Instance.RegisterPlayer(currentCharacter);
 
         // RectTransform 위치를 (0, 0, -70)으로 설정 (또는 이전 위치로 유지)
         RectTransform newRectTransform = currentCharacter.GetComponent<RectTransform>();

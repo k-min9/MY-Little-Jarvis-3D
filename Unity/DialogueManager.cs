@@ -42,20 +42,6 @@ public class DialogueManager : MonoBehaviour
 
     private string jsonFilePath;
 
-    private void Awake()
-    {
-        // 싱글톤 인스턴스 설정
-        if (instance == null)
-        {
-            instance = this;
-            DontDestroyOnLoad(gameObject); // 씬 전환 시에도 오브젝트 유지
-        }
-        else
-        {
-            // Destroy(gameObject); // 이미 인스턴스가 존재하면 파괴
-        }
-    }
-
     private void Start()
     {
         LoadDialoguesFromJSON();  // 현재 캐릭터의 JSON 파일 읽기 (CharManager 이후에 실행되어야 함. 안그러면 꼬임)
