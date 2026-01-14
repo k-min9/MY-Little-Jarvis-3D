@@ -84,6 +84,13 @@ public class AnswerBalloonManager : MonoBehaviour
     // AnswerBalloon을 타이머 무제한으로 보이기
     public void ShowAnswerBalloonInf()
     {
+        // Operator 모드일 경우 PortraitBalloonSimpleManager로 라우팅
+        if (ChatModeManager.Instance.IsOperatorMode())
+        {
+            PortraitBalloonSimpleManager.Instance.ShowInf();
+            return;
+        }
+
         hideTimer = 99999f;
         answerBalloon.SetActive(true);
         answerText.text = string.Empty; // 텍스트 초기화
@@ -108,6 +115,13 @@ public class AnswerBalloonManager : MonoBehaviour
     // AnswerBalloon을 보이고 텍스트를 초기화하는 함수
     public void ShowAnswerBalloon()
     {
+        // Operator 모드일 경우 PortraitBalloonSimpleManager로 라우팅
+        if (ChatModeManager.Instance.IsOperatorMode())
+        {
+            PortraitBalloonSimpleManager.Instance.Show();
+            return;
+        }
+
         answerBalloon.SetActive(true);
         answerText.text = string.Empty; // 텍스트 초기화
         StatusManager.Instance.IsAnswering = true; // StatusManager 상태 업데이트
@@ -117,18 +131,25 @@ public class AnswerBalloonManager : MonoBehaviour
     // AnswerBalloon의 텍스트를 수정
     public void ModifyAnswerBalloonText()
     {
+        // 표시할 텍스트 선택
+        string displayText = textEn;
         if (answerLanguage == "ko")
         {
-            answerText.text = textKo; // 텍스트 변경
+            displayText = textKo;
         }
         else if (answerLanguage == "jp")
         {
-            answerText.text = textJp; // 텍스트 변경
+            displayText = textJp;
         }
-        else
+
+        // Operator 모드일 경우 PortraitBalloonSimpleManager로 라우팅
+        if (ChatModeManager.Instance.IsOperatorMode())
         {
-            answerText.text = textEn; // 텍스트 변경
+            PortraitBalloonSimpleManager.Instance.ModifyText(displayText);
+            return;
         }
+
+        answerText.text = displayText;
 
         // 높이 조정
         float textHeight = answerBalloonText.preferredHeight;
@@ -202,6 +223,13 @@ public class AnswerBalloonManager : MonoBehaviour
     // 현재(마지막) 오디오 재생 후 AnswerBalloon을 숨기는 코루틴 호출
     public void HideAnswerBalloonAfterAudio()
     {
+        // Operator 모드일 경우 PortraitBalloonSimpleManager로 라우팅
+        if (ChatModeManager.Instance.IsOperatorMode())
+        {
+            PortraitBalloonSimpleManager.Instance.HideAfterAudio();
+            return;
+        }
+
         AudioClip clip = VoiceManager.Instance.GetAudioClip();
 
         if (clip != null)
@@ -213,6 +241,14 @@ public class AnswerBalloonManager : MonoBehaviour
     // AnswerBalloon을 숨기는 함수
     public void HideAnswerBalloon()
     {
+        // Operator 모드일 경우 PortraitBalloonSimpleManager로 라우팅
+        if (ChatModeManager.Instance.IsOperatorMode())
+        {
+            PortraitBalloonSimpleManager.Instance.Hide();
+            StatusManager.Instance.IsAnswering = false;
+            return;
+        }
+
         hideTimer = 0f;  // inf용 초기화
         answerBalloon.SetActive(false);
         StatusManager.Instance.IsAnswering = false;

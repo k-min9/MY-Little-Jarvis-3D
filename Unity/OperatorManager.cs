@@ -73,6 +73,9 @@ public class OperatorManager : MonoBehaviour
         if (!StatusManager.Instance.IsAnsweringPortrait) return;
         StatusManager.Instance.IsAnsweringPortrait = false;
 
+        // 말풍선도 함께 숨김
+        PortraitBalloonSimpleManager.Instance.Hide();
+
         Vector2 currentPos = portraitTransform.anchoredPosition;
         float width = portraitTransform.sizeDelta.x;
         Vector2 targetPos = new Vector2(currentPos.x - width * 0.5f, currentPos.y);
@@ -80,12 +83,6 @@ public class OperatorManager : MonoBehaviour
         Sequence seq = DOTween.Sequence();
         seq.Append(portraitTransform.DOScaleX(0f, 0.4f).SetEase(Ease.InCubic));
         seq.Join(portraitTransform.DOAnchorPos(targetPos, 0.4f).SetEase(Ease.InCubic));
-
-        // 일단은 자체적으로 update중
-        // seq.OnComplete(() =>
-        // {
-        //     PortraitBalloonSimpleManager.Instance.Hide();
-        // });
     }
 
     // 현재 캐릭터의 public Getter 추가
@@ -99,8 +96,8 @@ public class OperatorManager : MonoBehaviour
         float currentTime = Time.time;
         float newHideTime = currentTime + delay;
 
-        // 기존 예약된 타이머가 없거나, 새 타이밍이 더 빠를 경우만 교체
-        if (hideCoroutine == null || newHideTime < hideScheduleTime)
+        // 기존 예약된 타이머가 없거나, 새 타이밍이 더 길 경우 교체 (중복 호출 시 마지막 타이머 적용)
+        if (hideCoroutine == null || newHideTime > hideScheduleTime)
         {
             if (hideCoroutine != null)
             {
