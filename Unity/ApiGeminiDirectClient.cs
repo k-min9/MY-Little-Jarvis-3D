@@ -85,29 +85,49 @@ public class ApiGeminiDirectClient : MonoBehaviour
         Action onComplete
     )
     {
-        try
+        const int maxRetries = 2;
+        int retryCount = 0;
+        
+        while (retryCount <= maxRetries)
         {
-            // API 키 로드 (검증된 키 사용)
-            apiKey = await ApiKei.GetValidatedGeminiKey();
+            try
+            {
+                // API 키 로드 (검증된 키 사용)
+                apiKey = await ApiKei.GetValidatedGeminiKey();
 
-            // 프롬프트 생성
-            string prompt = ApiGeminiPromptBuilder.BuildGemmaPrompt(
-                query, playerName, charName, memoryList,
-                aiLanguage, guidelineList, situationDict
-            );
+                // 프롬프트 생성
+                string prompt = ApiGeminiPromptBuilder.BuildGemmaPrompt(
+                    query, playerName, charName, memoryList,
+                    aiLanguage, guidelineList, situationDict
+                );
 
-            Debug.Log($"[GeminiDirect] Prompt length: {prompt.Length}");
+                Debug.Log($"[GeminiDirect] Prompt length: {prompt.Length}" + (retryCount > 0 ? $" (retry {retryCount})" : ""));
 
-            // Gemini API 호출
-            await StreamGeminiAPI(prompt, aiLanguage, chatIdx, playerName, onChunkReceived);
+                // Gemini API 호출
+                await StreamGeminiAPI(prompt, aiLanguage, chatIdx, playerName, onChunkReceived);
 
-            // 완료 콜백
-            onComplete?.Invoke();
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"[GeminiDirect] Error: {ex.Message}");
-            onComplete?.Invoke();
+                // 완료 콜백
+                onComplete?.Invoke();
+                return;  // 성공 시 종료
+            }
+            catch (Exception ex)
+            {
+                retryCount++;
+                Debug.LogError($"[GeminiDirect] Error (attempt {retryCount}/{maxRetries + 1}): {ex.Message}");
+                
+                if (retryCount <= maxRetries)
+                {
+                    // 재시도 전 대기 (0.5초 고정)
+                    Debug.Log($"[GeminiDirect] Retrying in 500ms with different key...");
+                    await Task.Delay(500);
+                }
+                else
+                {
+                    // 최종 실패:  onComplete 호출하지 않음, 에러 말풍선 표시
+                    Debug.LogError($"[GeminiDirect] All retries failed. Showing error balloon.");
+                    EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), "No", 2f);
+                }
+            }
         }
     }
 
@@ -232,6 +252,19 @@ public class ApiGeminiDirectClient : MonoBehaviour
                                 {
                                     sentence = Regex.Replace(sentence, @"(<USER>|<user>|{{user}})", "You");
                                 }
+                                
+                                // Stop strings 잔여물 제거
+                                sentence = sentence
+                                    .Replace("<end_of_turn>", "")
+                                    .Replace("</end_of_turn>", "")
+                                    .Replace("<|im_end|>", "")
+                                    .Replace("<|eot_id|>", "")
+                                    .Replace("<start_of_turn>user", "")
+                                    .Replace("<|im_start|>", "")
+                                    .Trim();
+                                
+                                if (string.IsNullOrEmpty(sentence))
+                                    continue;
 
                                 // JObject 생성 (기존 서버 형식과 호환)
                                 JObject responseJson = CreateResponseJson(sentence, language, chatIdx);
@@ -376,7 +409,7 @@ public class ApiGeminiDirectClient : MonoBehaviour
         return (reply, stopFound);
     }
 
-    // 문장 분리 (Python util_string.get_punctuation_sentences 포팅 - 2024 최신 버전)
+    // 문장 분리 (Python util_string.get_punctuation_sentences 포팅 - preserveNewline 최신 버전)
     private List<string> GetPunctuationSentences(string inputStrings, bool isPreserveNewline = true)
     {
         if (string.IsNullOrEmpty(inputStrings))
