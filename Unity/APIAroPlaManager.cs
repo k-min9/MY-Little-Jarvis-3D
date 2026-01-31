@@ -213,6 +213,9 @@ public class APIAroPlaManager : MonoBehaviour
         isAroplaMode = false;
         LogToFile("Aropla Channel Mode Stopped");
         
+        // 발화 중인 캐릭터 초기화
+        StatusManager.Instance.ClearSpeakingCharacters();
+        
         // 프라나 인스턴스 제거
         HideAroplaChannelUI();
         
@@ -307,34 +310,61 @@ public class APIAroPlaManager : MonoBehaviour
                 { "intent_smalltalk", intentSmalltalk }
             };
 
-            // API 호출
-            var response = await CallAroplaAPI(requestData);
-            
-            if (response != null)
+            // 순수 Gemini 모드 / 서버 모드 분기
+            if (false)  // TODO: 설정으로 변경 (true = 순수 Gemini, false = 레거시 서버)
             {
-                // 응답 처리 (사용자 메시지 정보와 함께)
-                ProcessAroplaResponse(response, message, currentSpeaker);
+                // 순수 Gemini API 직접 호출
+                await ProcessWithGeminiDirect(requestData, message, currentSpeaker);
+            }
+            else
+            {
+                // 서버 호출 방식
                 
-                // 다음 발화자가 AI 캐릭터인 경우 연속 처리
-                if (response.next_speaker != "sensei")
+                // targetSpeaker에 맞는 캐릭터 위에 생각 말풍선 표시
+                string targetSpeakerForBalloon = requestData.GetValueOrDefault("target_speaker", "arona");
+                if (string.IsNullOrEmpty(targetSpeakerForBalloon)) targetSpeakerForBalloon = "arona";
+                
+                GameObject targetCharForBalloon = targetSpeakerForBalloon == "plana" ? planaInstance : CharManager.Instance.GetCurrentCharacter();
+                GameObject thinkingBalloon = EmotionBalloonManager.Instance.ShowEmotionBalloon(targetCharForBalloon, "Time");
+                
+                var response = await CallAroplaAPI(requestData);
+                
+                // 생각 말풍선 제거
+                if (thinkingBalloon != null)
                 {
-                    AroplaLog("=== Continuing Conversation ===");
-                    AroplaLog($"Next AI Speaker: {response.next_speaker}");
-                    AroplaLog("Will continue automatically in 1 second...");
-                    AroplaLog("================================");
+                    Destroy(thinkingBalloon);
+                    thinkingBalloon = null;
+                }
+                
+                if (response != null)
+                {
+                    ProcessAroplaResponse(response, message, currentSpeaker);
                     
-                    // 연속 대화를 위해 isProcessing을 먼저 해제
-                    isProcessing = false;
-                    await ContinueAroplaConversation(response.speaker, response.next_speaker);
-                    return; // finally 블록에서 중복 해제 방지
+                    if (response.next_speaker != "sensei")
+                    {
+                        AroplaLog("=== Continuing Conversation ===");
+                        AroplaLog($"Next AI Speaker: {response.next_speaker}");
+                        AroplaLog("Will continue automatically in 1 second...");
+                        AroplaLog("================================");
+                        
+                        isProcessing = false;
+                        await ContinueAroplaConversation(response.speaker, response.next_speaker);
+                        return;
+                    }
+                    else
+                    {
+                        AroplaLog("=== Waiting for User Input ===");
+                        AroplaLog("Next speaker is sensei - conversation paused");
+                        AroplaLog("================================");
+                    }
                 }
                 else
                 {
-                    AroplaLog("=== Waiting for User Input ===");
-                    AroplaLog("Next speaker is sensei - conversation paused");
-                    AroplaLog("================================");
-                    
-                    // 사용자 입력 대기
+                    // API 실패 시 에러 말풍선 표시
+                    if (targetCharForBalloon != null)
+                    {
+                        EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(targetCharForBalloon, "No", 2f);
+                    }
                 }
             }
         }
@@ -349,6 +379,201 @@ public class APIAroPlaManager : MonoBehaviour
         }
     }
 
+    // [NEW] 순수 Gemini API 직접 호출 방식
+    private async Task ProcessWithGeminiDirect(Dictionary<string, string> requestData, string message, string currentSpeaker)
+    {
+        AroplaLog("=== Gemini Direct Mode ===");
+        string lang = requestData.GetValueOrDefault("ai_language", "ko");
+        string targetSpeaker = requestData.GetValueOrDefault("target_speaker", "");
+
+        // 메모리 JSON 파싱
+        string memoryJson = requestData.GetValueOrDefault("memory", "[]");
+        var memoryList = ParseMemoryJsonToList(memoryJson);
+
+        // 1. target_speaker 결정 (누구에게 말하는지)
+        if (string.IsNullOrEmpty(targetSpeaker) && currentSpeaker == "sensei")
+        {
+            var (analyzedTarget, reason) = await ApiGeminiMultiClient.Instance.AnalyzeTargetSpeaker(
+                message, currentSpeaker, lang, memoryList);
+            targetSpeaker = analyzedTarget;
+            AroplaLog($"[Gemini] Target Speaker: {targetSpeaker} ({reason})");
+        }
+
+        // target_speaker 기본값
+        if (string.IsNullOrEmpty(targetSpeaker))
+        {
+            targetSpeaker = "arona";
+        }
+
+        // 2. target_listener 결정 (누구에게 응답하는지)
+        var (targetListener, listenerReason) = ApiGeminiMultiClient.Instance.DetermineTargetListenerFromContext(
+            currentSpeaker, targetSpeaker, message, memoryList, lang);
+        AroplaLog($"[Gemini] Target Listener: {targetListener} ({listenerReason})");
+
+        // 생각중 말풍선 표시 (targetSpeaker에 해당하는 캐릭터 위에)
+        GameObject targetCharForBalloon = targetSpeaker == "plana" 
+            ? planaInstance 
+            : CharManager.Instance.GetCurrentCharacter();
+        GameObject thinkingBalloon = null;
+        if (targetCharForBalloon != null)
+        {
+            thinkingBalloon = EmotionBalloonManager.Instance.ShowEmotionBalloon(targetCharForBalloon, "Time");
+        }
+
+        // 스트리밍 응답 처리용 초기화
+        replyListKo.Clear();
+        replyListJp.Clear();
+        replyListEn.Clear();
+        string accumulatedReply = "";
+
+        // 3. Gemini 스트리밍 호출 - MultiConversationRequest 객체로 전달
+        var geminiRequest = new ApiGeminiMulti.MultiConversationRequest
+        {
+            query = message,
+            currentSpeaker = currentSpeaker,
+            targetSpeaker = targetSpeaker,
+            targetListener = targetListener,
+            aiLanguage = lang,
+            chatIdx = requestData.GetValueOrDefault("chat_idx", "-1"),
+            playerName = requestData.GetValueOrDefault("player_name", "sensei"),
+            participants = new List<ApiGeminiMulti.MultiParticipant>(),
+            memoryList = memoryList,
+            guidelineList = new List<string>(),
+            situationDict = new Dictionary<string, object>()
+        };
+
+        await ApiGeminiMultiClient.Instance.CallGeminiMultiStreamDirect(
+            geminiRequest,
+            // onChunkReceived 콜백 - 문장 단위 스트리밍 (sentence, speaker, sentenceIndex)
+            (sentence, speaker, sentenceIndex) =>
+            {
+                // 첫 응답 시 생각 말풍선 제거
+                if (sentenceIndex == 0 && thinkingBalloon != null)
+                {
+                    Destroy(thinkingBalloon);
+                    thinkingBalloon = null;
+                }
+                
+                accumulatedReply += sentence;
+                AroplaLog($"[Gemini] Sentence[{sentenceIndex}]: {sentence}");
+                
+                // 실시간 표시 (누적된 전체 텍스트)
+                DisplayMessage(targetSpeaker, accumulatedReply);
+                
+                // 답변 리스트에 추가 (TODO: 번역 API 연동 시 분리)
+                if (!string.IsNullOrEmpty(sentence))
+                {
+                    replyListKo.Add(sentence);
+                    replyListJp.Add(sentence);
+                    replyListEn.Add(sentence);
+                }
+            },
+            // onComplete 콜백 - 완료
+            (result) =>
+            {
+                string fullText = result.sentences != null ? string.Join(" ", result.sentences) : "";
+                AroplaLog($"[Gemini] Complete: {fullText}");
+            },
+            // onError 콜백
+            (error) =>
+            {
+                AroplaLogError($"[Gemini] Error: {error}");
+                
+                // 생각 말풍선 제거 후 에러 말풍선 표시
+                if (thinkingBalloon != null)
+                {
+                    Destroy(thinkingBalloon);
+                    thinkingBalloon = null;
+                }
+                if (targetCharForBalloon != null)
+                {
+                    EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(targetCharForBalloon, "No", 2f);
+                }
+            }
+        );
+
+        // 4. 사용자 메시지 저장 (새로운 입력인 경우)
+        if (!string.IsNullOrEmpty(message) && currentSpeaker == "sensei")
+        {
+            SaveAroplaConversationMemory("sensei", "user", message, message, message, message);
+        }
+
+        // 5. 캐릭터 응답 저장
+        string replyKo = string.Join(" ", replyListKo);
+        string replyJp = string.Join(" ", replyListJp);
+        string replyEn = string.Join(" ", replyListEn);
+        
+        if (!string.IsNullOrEmpty(accumulatedReply))
+        {
+            SaveAroplaConversationMemory(targetSpeaker, "assistant", accumulatedReply, replyKo, replyJp, replyEn);
+        }
+
+        // 6. 다음 발화자 결정
+        var updatedMemories = MemoryManager.Instance.GetAllConversationMemory(filename: GetFileName());
+        string updatedMemoryJson = JsonConvert.SerializeObject(updatedMemories);
+        var updatedMemoryList = ParseMemoryJsonToList(updatedMemoryJson);
+
+        var (nextSpeaker, nextReason) = await ApiGeminiMultiClient.Instance.DecideNextSpeaker(
+            updatedMemoryList, message, accumulatedReply,
+            targetSpeaker, currentSpeaker, lang);
+        AroplaLog($"[Gemini] Next Speaker: {nextSpeaker} ({nextReason})");
+
+        // 다음 발화자 표시
+        ShowNextSpeakerBalloon(targetSpeaker, nextSpeaker);
+
+        // 7. 다음 발화자가 AI인 경우 연속 처리
+        if (nextSpeaker != "sensei")
+        {
+            AroplaLog("=== Continuing Conversation ===");
+            AroplaLog($"Next AI Speaker: {nextSpeaker}");
+            AroplaLog("Will continue automatically in 1 second...");
+            AroplaLog("================================");
+            
+            isProcessing = false;
+            await ContinueAroplaConversation(targetSpeaker, nextSpeaker);
+        }
+        else
+        {
+            AroplaLog("=== Waiting for User Input ===");
+            AroplaLog("Next speaker is sensei - conversation paused");
+            AroplaLog("================================");
+        }
+    }
+
+    // 메모리 JSON을 Flow Director용 List로 파싱
+    private List<Dictionary<string, string>> ParseMemoryJsonToList(string memoryJson)
+    {
+        var result = new List<Dictionary<string, string>>();
+        
+        if (string.IsNullOrEmpty(memoryJson))
+            return result;
+        
+        try
+        {
+            var jsonArray = JArray.Parse(memoryJson);
+            foreach (var item in jsonArray)
+            {
+                var dict = new Dictionary<string, string>
+                {
+                    { "speaker", item["speaker"]?.ToString() ?? "" },
+                    { "role", item["role"]?.ToString() ?? "" },
+                    { "message", item["message"]?.ToString() ?? "" },
+                    { "messageKo", item["messageKo"]?.ToString() ?? item["message_ko"]?.ToString() ?? "" },
+                    { "messageJp", item["messageJp"]?.ToString() ?? item["message_jp"]?.ToString() ?? "" },
+                    { "messageEn", item["messageEn"]?.ToString() ?? item["message_en"]?.ToString() ?? "" },
+                    { "character_name", item["character_name"]?.ToString() ?? item["speaker"]?.ToString() ?? "" }
+                };
+                result.Add(dict);
+            }
+        }
+        catch (Exception ex)
+        {
+            AroplaLogWarning($"Memory JSON parsing error: {ex.Message}");
+        }
+        
+        return result;
+    }
+
     // 연속 대화 처리 (AI끼리 대화)
     private async Task ContinueAroplaConversation(string currentSpeaker, string targetSpeaker)
     {
@@ -356,7 +581,7 @@ public class APIAroPlaManager : MonoBehaviour
         AroplaLog($"Current isProcessing state: {isProcessing}");
         AroplaLog("Waiting 1 second for natural flow...");
         
-        await Task.Delay(1000); // 1초 대기 (자연스러운 흐름을 위해)
+        // await Task.Delay(1000); // 1초 대기 : 바빠죽겠는데 왜 대기한거지. 문제 없으면 제거. 260129
         
         if (targetSpeaker != "sensei")
         {
@@ -438,6 +663,9 @@ public class APIAroPlaManager : MonoBehaviour
     // 메시지 UI 표시 (다국어 지원)
     private void DisplayMessage(string speaker, string message, string messageKo = "", string messageJp = "", string messageEn = "")
     {
+        // 이전 발화자의 입 모션 종료 및 현재 발화자 설정
+        StatusManager.Instance.ClearSpeakingCharacters();
+        
         switch (speaker)
         {
             case "sensei":
@@ -447,11 +675,22 @@ public class APIAroPlaManager : MonoBehaviour
                 break;
                 
             case "arona":
+                // 아로나(메인 캐릭터)를 발화자로 설정
+                GameObject aronaChar = CharManager.Instance.GetCurrentCharacter();
+                if (aronaChar != null)
+                {
+                    StatusManager.Instance.AddSpeakingCharacter(aronaChar);
+                }
                 // 아로나(메인 캐릭터) 말풍선 표시 (다국어 지원)
                 ShowAronaMessage(message, messageKo, messageJp, messageEn);
                 break;
                 
             case "plana":
+                // 프라나를 발화자로 설정
+                if (planaInstance != null)
+                {
+                    StatusManager.Instance.AddSpeakingCharacter(planaInstance);
+                }
                 // 프라나 전용 말풍선 표시 (다국어 지원)
                 ShowPlanaMessage(message, messageKo, messageJp, messageEn);
                 break;
@@ -465,19 +704,13 @@ public class APIAroPlaManager : MonoBehaviour
         if (speaker == "sensei") return;
         
         string chatIdx = GameManager.Instance.chatIdxSuccess;
-        bool isJapanese = SettingManager.Instance.settings.sound_language == "jp";
+        string soundLang = SettingManager.Instance.settings.sound_language ?? "jp";
         
         // 캐릭터별 닉네임 설정 (아로나/프라나 각각의 음성 생성)
         string characterNickname = GetCharacterNickname(speaker);
         
-        if (isJapanese)
-        {
-            APIManager.Instance.GetJpWavFromAPI(message, chatIdx, characterNickname);
-        }
-        else
-        {
-            APIManager.Instance.GetKoWavFromAPI(message, chatIdx, characterNickname);
-        }
+        // 세션 기반 TTS 요청
+        APIManager.Instance.RequestTTS(message, chatIdx, soundLang, characterNickname);
         
         LogToFile($"Voice generation requested for {speaker} (nickname: {characterNickname}): {message}");
     }
@@ -516,13 +749,66 @@ public class APIAroPlaManager : MonoBehaviour
 
     // 스트리밍 응답 데이터 저장용
     private AroplaConversationResponse currentStreamResponse;
-    private bool isStreamingComplete;
+    private TaskCompletionSource<AroplaConversationResponse> streamingCompletionSource;
     private List<AroplaReply> streamReplyList;
     
     // APIManager 방식과 동일한 스트리밍 답변 조립용 리스트들
     private List<string> replyListKo = new List<string>();
     private List<string> replyListJp = new List<string>();
     private List<string> replyListEn = new List<string>();
+    
+    // 다음 발화자 표시용 말풍선 (아로프라 채널 전용)
+    private GameObject nextSpeakerBalloon;
+    
+    // 다음 발화자 아이콘 말풍선 표시 (현재 발화자 머리 위에 다음 발화 대상 아이콘 표시)
+    private void ShowNextSpeakerBalloon(string speaker, string nextSpeaker)
+    {
+        // 기존 말풍선 제거
+        HideNextSpeakerBalloon();
+        
+        // 다음 발화자가 없는 경우만 말풍선 표시 안 함
+        if (string.IsNullOrEmpty(nextSpeaker))
+        {
+            return;
+        }
+        
+        // 발화자에 따라 대상 캐릭터 결정
+        GameObject targetCharacter = null;
+        if (speaker == "arona")
+        {
+            targetCharacter = CharManager.Instance.GetCurrentCharacter(); // 메인 캐릭터 (아로나)
+        }
+        else if (speaker == "plana")
+        {
+            targetCharacter = planaInstance; // 서브 캐릭터 (프라나)
+        }
+        
+        if (targetCharacter == null)
+        {
+            AroplaLogWarning($"ShowNextSpeakerBalloon: target character not found for speaker '{speaker}'");
+            return;
+        }
+        
+        // EmotionBalloonManager를 사용하여 말풍선 표시
+        nextSpeakerBalloon = EmotionBalloonManager.Instance.SetEmotionBalloonForTarget(
+            targetCharacter, 
+            nextSpeaker, 
+            300f  // 충분히 긴 시간 (다음 답변이 오면 제거됨)
+        );
+        
+        AroplaLog($"🎯 Next speaker balloon shown: {speaker} -> {nextSpeaker}");
+    }
+    
+    // 다음 발화자 아이콘 말풍선 제거
+    private void HideNextSpeakerBalloon()
+    {
+        if (nextSpeakerBalloon != null)
+        {
+            Destroy(nextSpeakerBalloon);
+            nextSpeakerBalloon = null;
+            AroplaLog("🎯 Next speaker balloon hidden");
+        }
+    }
     
     // 아로프라 스트리밍 API 호출
     private async Task<AroplaConversationResponse> CallAroplaAPI(Dictionary<string, string> requestData)
@@ -548,7 +834,7 @@ public class APIAroPlaManager : MonoBehaviour
 
         // 스트리밍 응답 초기화
         currentStreamResponse = null;
-        isStreamingComplete = false;
+        streamingCompletionSource = new TaskCompletionSource<AroplaConversationResponse>();
         streamReplyList = new List<AroplaReply>();
         
         // APIManager 방식과 동일하게 답변 조립용 리스트 초기화
@@ -619,26 +905,24 @@ public class APIAroPlaManager : MonoBehaviour
                         }
                     }
 
-                    // 스트리밍이 완료될 때까지 대기
-                    int waitCount = 0;
-                    while (!isStreamingComplete && waitCount < 100) // 최대 10초 대기
+                    // TaskCompletionSource를 통해 스트리밍 완료 대기 (최대 10초 타임아웃)
+                    var timeoutTask = Task.Delay(10000);
+                    var completedTask = await Task.WhenAny(streamingCompletionSource.Task, timeoutTask);
+                    
+                    if (completedTask == streamingCompletionSource.Task)
                     {
-                        await Task.Delay(100);
-                        waitCount++;
+                        var response2 = await streamingCompletionSource.Task;
+                        if (response2 != null)
+                        {
+                            AroplaLog($"Streaming completed - Final speaker: {response2.speaker}");
+                            AroplaLog($"Next speaker: {response2.next_speaker}");
+                            LogToFile($"Streaming API completed: {response2.speaker} -> {response2.next_speaker}");
+                            return response2;
+                        }
                     }
                     
-                    if (currentStreamResponse != null)
-                    {
-                        AroplaLog($"Streaming completed - Final speaker: {currentStreamResponse.speaker}");
-                        AroplaLog($"Next speaker: {currentStreamResponse.next_speaker}");
-                        LogToFile($"Streaming API completed: {currentStreamResponse.speaker} -> {currentStreamResponse.next_speaker}");
-                        return currentStreamResponse;
-                    }
-                    else
-                    {
-                        AroplaLogError("Streaming completed but no final response received");
-                        return null;
-                    }
+                    AroplaLogError("Streaming timeout or no final response2 received");
+                    return null;
                 }
             }
         }
@@ -648,6 +932,33 @@ public class APIAroPlaManager : MonoBehaviour
             LogToFile($"Streaming API Exception: {ex.Message}");
             return null;
         }
+    }
+
+    // 문장 리스트를 AroplaReply 배열로 변환
+    private AroplaReply[] CreateReplyListFromSentences(List<string> sentences, string aiLanguage)
+    {
+        var replyList = new List<AroplaReply>();
+        foreach (var sentence in sentences)
+        {
+            var reply = new AroplaReply();
+            
+            // 언어에 따라 적절한 필드에 할당
+            if (aiLanguage == "ko")
+            {
+                reply.answer_ko = sentence;
+            }
+            else if (aiLanguage == "ja" || aiLanguage == "jp")
+            {
+                reply.answer_jp = sentence;
+            }
+            else
+            {
+                reply.answer_en = sentence;
+            }
+            
+            replyList.Add(reply);
+        }
+        return replyList.ToArray();
     }
 
     // 스트리밍 데이터 처리 콜백
@@ -717,6 +1028,8 @@ public class APIAroPlaManager : MonoBehaviour
     {
         try
         {
+            // 다음 답변이 오면 기존 next_speaker 말풍선 제거
+            HideNextSpeakerBalloon();
             string speaker = data["speaker"]?.ToString() ?? "unknown";
             string chatIdx = data["chat_idx"]?.ToString() ?? "0";
             
@@ -835,15 +1148,18 @@ public class APIAroPlaManager : MonoBehaviour
                 type = "reply"
             };
             
-            // 스트리밍 완료 플래그 설정
-            isStreamingComplete = true;
+            // TaskCompletionSource를 통해 완료 시그널 전달
+            streamingCompletionSource?.TrySetResult(currentStreamResponse);
+            
+            // 다음 발화자 아이콘 말풍선 표시 (다음 답변이 올 때까지)
+            ShowNextSpeakerBalloon(speaker, nextSpeaker);
             
             LogToFile($"Final response: {speaker} -> {nextSpeaker} ({reasoning})");
         }
         catch (Exception ex)
         {
             AroplaLogError($"Error handling final response: {ex.Message}");
-            isStreamingComplete = true; // 에러가 나도 완료로 처리
+            streamingCompletionSource?.TrySetResult(null); // 에러가 나도 완료로 처리
         }
     }
     
@@ -881,7 +1197,7 @@ public class APIAroPlaManager : MonoBehaviour
             type = "error"
         };
         
-        isStreamingComplete = true;
+        streamingCompletionSource?.TrySetResult(currentStreamResponse);
         LogToFile($"Server error: {errorMessage}");
     }
 
@@ -1331,9 +1647,9 @@ public class APIAroPlaManager : MonoBehaviour
         string displayEn = !string.IsNullOrEmpty(messageEn) ? messageEn : message;
         
         // 아로나는 메인 캐릭터이므로 AnswerBalloonManager 사용
+        AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
         AnswerBalloonManager.Instance.ModifyAnswerBalloonTextInfo(displayKo, displayJp, displayEn);
         AnswerBalloonManager.Instance.ModifyAnswerBalloonText();
-        AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
         
         AroplaLog($"Arona Message (Main Character): {message}");
     }

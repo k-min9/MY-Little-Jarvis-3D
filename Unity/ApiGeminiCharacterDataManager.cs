@@ -76,6 +76,9 @@ public class ApiGeminiCharacterDataManager : MonoBehaviour
     // 캐시에 없는 캐릭터를 동적으로 로드 (Fallback)
     public string GetCharacterPrompt(string charName, string lang = "en")
     {
+        // 언어 코드 정규화: "jp" -> "ja"
+        if (lang == "jp") lang = "ja";
+        
         string cacheKey = $"{lang}/{charName}";
         
         // 1. 캐시 확인
