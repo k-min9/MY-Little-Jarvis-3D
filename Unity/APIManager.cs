@@ -24,6 +24,7 @@ public class APIManager : MonoBehaviour
     private bool isCompleted = false; // 반환이 완료되었는지 여부를 체크하는 플래그
     private bool isResponsedStarted = false; // 첫 반환이 돌아왔는지 여부
     private bool isAnswerStarted = false; // 첫 대답이 시작했는지 여부
+    private bool isFirstBalloonShown = false; // 첫 문장 말풍선 표시 여부 (GeminiDirect용)
     private string logFilePath; // 로그 파일 경로
 
     private DateTime lastSmallTalkCallTime = DateTime.MinValue;
@@ -76,6 +77,27 @@ public class APIManager : MonoBehaviour
         CallFetchNgrokJsonData();
         // #endif    
     }
+
+    // Update에서 TTS 관련 로직은 TTSManager로 이동됨
+
+    #region TTS (TTSManager로 위임)
+
+    // TTS 관련 함수들은 TTSManager.Instance로 위임됨
+    // 기존 코드와의 호환성을 위해 래퍼 함수 제공
+    
+    // 외부 매니저용: TTS 세션 시작 (TTSManager로 위임)
+    public void StartTtsSession(int chatIdxNum)
+    {
+        TTSManager.Instance.StartTtsSession(chatIdxNum);
+    }
+
+    // 외부 매니저용: TTS 요청 (TTSManager로 위임)
+    public void RequestTTS(string text, string chatIdx, string soundLanguage, string nickname = null)
+    {
+        TTSManager.Instance.RequestTTS(text, chatIdx, soundLanguage, nickname);
+    }
+
+    #endregion
 
     // Small Talk 호출
     public async void CallSmallTalkStream(string purpose = "잡담", string currentSpeaker = null, string chatIdx = "-1", string aiLanguage = null)
@@ -845,48 +867,26 @@ public class APIManager : MonoBehaviour
             AnswerBalloonManager.Instance.ModifyAnswerBalloonTextInfo(replyKo, replyJp, replyEn);  // Answerballoon 정보 갱신
             AnswerBalloonManager.Instance.ModifyAnswerBalloonText();  // 정보토대 답변
 
-            // 음성 API 호출
+            // 음성 API 호출 (TTSManager로 위임)
             if (answerVoice != null)
             {
-                if (SettingManager.Instance.settings.sound_language == "ko" || SettingManager.Instance.settings.sound_language == "en")
-                {
-                    GetKoWavFromAPI(answerVoice, chatIdx);
-                }
-                if (SettingManager.Instance.settings.sound_language == "jp")
-                {
-                    GetJpWavFromAPI(answerVoice, chatIdx);
-                }
+                string soundLang = SettingManager.Instance.settings.sound_language;
+                TTSManager.Instance.RequestTTS(answerVoice, chatIdx, soundLang);
             }
         }
     }
 
-    // GeminiDirect 전용 ProcessReply (최초 수신 시 UI 초기화 포함)
-    private void ProcessReplyGeminiDirect(JObject jsonObject)
+    // GeminiDirect 전용 ProcessReply (문장 단위로 호출됨)
+    private async void ProcessReplyGeminiDirect(JObject jsonObject)
     {
-        // 최초 수신 시 UI 초기화 및 리스트 초기화
+        // 최초 수신 시 리스트 초기화 (말풍선 표시는 첫 문장 번역 후로 지연)
         if (!isResponsedStarted)
         {
             // 리스트 초기화 (최초 1회만)
             replyListKo = new List<string>();
             replyListJp = new List<string>();
             replyListEn = new List<string>();
-            
-            // 생각 중 말풍선 숨기기
-            AnswerBalloonSimpleManager.Instance.HideAnswerBalloonSimple();
-
-            // 안내 말풍선 숨기기
-            NoticeManager.Instance.DeleteNoticeBalloonInstance();
-
-            // 전송시작 말풍선 제거
-            if (webEmotionBalloonInstance != null)
-            {
-                Destroy(webEmotionBalloonInstance);
-                webEmotionBalloonInstance = null;
-            }
-
-            AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
-            AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();
-            isResponsedStarted = true;
+            isFirstBalloonShown = false;
 
             // AI Info 내용 갱신
             try
@@ -905,11 +905,13 @@ public class APIManager : MonoBehaviour
                 Debug.LogWarning($"[GeminiDirect] Failed to refresh AI info: {ex.Message}");
             }
 
-            // 표정은 기본값으로 (Gemini에서 감정 분석 미지원)
+            // 표정 기본값
             EmotionManager.Instance.ShowEmotionFromEmotion("Neutral");
 
             // Web/Image 의도는 비활성화
             AnswerBalloonManager.Instance.HideWebImage();
+            
+            isResponsedStarted = true;
         }
 
         // chatIdx 체크
@@ -926,74 +928,140 @@ public class APIManager : MonoBehaviour
         JToken replyToken = jsonObject["reply_list"];
         if (replyToken != null && replyToken.Type == JTokenType.Array)
         {
-            string answerVoice = null;
+            // 언어 설정 가져오기
+            string uiLang = SettingManager.Instance.settings.ui_language ?? "ko";
+            string aiLang = SettingManager.Instance.settings.ai_language ?? "ko";
+            string soundLang = SettingManager.Instance.settings.sound_language ?? "ko";
+            
+            // UI 번역 필요 여부 (ai_lang != ui_lang이면 UI 번역 필요)
+            bool needUiTranslation = (aiLang != uiLang);
+            
+            // TTS 번역 필요 여부 (ai_lang != sound_lang이면 TTS 번역 필요)
+            bool needTtsTranslation = (aiLang != soundLang);
+            
             foreach (var reply in replyToken)
             {
-                string answerJp = reply["answer_jp"]?.ToString() ?? string.Empty;
-                string answerKo = reply["answer_ko"]?.ToString() ?? string.Empty;
-                string answerEn = reply["answer_en"]?.ToString() ?? string.Empty;
-
-                // 각각의 답변을 리스트에 누적 추가
-                if (!string.IsNullOrEmpty(answerJp))
+                // AI 원본 응답 (GeminiDirect는 단일 언어로 응답)
+                string answerOriginal = reply["answer_origin"]?.ToString() ?? string.Empty;
+                
+                if (string.IsNullOrEmpty(answerOriginal))
+                    continue;
+                
+                // Stop strings 제거 (잔여 태그 정리)
+                answerOriginal = answerOriginal
+                    .Replace("<end_of_turn>", "")
+                    .Replace("<|im_end|>", "")
+                    .Replace("<|eot_id|>", "")
+                    .Trim();
+                
+                if (string.IsNullOrEmpty(answerOriginal))
+                    continue;
+                
+                // --- 0. seq 선할당 (번역 전에 순서 확정) ---
+                int seq = TTSManager.Instance.RegisterTtsRequest(answerOriginal);
+                int capturedSessionId = TTSManager.Instance.GetSessionId();
+                
+                Debug.Log($"[TTS_Flow] 1.문장성립 seq={seq} text='{answerOriginal.Substring(0, Math.Min(30, answerOriginal.Length))}...'");
+                
+                // --- 1. UI 표시 (번역 필요 시 번역) ---
+                string answerUi = answerOriginal;
+                
+                if (needUiTranslation)
                 {
-                    replyListJp.Add(answerJp);
-                    if (SettingManager.Instance.settings.sound_language == "jp")
+                    // UI 언어로 번역
+                    if (uiLang == "jp" || uiLang == "ja")
                     {
-                        answerVoice = answerJp;
+                        var resultUi = await ApiTranslatorManager.Instance.Translate(answerOriginal, "ja");
+                        answerUi = resultUi?.Text ?? answerOriginal;
                     }
-                }
-
-                if (!string.IsNullOrEmpty(answerKo))
-                {
-                    replyListKo.Add(answerKo);
-                    if (SettingManager.Instance.settings.sound_language == "ko")
+                    else if (uiLang == "ko")
                     {
-                        answerVoice = answerKo;
+                        var resultUi = await ApiTranslatorManager.Instance.Translate(answerOriginal, "ko");
+                        answerUi = resultUi?.Text ?? answerOriginal;
+                    }
+                    else // en
+                    {
+                        var resultUi = await ApiTranslatorManager.Instance.Translate(answerOriginal, "en");
+                        answerUi = resultUi?.Text ?? answerOriginal;
                     }
                 }
                 
-                if (!string.IsNullOrEmpty(answerEn))
+                replyListJp.Add(answerUi);
+                replyListKo.Add(answerUi);
+                replyListEn.Add(answerUi);
+                
+                string replyKo = string.Join(" ", replyListKo);
+                string replyJp = string.Join(" ", replyListJp);
+                string replyEn = string.Join(" ", replyListEn);
+                
+                // --- 2. TTS 번역 (필요 시) ---
+                // 첫 문장(seq=0) TTS 번역 시작 전: 말풍선 표시 (로딩 시간 분산)
+                if (!isFirstBalloonShown)
                 {
-                    replyListEn.Add(answerEn);
-                    if (SettingManager.Instance.settings.sound_language == "en")
+                    // 생각 중 말풍선 숨기기
+                    AnswerBalloonSimpleManager.Instance.HideAnswerBalloonSimple();
+
+                    // 안내 말풍선 숨기기
+                    NoticeManager.Instance.DeleteNoticeBalloonInstance();
+
+                    // 전송시작 말풍선 제거
+                    if (webEmotionBalloonInstance != null)
                     {
-                        answerVoice = answerEn;
+                        Destroy(webEmotionBalloonInstance);
+                        webEmotionBalloonInstance = null;
+                    }
+                    
+                    // AnswerBalloon 표시
+                    AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
+                    AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();
+                    
+                    isFirstBalloonShown = true;
+                }
+                
+                // AnswerBalloon 내용 누적 (TTS 번역 전에 즉시 표시)
+                AnswerBalloonManager.Instance.ModifyAnswerBalloonTextInfo(replyKo, replyJp, replyEn);
+                AnswerBalloonManager.Instance.ModifyAnswerBalloonText();
+                
+                string answerVoice = answerOriginal;
+                
+                // UI 번역과 TTS 번역의 목표 언어가 같으면 중복 번역 방지
+                if (needUiTranslation && needTtsTranslation && uiLang == soundLang)
+                {
+                    // UI 번역 결과 재사용
+                    answerVoice = answerUi;
+                }
+                else if (needTtsTranslation)
+                {
+                    // UI와 다른 언어로 TTS 번역 필요
+                    if (soundLang == "jp" || soundLang == "ja")
+                    {
+                        var result = await ApiTranslatorManager.Instance.Translate(answerOriginal, "ja");
+                        answerVoice = result?.Text ?? answerOriginal;
+                    }
+                    else if (soundLang == "ko")
+                    {
+                        var result = await ApiTranslatorManager.Instance.Translate(answerOriginal, "ko");
+                        answerVoice = result?.Text ?? answerOriginal;
+                    }
+                    else // en
+                    {
+                        var result = await ApiTranslatorManager.Instance.Translate(answerOriginal, "en");
+                        answerVoice = result?.Text ?? answerOriginal;
                     }
                 }
-            }
-            
-            // AnswerBalloon 갱신 (누적된 전체 내용)
-            string replyKo = string.Join(" ", replyListKo);
-            string replyJp = string.Join(" ", replyListJp);
-            string replyEn = string.Join(" ", replyListEn);
-
-            AnswerBalloonManager.Instance.ModifyAnswerBalloonTextInfo(replyKo, replyJp, replyEn);
-            AnswerBalloonManager.Instance.ModifyAnswerBalloonText();
-
-            // 음성 API 호출
-            if (answerVoice != null)
-            {
-                // 기존 로직은 번역이 없어서 사용 불가. 향후 보강 필요.
-                // if (SettingManager.Instance.settings.sound_language == "ko" || SettingManager.Instance.settings.sound_language == "en")
-                // {
-                //     GetKoWavFromAPI(answerVoice, chatIdx);
-                // }
-                // if (SettingManager.Instance.settings.sound_language == "jp")
-                // {
-                //     GetJpWavFromAPI(answerVoice, chatIdx);
-                // }
                 
-                // GeminiDirect 음성 호출 (기존 로직 대체용)
-                // TODO` : 향후 언어로직감지 구현시우선 (현재 번역모듈 없음)
-                string answerVoiceLang = SettingManager.Instance.settings.ui_language ?? "en";
-                // Debug.Log("answerVoiceLang : " + answerVoiceLang);
-                if (answerVoiceLang == "ko" || answerVoiceLang == "en")
+                Debug.Log($"[TTS_Flow] 2.번역종료 seq={seq} voice='{answerVoice.Substring(0, Math.Min(20, answerVoice.Length))}...'");
+                
+                // --- 3. TTS 요청 (선할당된 seq 사용) ---
+                TTSManager.Instance.MarkTtsInFlight(seq, answerVoice);
+                
+                if (soundLang == "ko" || soundLang == "en")
                 {
-                    GetKoWavFromAPI(answerVoice, chatIdx);
+                    TTSManager.Instance.GetKoWavFromAPI(answerVoice, chatIdx, seq, capturedSessionId);
                 }
-                if (answerVoiceLang == "jp")
+                else // jp, ja
                 {
-                    GetJpWavFromAPI(answerVoice, chatIdx);
+                    TTSManager.Instance.GetJpWavFromAPI(answerVoice, chatIdx, seq, capturedSessionId);
                 }
             }
         }
@@ -1045,6 +1113,7 @@ public class APIManager : MonoBehaviour
             MemoryManager.Instance.SaveConversationMemory("character", "assistant", reply, replyKo, replyJp, replyEn);
         }
     }
+
 
     // 스트리밍 데이터를 가져오는 메서드
     public async Task FetchStreamingData(string url, Dictionary<string, string> data, byte[] screenshotBytes = null)
@@ -1133,11 +1202,11 @@ public class APIManager : MonoBehaviour
                                 // 풍선기준 최신대화여야 함
                                 if (curChatIdxNum >= GameManager.Instance.chatIdxBalloon)
                                 {
-                                    // 최신화 하면서 기존 음성 queue 내용 지워버리기
+                                    // 최신화 하면서 TTS 세션 시작 (기존 음성 queue도 정리됨)
                                     if (GameManager.Instance.chatIdxBalloon != curChatIdxNum)
                                     {
                                         GameManager.Instance.chatIdxBalloon = curChatIdxNum;
-                                        VoiceManager.Instance.ResetAudio();
+                                        TTSManager.Instance.BeginTtsSession(curChatIdxNum);
                                     }
 
                                     var jsonObject = JObject.Parse(line);
@@ -1472,11 +1541,12 @@ public class APIManager : MonoBehaviour
         //     return;
         // }
 
-        // server_type이 2 (Google)인 경우 Gemini 전용 함수 호출 [TODO : Sample용. 차후 제거.]
+        // server_type이 2 (Google)인 경우 Gemini 전용 함수 호출 [TODO : Sample은 현재 도메인이 이 방식이라 차용불가. 차후 제거.]
         int server_type_idx = SettingManager.Instance.settings.server_type_idx;  // 0: Auto, 1: Local, 2: Google, 3: OpenRouter
         if (server_type_idx == 2 || server_type_idx == 0)
         {
-            await CallConversationStreamGemini(query, chatIdx, ai_lang_in);
+            // await CallConversationStreamGemini(query, chatIdx, ai_lang_in);
+            await CallConversationStreamGeminiDirect(query, chatIdx, ai_lang_in);
             return;
         }
 
@@ -1814,6 +1884,10 @@ public class APIManager : MonoBehaviour
         query_origin = query;
         query_trans = "";
         
+        // TTS 세션 시작 (GeminiDirect는 FetchStreamingData를 거치지 않으므로 여기서 수행)
+        int chatIdxNum = int.TryParse(chatIdx, out var idx) ? idx : 0;
+        TTSManager.Instance.BeginTtsSession(chatIdxNum);
+        
         // 전송시작 말풍선
         if (webEmotionBalloonInstance != null)
         {
@@ -2026,404 +2100,8 @@ public class APIManager : MonoBehaviour
         }
     }
 
-    public async void GetKoWavFromAPI(string text, string chatIdx, string nickname = null)
-    {
-        // baseUrl을 비동기로 가져오기
-        var tcs = new TaskCompletionSource<string>();
-        ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
-        string baseUrl = await tcs.Task;
-
-        // dev_voice 사용 여부 (설치 상태 또는 DevSound 토글)
-        bool shouldUseDevServer = SettingManager.Instance.GetInstallStatus() < 2   // no install, lite
-                                || SettingManager.Instance.IsDevSoundEnabled();    // DevSound 토글 또는 Android
-        if (shouldUseDevServer)
-        {
-            // TaskCompletionSource를 사용하여 콜백을 async/await로 변환
-            var tcs2 = new TaskCompletionSource<string>();
-            
-            ServerManager.Instance.GetServerUrlFromServerId("dev_voice", (url) =>
-            {
-                tcs2.SetResult(url);
-            });
-            
-            // dev_voice 서버 URL을 기다림
-            string devVoiceUrl = await tcs2.Task;
-            
-            if (!string.IsNullOrEmpty(devVoiceUrl))
-            {
-                Debug.Log("dev_voice 서버 URL: " + devVoiceUrl);
-                baseUrl = devVoiceUrl;
-            }
-            else
-            {
-                Debug.LogWarning("dev_voice 서버 URL을 가져올 수 없습니다. 기본 URL을 사용합니다.");
-            }
-        }
-        
-        // baseUrl 유효성 체크
-        if (string.IsNullOrEmpty(baseUrl))
-        {
-            Debug.LogError("[GetKoWavFromAPI] baseUrl이 비어있습니다. 음성 합성을 건너뜁니다.");
-            return;
-        }
-        
-        // API 호출을 위한 URL 구성
-        string url = baseUrl + "/getSound/ko"; // GET + Uri.EscapeDataString(text);
-
-        // 닉네임 가져오기 (optional 파라미터가 있으면 사용, 없으면 현재 캐릭터)
-        if (string.IsNullOrEmpty(nickname))
-        {
-            nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
-        }
-
-        // HttpWebRequest 객체 생성
-        HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-        request.Method = "POST";
-        request.ContentType = "application/json";
-
-        var requestData = new Dictionary<string, string>
-        {
-            { "text", text},
-            { "char", nickname},
-            { "lang", "ko" },  // 현재 두 함수를 합치지 못하는 이유. 서버쪽은 주소 하나로 통합해서 lang으로 ja인지 아닌지만 판단 중.
-            // { "lang", SettingManager.Instance.settings.sound_language.ToString() },
-            { "speed", SettingManager.Instance.settings.sound_speedMaster.ToString()},
-            { "chatIdx", chatIdx}
-        };
-        string jsonData = JsonConvert.SerializeObject(requestData);
-        byte[] byteArray = Encoding.UTF8.GetBytes(jsonData);
-
-
-        try
-        {
-            // 요청 본문에 데이터 쓰기
-            using (Stream dataStream = await request.GetRequestStreamAsync())
-            {
-                dataStream.Write(byteArray, 0, byteArray.Length);
-            }
-
-            // 비동기 방식으로 요청 보내기
-            using (HttpWebResponse response = (HttpWebResponse)await request.GetResponseAsync())
-            {
-                // 요청이 성공했는지 확인
-                if (response.StatusCode == HttpStatusCode.OK)
-                {
-                    // 헤더에서 Chat-Idx 값을 가져와, 현재 대화보다 과거일 경우에는 queue에 넣지 않음
-                    string chatIdxHeader = response.Headers["Chat-Idx"];
-                    int chatIdxHeaderNum = int.Parse(chatIdxHeader);
-                    if (GameManager.Instance.chatIdxBalloon > chatIdxHeaderNum)
-                    {
-                        Debug.Log("과거대화 : " + GameManager.Instance.chatIdxBalloon.ToString() + "/" + chatIdxHeaderNum.ToString());
-                        return;
-                    }
-
-                    // 응답 스트림을 읽어서 파일에 저장
-                    using (Stream responseStream = response.GetResponseStream())
-                    {
-                        if (responseStream != null)
-                        {
-                            byte[] wavData = ReadFully(responseStream);
-
-                            // StreamingAssets 경로에 WAV 파일 저장
-                            SaveWavToFile(wavData);
-                        }
-                    }
-                }
-                else
-                {
-                    Debug.LogError($"Error fetching WAV file: {response.StatusCode}");
-                }
-            }
-        }
-        catch (WebException ex)
-        {
-            Debug.LogError($"WebException: {ex.Message}");
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"Exception: {ex.Message}");
-        }
-    }
-
-    public async void GetJpWavFromAPI(string text, string chatIdx, string nickname = null)
-    {
-        // baseUrl을 비동기로 가져오기
-        var tcs = new TaskCompletionSource<string>();
-        ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
-        string baseUrl = await tcs.Task;
-
-        // dev_voice 사용 여부 (설치 상태 또는 DevSound 토글)
-        bool shouldUseDevServer = SettingManager.Instance.GetInstallStatus() < 2   // no install, lite
-                                || SettingManager.Instance.IsDevSoundEnabled();    // DevSound 토글 또는 Android
-        if (shouldUseDevServer)
-        {
-            // TaskCompletionSource를 사용하여 콜백을 async/await로 변환
-            var tcs2 = new TaskCompletionSource<string>();
-            
-            ServerManager.Instance.GetServerUrlFromServerId("dev_voice", (url) =>
-            {
-                tcs2.SetResult(url);
-            });
-            
-            // dev_voice 서버 URL을 기다림
-            string devVoiceUrl = await tcs2.Task;
-            
-            if (!string.IsNullOrEmpty(devVoiceUrl))
-            {
-                Debug.Log("dev_voice 서버 URL: " + devVoiceUrl);
-                baseUrl = devVoiceUrl;
-            }
-            else
-            {
-                Debug.LogWarning("dev_voice 서버 URL을 가져올 수 없습니다. 기본 URL을 사용합니다.");
-            }
-        }
-
-        // baseUrl 유효성 체크
-        if (string.IsNullOrEmpty(baseUrl))
-        {
-            Debug.LogError("[GetJpWavFromAPI] baseUrl이 비어있습니다. 음성 합성을 건너뜁니다.");
-            return;
-        }
-
-        string url = baseUrl + "/getSound/jp"; // GET + Uri.EscapeDataString(text);
-
-        // 닉네임 가져오기 (optional 파라미터가 있으면 사용, 없으면 현재 캐릭터)
-        if (string.IsNullOrEmpty(nickname))
-        {
-            nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
-        }
-
-        // HttpWebRequest 객체 생성
-        HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-        request.Method = "POST";
-        request.ContentType = "application/json";
-
-        var requestData = new Dictionary<string, string>
-        {
-            { "text", text},
-            { "char", nickname},
-            { "lang", "ja"},
-            { "speed", SettingManager.Instance.settings.sound_speedMaster.ToString()},
-            { "chatIdx", chatIdx}
-        };
-        string jsonData = JsonConvert.SerializeObject(requestData);
-        byte[] byteArray = Encoding.UTF8.GetBytes(jsonData);
-
-
-        try
-        {
-            // 요청 본문에 데이터 쓰기
-            using (Stream dataStream = await request.GetRequestStreamAsync())
-            {
-                dataStream.Write(byteArray, 0, byteArray.Length);
-            }
-
-            // 비동기 방식으로 요청 보내기
-            using (HttpWebResponse response = (HttpWebResponse)await request.GetResponseAsync())
-            {
-                // 요청이 성공했는지 확인
-                if (response.StatusCode == HttpStatusCode.OK)
-                {
-                    // 응답 스트림을 읽어서 파일에 저장
-                    using (Stream responseStream = response.GetResponseStream())
-                    {
-
-                        // 헤더에서 Chat-Idx 값을 가져와, 현재 대화보다 과거일 경우에는 queue에 넣지 않음
-                        string chatIdxHeader = response.Headers["Chat-Idx"];
-                        int chatIdxHeaderNum = int.Parse(chatIdxHeader);
-                        if (GameManager.Instance.chatIdxBalloon > chatIdxHeaderNum)
-                        {
-                            Debug.Log("과거대화 : " + GameManager.Instance.chatIdxBalloon.ToString() + "/" + chatIdxHeaderNum.ToString());
-                            return;
-                        }
-
-                        if (responseStream != null)
-                        {
-                            byte[] wavData = ReadFully(responseStream);
-
-                            // persistentDataPath에 WAV 파일 저장
-                            SaveWavToFile(wavData);
-                        }
-                    }
-                }
-                else
-                {
-                    Debug.LogError($"Error fetching WAV file: {response.StatusCode}");
-                }
-            }
-        }
-        catch (WebException ex)
-        {
-            // early stop 등의 거절도 여기로 보냈음
-            Debug.LogError($"WebException: {ex.Message}\nerror Text : {text}");
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"Exception: {ex.Message}");
-        }
-    }
-
-    
-    public async void GetHowlingFromAPI(string text)
-    {
-        // API 호출을 위한 URL 구성
-        // string baseUrl = ServerManager.Instance.GetBaseUrl();
-        string baseUrl = "http://127.0.0.1:5050";  // dev->5050포트용
-        string url = baseUrl + "/howling"; 
-        Debug.Log("url : " + url);
-
-        // HttpWebRequest 객체 생성
-        HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-        request.Method = "POST";
-        request.ContentType = "application/json";
-
-        var requestData = new Dictionary<string, string>
-        {
-            { "text", text},
-            { "lang", ""},
-            { "is_play", "true"},
-        };
-        string jsonData = JsonConvert.SerializeObject(requestData);
-        byte[] byteArray = Encoding.UTF8.GetBytes(jsonData);
-
-
-        try
-        {
-            // 요청 본문에 데이터 쓰기
-            using (Stream dataStream = await request.GetRequestStreamAsync())
-            {
-                dataStream.Write(byteArray, 0, byteArray.Length);
-            }
-
-            // 비동기 방식으로 요청 보내기
-            using (HttpWebResponse response = (HttpWebResponse)await request.GetResponseAsync())
-            {
-                // 요청이 성공했는지 확인
-                if (response.StatusCode == HttpStatusCode.OK)
-                {
-                    Debug.LogError($"Howling : " + text);
-                    // 저장 지금은 필요없음
-                    // // 응답 스트림을 읽어서 파일에 저장
-                    // using (Stream responseStream = response.GetResponseStream())
-                    // {
-                    //     if (responseStream != null)
-                    //     {
-                    //         byte[] wavData = ReadFully(responseStream);
-
-                    //         // StreamingAssets 경로에 WAV 파일 저장
-                    //         SaveWavToFile(wavData);
-                    //     }
-                    // }
-                }
-                else
-                {
-                    Debug.LogError($"Error fetching WAV file: {response.StatusCode}");
-                }
-            }
-        }
-        catch (WebException ex)
-        {
-            Debug.LogError($"WebException: {ex.Message}");
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"Exception: {ex.Message}");
-        }
-    }
-
-
-    // 스트림을 바이트 배열로 변환하는 함수
-    private byte[] ReadFully(Stream input)
-    {
-        using (MemoryStream ms = new MemoryStream())
-        {
-            input.CopyTo(ms);
-            return ms.ToArray();
-        }
-    }
-
-    // 파일을 persistentDataPath에 저장
-    private void SaveWavToFile(byte[] wavData)
-    {
-        // WAV 파일의 길이를 계산
-        float wavDuration = GetWavDuration(wavData);
-        // Debug.Log("wavDuration : " + wavDuration);
-
-        // 10초를 초과하면 저장/재생하지 않음
-        // if (wavDuration > 10f)
-        // {
-        //     Debug.LogWarning("WAV file is longer than 10 seconds. File will not be saved.");
-        //     return;
-        // }
-
-        string filePath = Path.Combine(Application.persistentDataPath, "response.wav");
-        try
-        {
-            File.WriteAllBytes(filePath, wavData);
-            VoiceManager.Instance.LoadAudioWavToQueue();
-            // Debug.Log($"WAV file saved to: {filePath}");
-        }
-        catch (IOException e)
-        {
-            Debug.LogError($"Error saving WAV file: {e.Message}");
-        }
-    }
-
-    // WAV 데이터에서 길이 계산
-    private float GetWavDuration(byte[] wavData)
-    {
-        // WAV 헤더를 분석
-        using (MemoryStream ms = new MemoryStream(wavData))
-        using (BinaryReader reader = new BinaryReader(ms))
-        {
-            // "RIFF" 체크
-            string riff = new string(reader.ReadChars(4));
-            if (riff != "RIFF")
-            {
-                Debug.LogError("Invalid WAV file: Missing RIFF header.");
-                return 0f;
-            }
-
-            reader.ReadInt32(); // Chunk Size (무시)
-            string wave = new string(reader.ReadChars(4));
-            if (wave != "WAVE")
-            {
-                Debug.LogError("Invalid WAV file: Missing WAVE header.");
-                return 0f;
-            }
-
-            // "fmt " 체크
-            string fmt = new string(reader.ReadChars(4));
-            if (fmt != "fmt ")
-            {
-                Debug.LogError("Invalid WAV file: Missing fmt header.");
-                return 0f;
-            }
-
-            int fmtChunkSize = reader.ReadInt32();
-            reader.ReadInt16(); // Audio Format (무시)
-            int numChannels = reader.ReadInt16();
-            int sampleRate = reader.ReadInt32();
-            reader.ReadInt32(); // Byte Rate (무시)
-            reader.ReadInt16(); // Block Align (무시)
-            int bitsPerSample = reader.ReadInt16();
-
-            // "data" 체크
-            string dataHeader = new string(reader.ReadChars(4));
-            if (dataHeader != "data")
-            {
-                Debug.LogError("Invalid WAV file: Missing data header.");
-                return 0f;
-            }
-
-            int dataSize = reader.ReadInt32();
-
-            // WAV 길이 계산
-            int totalSamples = dataSize / (bitsPerSample / 8 * numChannels);
-            return (float)totalSamples / sampleRate;
-        }
-    }
+    // TTS 관련 함수들 (GetKoWavFromAPI, GetJpWavFromAPI, GetHowlingFromAPI, ReadFully, SaveWavToFile, GetWavDuration)은
+    // TTSManager.cs로 이동되었습니다.
 
     [System.Serializable]
     public class NgrokJsonResponse
@@ -2570,22 +2248,57 @@ public class APIManager : MonoBehaviour
             return;
         }
 
+
         try
         {
-            // dev_ocr_translate 서버 URL 가져오기
+            // baseUrl을 비동기로 가져오기
             var tcs = new TaskCompletionSource<string>();
-            ServerManager.Instance.GetServerUrlFromServerId("dev_ocr_translate", (url) =>
-            {
-                tcs.SetResult(url);
-            });
+            ServerManager.Instance.GetBaseUrl((urlResult) => tcs.SetResult(urlResult));
             string baseUrl = await tcs.Task;
+
+            // local_ocr 사용 여부 (isDevOCR보다 우선됨, 저장 안함)
+            if (SettingManager.Instance.settings.isLocalOCR)
+            {
+                baseUrl = "http://127.0.0.1:5000";  // local_ocr 서버
+                Debug.Log("[PaddleOCR] local_ocr 서버 사용: " + baseUrl);
+            }
+            // dev_ocr_translate 사용 여부 (설치 상태 또는 DevOCR 토글)
+            else
+            {
+                bool shouldUseDevServer = SettingManager.Instance.GetInstallStatus() < 2   // no install, lite
+                                        || SettingManager.Instance.IsDevOCREnabled();    // DevOCR 토글 또는 Android
+                if (shouldUseDevServer)
+                {
+                    // TaskCompletionSource를 사용하여 콜백을 async/await로 변환
+                    var tcs2 = new TaskCompletionSource<string>();
+                    
+                    ServerManager.Instance.GetServerUrlFromServerId("dev_ocr_translate", (url) =>
+                    {
+                        tcs2.SetResult(url);
+                    });
+                    
+                    // dev_ocr_translate 서버 URL을 기다림
+                    string devOcrUrl = await tcs2.Task;
+                    
+                    if (!string.IsNullOrEmpty(devOcrUrl))
+                    {
+                        Debug.Log("[PaddleOCR] dev_ocr_translate 서버 URL: " + devOcrUrl);
+                        baseUrl = devOcrUrl;
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[PaddleOCR] dev_ocr_translate 서버 URL을 가져올 수 없습니다. 기본 URL을 사용합니다.");
+                    }
+                }
+            }
             
             if (string.IsNullOrEmpty(baseUrl))
             {
-                Debug.LogError("[PaddleOCR] dev_ocr_translate 서버 URL을 가져올 수 없습니다.");
+                Debug.LogError("[PaddleOCR] baseUrl이 비어있습니다. OCR 처리를 건너뜁니다.");
                 callback?.Invoke(null);
                 return;
             }
+
             
             string url = baseUrl + "/paddle/ocr";
             Debug.Log($"[PaddleOCR] URL: {url}, useTranslate: {useTranslate}, origin_lang: {originLang}, target_lang: {targetLang}");
