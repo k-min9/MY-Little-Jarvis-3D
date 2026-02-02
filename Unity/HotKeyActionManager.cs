@@ -2,6 +2,7 @@ using UnityEngine;
 using System;
 using System.Collections.Generic;
 using DevionGames.UIWidgets;
+using Newtonsoft.Json.Linq;
 
 // 드롭다운 표시용 텍스트를 위한 Attribute
 [AttributeUsage(AttributeTargets.Field)]
@@ -70,6 +71,18 @@ public enum HotKeyActionType
 
     [DisplayText("OCR3")]
     ActionOCR3,
+
+    [DisplayText("VL_TEST")]
+    ActionVL_TEST,
+
+    [DisplayText("VL_RUN")]
+    ActionVL_RUN,
+
+    [DisplayText("VL_Special1")]
+    ActionVL_Special1,
+
+    [DisplayText("VL_Special2")]
+    ActionVL_Special2,
 
     [DisplayText("Dev Mode")]
     ActionDevMode,
@@ -231,71 +244,135 @@ public class HotKeyActionManager : MonoBehaviour
         actions["ActionOCR"] = () =>
         {
             Debug.Log("OCR 실행 - 현재 활성 슬롯 옵션 사용");            
-            OCROptions options = OCRManager.Instance.GetCurrentOptions();                    
-            // Screenshot 영역이 설정되어 있으면 영역 OCR, 아니면 전체 화면 OCR
-            if (ScreenshotManager.Instance.IsScreenshotAreaSet())
-            {
-                Debug.Log("Screenshot 영역이 설정되어 있음 - 영역 OCR 실행");
-                ScreenshotOCRManager.Instance.ExecuteAreaOCR(options);
-            }
-            else
-            {
-                Debug.Log("Screenshot 영역이 설정되지 않음 - 전체 화면 OCR 실행");
-                ScreenshotOCRManager.Instance.ExecuteFullScreenOCR(options);
-            }
+            OCROptions options = OCRManager.Instance.GetCurrentOptions();
+            int slot = OCRManager.Instance.GetActiveSlot();
+            ScreenshotOCRManager.Instance.ExecuteOCRWithSlot(options, slot);
         };
 
         // OCR1 실행 (슬롯 1 옵션 사용)
         actions["ActionOCR1"] = () =>
         {
-            Debug.Log("OCR1 실행 - 슬롯 1 옵션 사용");            
-            OCROptions options = OCRManager.Instance.GetOptions(1);                    
-            if (ScreenshotManager.Instance.IsScreenshotAreaSet())
-            {
-                Debug.Log("Screenshot 영역이 설정되어 있음 - 영역 OCR 실행");
-                ScreenshotOCRManager.Instance.ExecuteAreaOCR(options);
-            }
-            else
-            {
-                Debug.Log("Screenshot 영역이 설정되지 않음 - 전체 화면 OCR 실행");
-                ScreenshotOCRManager.Instance.ExecuteFullScreenOCR(options);
-            }
+            Debug.Log("OCR1 실행 - 슬롯 1 옵션 사용");
+            OCROptions options = OCRManager.Instance.GetOptions(1);
+            ScreenshotOCRManager.Instance.ExecuteOCRWithSlot(options, 1);
         };
 
         // OCR2 실행 (슬롯 2 옵션 사용)
         actions["ActionOCR2"] = () =>
         {
-            Debug.Log("OCR2 실행 - 슬롯 2 옵션 사용");            
-            OCROptions options = OCRManager.Instance.GetOptions(2);                    
-            if (ScreenshotManager.Instance.IsScreenshotAreaSet())
-            {
-                Debug.Log("Screenshot 영역이 설정되어 있음 - 영역 OCR 실행");
-                ScreenshotOCRManager.Instance.ExecuteAreaOCR(options);
-            }
-            else
-            {
-                Debug.Log("Screenshot 영역이 설정되지 않음 - 전체 화면 OCR 실행");
-                ScreenshotOCRManager.Instance.ExecuteFullScreenOCR(options);
-            }
+            Debug.Log("OCR2 실행 - 슬롯 2 옵션 사용");
+            OCROptions options = OCRManager.Instance.GetOptions(2);
+            ScreenshotOCRManager.Instance.ExecuteOCRWithSlot(options, 2);
         };
 
         // OCR3 실행 (슬롯 3 옵션 사용)
         actions["ActionOCR3"] = () =>
         {
-            Debug.Log("OCR3 실행 - 슬롯 3 옵션 사용");            
-            OCROptions options = OCRManager.Instance.GetOptions(3);                    
-            if (ScreenshotManager.Instance.IsScreenshotAreaSet())
-            {
-                Debug.Log("Screenshot 영역이 설정되어 있음 - 영역 OCR 실행");
-                ScreenshotOCRManager.Instance.ExecuteAreaOCR(options);
-            }
-            else
-            {
-                Debug.Log("Screenshot 영역이 설정되지 않음 - 전체 화면 OCR 실행");
-                ScreenshotOCRManager.Instance.ExecuteFullScreenOCR(options);
-            }
+            Debug.Log("OCR3 실행 - 슬롯 3 옵션 사용");
+            OCROptions options = OCRManager.Instance.GetOptions(3);
+            ScreenshotOCRManager.Instance.ExecuteOCRWithSlot(options, 3);
         };
 
+        // VL Agent 테스트 실행 (클릭까지 수행)
+        actions["ActionVL_TEST"] = () =>
+        {
+            Debug.Log("VL_TEST 실행");
+            ApiVlAgentManager.Instance.ExecuteVlAgentAndClick(
+                target: "button",
+                maxResults: 10,
+                isMouseMove: true,  // 마우스 커서 이동 유지
+                onComplete: (success, x, y) =>
+                {
+                    if (success)
+                    {
+                        Debug.Log($"[VL_TEST] 클릭 성공: ({x}, {y})");
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[VL_TEST] 클릭 실패 또는 대상 없음");
+                    }
+                }
+            );
+        };
+
+        // VL Planer Run 테스트 실행 (스트리밍)
+        actions["ActionVL_RUN"] = () =>
+        {
+            Debug.Log("VL_RUN 실행 - VL Planer 스트리밍 테스트");
+            ApiVlAgentManager.Instance.ExecuteVlPlanerRun(
+                query: "노란 버튼을 클릭해줘",  // 테스트용 쿼리
+                onEvent: (eventData) =>
+                {
+                    string kind = (string)eventData["kind"] ?? "unknown";    // 이벤트 종류: goal, plan, observe, act, check, wait, done, fail 등
+                    string message = (string)eventData["message"] ?? "";     // 이벤트 한 줄 요약 메시지
+                    Debug.Log($"[VL_RUN] Event: kind={kind}, message={message}");
+                },
+                onComplete: (success, errorMsg) =>
+                {
+                    if (success)
+                    {
+                        Debug.Log("[VL_RUN] VL Planer 실행 완료");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[VL_RUN] VL Planer 실패: {errorMsg}");
+                    }
+                }
+            );
+        };
+
+        // VL Planer Special 실행 (MomoTalk 미독 순회 등)
+        actions["ActionVL_Special1"] = () =>
+        {
+            Debug.Log("VL_Special1 실행 - VL Planer Special 스트리밍");
+            ApiVlAgentManager.Instance.ExecuteVlPlanerRunSpecial(
+                query: "",  // Special은 쿼리 선택적
+                onEvent: (eventData) =>
+                {
+                    string kind = (string)eventData["kind"] ?? "unknown";
+                    string message = (string)eventData["message"] ?? "";
+                    Debug.Log($"[VL_Special1] Event: kind={kind}, message={message}");
+                },
+                onComplete: (success, errorMsg) =>
+                {
+                    if (success)
+                    {
+                        Debug.Log("[VL_Special1] VL Planer Special 실행 완료");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[VL_Special1] VL Planer Special 실패: {errorMsg}");
+                    }
+                }
+            );
+        };
+
+        // VL Engine 실행 (시나리오 기반 엔진)
+        actions["ActionVL_Special2"] = () =>
+        {
+            Debug.Log("VL_Special2 실행 - VL Engine 스트리밍");
+            ApiVlEngineManager.Instance.ExecuteVlEngine(
+                query: "",
+                onEvent: (eventData) =>
+                {
+                    string kind = (string)eventData["kind"] ?? "unknown";
+                    string message = (string)eventData["message"] ?? "";
+                    Debug.Log($"[VL_Special2] Event: kind={kind}, message={message}");
+                },
+                onComplete: (response) =>
+                {
+                    if (response != null)
+                    {
+                        string kind = (string)response["kind"] ?? "unknown";
+                        Debug.Log($"[VL_Special2] VL Engine 완료: {kind}");
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[VL_Special2] VL Engine 실패: 응답 없음");
+                    }
+                }
+            );
+        };
 
         // Dev Mode 토글
         actions["ActionDevMode"] = () =>
