@@ -58,11 +58,17 @@ public class AnimationManager : MonoBehaviour
         }
     }
 
-    public void Listen()
+    // targetCharacter가 null이면 현재 캐릭터 사용
+    public void Listen(GameObject targetCharacter = null)
     {
         try
         {
-            Animator _animator = CharManager.Instance.GetCurrentCharacter().GetComponent<Animator>();
+            if (targetCharacter == null)
+            {
+                targetCharacter = CharManager.Instance.GetCurrentCharacter();
+            }
+            
+            Animator _animator = targetCharacter.GetComponent<Animator>();
 
             _animator.SetBool("isWalk", false);
             _animator.SetBool("isRun", false);
@@ -70,8 +76,8 @@ public class AnimationManager : MonoBehaviour
             _animator.SetBool("isDance", false);
             _animator.SetBool("isListen", true);
 
-            // 얼굴 표정 있을 경우 사용
-            EmotionManager.Instance.ShowEmotionFromAction("listen");
+            // 얼굴 표정 있을 경우 사용 (targetCharacter에 적용)
+            EmotionManager.Instance.ShowEmotionFromAction("listen", targetCharacter);
         }
         catch
         {
@@ -79,16 +85,22 @@ public class AnimationManager : MonoBehaviour
         }
     }
 
-    public void ListenDisable()
+    // targetCharacter가 null이면 현재 캐릭터 사용
+    public void ListenDisable(GameObject targetCharacter = null)
     {
         try
         {
-            Animator _animator = CharManager.Instance.GetCurrentCharacter().GetComponent<Animator>();
+            if (targetCharacter == null)
+            {
+                targetCharacter = CharManager.Instance.GetCurrentCharacter();
+            }
+            
+            Animator _animator = targetCharacter.GetComponent<Animator>();
             _animator.SetBool("isListen", false);
 
-            // 얼굴 표정 있을 경우 사용
+            // 얼굴 표정 있을 경우 사용 (targetCharacter에 적용)
             // 고도화 고려 : 현재 Listen 재생일 경우 사용하는 추가 기능도 가능(StatusManager에서 관리 추천)
-            EmotionManager.Instance.ShowEmotionFromAction("default");   // normal도 고려
+            EmotionManager.Instance.ShowEmotionFromAction("default", targetCharacter);   // normal도 고려
         }
         catch
         {
