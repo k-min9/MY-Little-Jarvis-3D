@@ -102,6 +102,12 @@ public class ApiGeminiDirectClient : MonoBehaviour
                 );
 
                 Debug.Log($"[GeminiDirect] Prompt length: {prompt.Length}" + (retryCount > 0 ? $" (retry {retryCount})" : ""));
+                
+                // 프롬프트 디버그 저장
+                if (DebugManager.Instance != null)
+                {
+                    DebugManager.Instance.SavePromptDebug(prompt, charName, "geminidirect");
+                }
 
                 // Gemini API 호출
                 await StreamGeminiAPI(prompt, aiLanguage, chatIdx, playerName, onChunkReceived);
@@ -197,6 +203,14 @@ public class ApiGeminiDirectClient : MonoBehaviour
 
         // 응답 수신 및 SSE 스트리밍 처리
         StringBuilder responseLog = new StringBuilder();
+        
+        // 디버그 로그 축적용
+        StringBuilder debugLog = new StringBuilder();
+        debugLog.AppendLine("=== Gemini Direct Stream Debug Log ===");
+        debugLog.AppendLine($"Timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        debugLog.AppendLine($"Model: {modelName}");
+        debugLog.AppendLine($"Chat Index: {chatIdx}");
+        debugLog.AppendLine("========================================\n");
 
         string accumulatedText = "";
         List<string> sentencesAlreadySent = new List<string>();
@@ -229,19 +243,30 @@ public class ApiGeminiDirectClient : MonoBehaviour
                         if (TryExtractChunkTextFromJson(payload, out string chunkText))
                         {
                             accumulatedText += chunkText;
+                            debugLog.AppendLine($"[Chunk Received] '{chunkText}'");
 
                             // stop string 확인 및 부분 매칭 제거
                             string cleanedText;
                             bool stopFound;
                             (cleanedText, stopFound) = ApplyStoppingStrings(accumulatedText);
+                            
+                            debugLog.AppendLine($"[Accumulated] '{accumulatedText}'");
+                            debugLog.AppendLine($"[After StopString] '{cleanedText}', ShouldStop={stopFound}");
 
                             // 문장 분리 (줄바꿈 보존)
                             List<string> sentences = GetPunctuationSentences(cleanedText, true);
+                            
+                            debugLog.AppendLine($"[Sentences Split] Count={sentences.Count}, AlreadySent={sentencesAlreadySent.Count}");
+                            for (int j = 0; j < sentences.Count; j++)
+                            {
+                                debugLog.AppendLine($"  [Sentence {j}] '{sentences[j]}'");
+                            }
 
                             // 새로운 문장만 전송
                             for (int i = sentencesAlreadySent.Count; i < sentences.Count; i++)
                             {
                                 string sentence = sentences[i];
+                                debugLog.AppendLine($"[Before NameReplace {i}] '{sentence}'");
 
                                 // 선생님 이름 적용
                                 if (!string.IsNullOrEmpty(playerName))
@@ -253,6 +278,8 @@ public class ApiGeminiDirectClient : MonoBehaviour
                                     sentence = Regex.Replace(sentence, @"(<USER>|<user>|{{user}})", "You");
                                 }
                                 
+                                debugLog.AppendLine($"[Before StopClean {i}] '{sentence}'");
+                                
                                 // Stop strings 잔여물 제거
                                 sentence = sentence
                                     .Replace("<end_of_turn>", "")
@@ -263,14 +290,20 @@ public class ApiGeminiDirectClient : MonoBehaviour
                                     .Replace("<|im_start|>", "")
                                     .Trim();
                                 
+                                debugLog.AppendLine($"[After StopClean {i}] '{sentence}'");
+                                
                                 if (string.IsNullOrEmpty(sentence))
+                                {
+                                    debugLog.AppendLine($"[Filtered Empty {i}]");
                                     continue;
+                                }
 
                                 // JObject 생성 (기존 서버 형식과 호환)
                                 JObject responseJson = CreateResponseJson(sentence, language, chatIdx);
 
                                 // 콜백 호출
                                 onChunkReceived?.Invoke(responseJson);
+                                debugLog.AppendLine($"[Sent to Callback {i}] '{sentence}'");
 
                                 sentencesAlreadySent.Add(sentence);
                             }
@@ -302,9 +335,78 @@ public class ApiGeminiDirectClient : MonoBehaviour
                 }
             }
         }
+        
+        // Unity 추가 로직
+        // 남은 텍스트 처리 (마지막 조각) - 미완성 문장도 포함
+        debugLog.AppendLine($"\n[Final Processing] AccumulatedText: '{accumulatedText}'");
+        debugLog.AppendLine($"[Final Processing] AlreadySent Count: {sentencesAlreadySent.Count}");
+        
+        if (!string.IsNullOrEmpty(accumulatedText))
+        {
+            string finalCleaned;
+            (finalCleaned, _) = ApplyStoppingStrings(accumulatedText);
+            debugLog.AppendLine($"[Final After StopString] '{finalCleaned}'");
+            
+            // 전체 텍스트를 다시 파싱 (미완성 문장 포함)
+            List<string> finalSentences = GetPunctuationSentences(finalCleaned, true);
+            debugLog.AppendLine($"[Final Sentences] Count={finalSentences.Count}");
+            
+            // 이미 보낸 개수를 넘는 문장만 전송
+            for (int i = sentencesAlreadySent.Count; i < finalSentences.Count; i++)
+            {
+                string sentence = finalSentences[i];
+                debugLog.AppendLine($"[Final Sentence {i}] '{sentence}'");
+                
+                // 선생님 이름 적용
+                if (!string.IsNullOrEmpty(playerName))
+                {
+                    sentence = Regex.Replace(sentence, @"(<USER>|<user>|{{user}})", playerName);
+                }
+                else
+                {
+                    sentence = Regex.Replace(sentence, @"(<USER>|<user>|{{user}})", "You");
+                }
+                
+                // Stop strings 잔여물 제거
+                sentence = sentence
+                    .Replace("<end_of_turn>", "")
+                    .Replace("</end_of_turn>", "")
+                    .Replace("<|im_end|>", "")
+                    .Replace("<|eot_id|>", "")
+                    .Replace("<start_of_turn>user", "")
+                    .Replace("<|im_start|>", "")
+                    .Trim();
+                
+                if (!string.IsNullOrEmpty(sentence))
+                {
+                    JObject responseJson = CreateResponseJson(sentence, language, chatIdx);
+                    onChunkReceived?.Invoke(responseJson);
+                    debugLog.AppendLine($"[Final Sent {i}] '{sentence}'");
+                }
+            }
+        }
 
         // 응답 로그 저장
         SaveResponseLog(responseLog.ToString());
+        
+        // 디버그 로그 저장
+        try
+        {
+            if (DebugManager.Instance != null)
+            {
+                string charName = "direct";
+                DebugManager.Instance.SaveTextToFile(debugLog.ToString(), $"stream_{charName}", "geminidirect_debug");
+                Debug.Log($"[GeminiDirect] Debug log saved for {charName}");
+            }
+            else
+            {
+                Debug.LogWarning("[GeminiDirect] DebugManager.Instance is null, cannot save debug log");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[GeminiDirect] Failed to save debug log: {ex.Message}");
+        }
     }
 
     // SSE JSON에서 텍스트 추출
@@ -461,7 +563,7 @@ public class ApiGeminiDirectClient : MonoBehaviour
             inputString = Regex.Replace(inputString, @"\n+", UNIQUE3);
 
             // 문장 분리 기준으로 교체 (줄바꿈 제외)
-            string[] separators = { ". ", ".\\", "? ", "?\\", "! ", "!\\", "？", "。", "！" };
+            string[] separators = { ". ", ".\\", "? ", "?\\", "! ", "!\\", "… ", "？", "。", "！" };
             foreach (string sep in separators)
             {
                 if (sep.Length == 1)
@@ -594,21 +696,19 @@ public class ApiGeminiDirectClient : MonoBehaviour
         if (sentences.Count > 0)
         {
             string lastSentence = sentences[sentences.Count - 1];
-            if (lastSentence.Length >= 15 || sentences.Count == 1)
+            string trimmedLast = lastSentence.TrimEnd();
+            
+            if (trimmedLast.Length > 0)
             {
-                string trimmedLast = lastSentence.TrimEnd();
-                if (trimmedLast.Length > 0)
-                {
-                    char lastPunc = trimmedLast[trimmedLast.Length - 1];
-                    bool endsWithComplete = Array.IndexOf(COMPLETE_PUNCS, lastPunc) >= 0;
+                char lastChar = trimmedLast[trimmedLast.Length - 1];
+                bool endsWithComplete = Array.IndexOf(COMPLETE_PUNCS, lastChar) >= 0;
 
-                    if (endsWithComplete)
+                if (endsWithComplete)
+                {
+                    // 마침표인 경우 숫자 다음이 아닌지 확인
+                    if (lastChar != '.' || (trimmedLast.Length >= 2 && !char.IsDigit(trimmedLast[trimmedLast.Length - 2])))
                     {
-                        // 마침표인 경우 숫자 다음이 아닌지 확인
-                        if (lastPunc != '.' || (trimmedLast.Length >= 2 && !char.IsDigit(trimmedLast[trimmedLast.Length - 2])))
-                        {
-                            isEnded = true;
-                        }
+                        isEnded = true;
                     }
                 }
             }

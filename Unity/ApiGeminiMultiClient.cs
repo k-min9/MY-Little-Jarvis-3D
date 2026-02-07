@@ -159,6 +159,12 @@ public class ApiGeminiMultiClient : MonoBehaviour
                 // 프롬프트 생성
                 string prompt = ApiGeminiMultiPromptBuilder.BuildGemmaMultiPrompt(request);
                 Debug.Log($"[ApiGeminiMultiClient] 프롬프트 생성 완료 (길이: {prompt.Length})");
+                
+                // 프롬프트 디버그 저장
+                if (DebugManager.Instance != null)
+                {
+                    DebugManager.Instance.SavePromptDebug(prompt, request.targetSpeaker, "geminimultidirect");
+                }
 
                 // API 호출
                 await StreamGeminiAPI(apiKey, prompt, request, result, onChunkReceived, cancellationToken);
@@ -254,6 +260,14 @@ public class ApiGeminiMultiClient : MonoBehaviour
         // 응답 수신 및 SSE 스트리밍 처리
         StringBuilder accumulator = new StringBuilder();
         int sentenceIndex = 0;
+        
+        // 디버그 로그 축적용
+        StringBuilder debugLog = new StringBuilder();
+        debugLog.AppendLine("=== Gemini Multi Stream Debug Log ===");
+        debugLog.AppendLine($"Character: {request.targetSpeaker}");
+        debugLog.AppendLine($"Timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        debugLog.AppendLine($"Model: {modelName}");
+        debugLog.AppendLine("===================================\n");
 
         using (WebResponse response = await httpRequest.GetResponseAsync())
         using (Stream responseStream = response.GetResponseStream())
@@ -283,25 +297,46 @@ public class ApiGeminiMultiClient : MonoBehaviour
                         {
                             accumulator.Append(chunkText);
                             string accumulated = accumulator.ToString();
+                            
+                            debugLog.AppendLine($"[Chunk Received] '{chunkText}'");
 
                             // Stop string 체크 및 적용
                             string processed = ApplyStopStrings(accumulated, out bool shouldStop);
+                            
+                            debugLog.AppendLine($"[Accumulated] '{accumulated}'");
+                            debugLog.AppendLine($"[After StopString] '{processed}', ShouldStop={shouldStop}");
 
                             // 문장 분리 및 콜백 (완성 문장만 방출)
                             List<string> sentences = GetPunctuationSentences(processed, false, false);
+                            
+                            debugLog.AppendLine($"[Sentences Split] Count={sentences.Count}, ResultCount={result.sentences.Count}");
+                            for (int i = 0; i < sentences.Count; i++)
+                            {
+                                debugLog.AppendLine($"  [Sentence {i}] '{sentences[i]}'");
+                            }
+                            
                             while (sentences.Count > result.sentences.Count)
                             {
                                 int newIdx = result.sentences.Count;
                                 string newSentence = sentences[newIdx];
 
+                                debugLog.AppendLine($"[Before PostProcess {newIdx}] '{newSentence}'");
+                                
                                 // 후처리 적용
                                 newSentence = PostProcessReply(newSentence, request.playerName);
+                                
+                                debugLog.AppendLine($"[After PostProcess {newIdx}] '{newSentence}'");
 
                                 if (!string.IsNullOrWhiteSpace(newSentence))
                                 {
                                     result.sentences.Add(newSentence);
                                     onChunkReceived?.Invoke(newSentence, request.targetSpeaker, sentenceIndex);
+                                    debugLog.AppendLine($"[Sent to Callback {sentenceIndex}] '{newSentence}'");
                                     sentenceIndex++;
+                                }
+                                else
+                                {
+                                    debugLog.AppendLine($"[Filtered Empty {newIdx}]");
                                 }
                             }
 
@@ -328,21 +363,37 @@ public class ApiGeminiMultiClient : MonoBehaviour
 
             // 남은 텍스트 처리 (마지막 조각)
             string remaining = accumulator.ToString();
+            debugLog.AppendLine($"\n[Final Processing] Remaining: '{remaining}'");
+            
             remaining = ApplyStopStrings(remaining, out _);
+            debugLog.AppendLine($"[Final After StopString] '{remaining}'");
+            
             remaining = PostProcessReply(remaining, request.playerName);
+            debugLog.AppendLine($"[Final After PostProcess] '{remaining}'");
 
             List<string> finalSentences = GetPunctuationSentences(remaining, false, true);
+            debugLog.AppendLine($"[Final Sentences] Count={finalSentences.Count}");
+            
             while (finalSentences.Count > result.sentences.Count)
             {
                 int idx = result.sentences.Count;
                 string sentence = finalSentences[idx];
+                debugLog.AppendLine($"[Final Sentence {idx}] '{sentence}'");
+                
                 if (!string.IsNullOrWhiteSpace(sentence))
                 {
                     result.sentences.Add(sentence);
                     onChunkReceived?.Invoke(sentence, request.targetSpeaker, sentenceIndex);
+                    debugLog.AppendLine($"[Final Sent {sentenceIndex}] '{sentence}'");
                     sentenceIndex++;
                 }
             }
+        }
+        
+        // 디버그 로그 저장
+        if (DebugManager.Instance != null)
+        {
+            DebugManager.Instance.SaveTextToFile(debugLog.ToString(), $"stream_{request.targetSpeaker}", "geminimulti_debug");
         }
     }
 
