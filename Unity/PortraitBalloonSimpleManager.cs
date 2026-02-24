@@ -34,21 +34,55 @@ public class PortraitBalloonSimpleManager : MonoBehaviour
 
     private void Update()
     {
-        if (hideTimer > 0f)
-            hideTimer -= Time.deltaTime;
+        // Operator 모드일 때와 아닐 때 다르게 동작
+        if (!ChatModeManager.Instance.IsOperatorMode())
+        {
+            // Portrait 일반 모드
+            if (hideTimer > 0f)
+                hideTimer -= Time.deltaTime;
 
-        if (hideTimer <= 0f && StatusManager.Instance.IsAnsweringPortrait)
-            Hide();
+            if (hideTimer <= 0f && portraitBalloonSimple.activeSelf)
+                Hide();
 
-        if (StatusManager.Instance.IsAnsweringPortrait)
-            UpdateBalloonPosition();
+            if (StatusManager.Instance.IsAnsweringPortrait && portraitBalloonSimple.activeSelf)
+                UpdateBalloonPosition();
+        }
+        else
+        {
+            // Operator 모드
+            // 타이머 갱신
+            if (hideTimer > 0f)
+            {
+                hideTimer -= Time.deltaTime;
+            }
+
+            // 타이머가 완료되면 말풍선 숨기기 + IsAnsweringOperator 해제
+            if (hideTimer <= 0f && StatusManager.Instance.IsAnsweringOperator && portraitBalloonSimple.activeSelf)
+            {
+                Hide();
+            }
+
+            // 말풍선 활성화 중이면 위치 갱신
+            if (StatusManager.Instance.IsAnsweringOperator && portraitBalloonSimple.activeSelf)
+            {
+                UpdateBalloonPosition();
+            }
+
+            // 다른 상태일 때 숨기기
+            if (StatusManager.Instance.IsPicking || StatusManager.Instance.IsListening || StatusManager.Instance.IsAsking)
+            {
+                Hide();
+            }
+        }
     }
 
+    // 오퍼레이터 모드 - AnswerBalloon위임용
     public void ShowInf()
     {
         hideTimer = 99999f;
         portraitBalloonSimple.SetActive(true);
         portraitText.text = string.Empty;
+        StatusManager.Instance.IsAnsweringOperator = true;
         UpdateBalloonPosition();
     }
 
@@ -56,6 +90,7 @@ public class PortraitBalloonSimpleManager : MonoBehaviour
     {
         portraitBalloonSimple.SetActive(true);
         portraitText.text = string.Empty;
+        StatusManager.Instance.IsAnsweringOperator = true;
         UpdateBalloonPosition();
     }
 
@@ -89,6 +124,7 @@ public class PortraitBalloonSimpleManager : MonoBehaviour
     {
         hideTimer = 0f;
         portraitBalloonSimple.SetActive(false);
+        StatusManager.Instance.IsAnsweringOperator = false;
     }
 
     private void UpdateBalloonPosition()

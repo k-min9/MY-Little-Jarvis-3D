@@ -70,6 +70,13 @@ public class AnswerBalloonSimpleManager : MonoBehaviour
         if (AnswerBalloonManager.Instance.isAnswered) AnswerBalloonManager.Instance.HideAnswerBalloon();
         ChatBalloonManager.Instance.HideChatBalloon();
 
+        // Operator 모드일 경우 PortraitBalloonSimpleManager로 라우팅
+        if (ChatModeManager.Instance.IsOperatorMode())
+        {
+            PortraitBalloonSimpleManager.Instance.ShowInf();
+            return;
+        }
+
         hideTimer = 99999f;
         answerBalloonSimple.SetActive(true);
         answerText.text = string.Empty; // 텍스트 초기화
@@ -84,6 +91,13 @@ public class AnswerBalloonSimpleManager : MonoBehaviour
         if (AnswerBalloonManager.Instance.isAnswered) AnswerBalloonManager.Instance.HideAnswerBalloon();
         ChatBalloonManager.Instance.HideChatBalloon();
 
+        // Operator 모드일 경우 PortraitBalloonSimpleManager로 라우팅
+        if (ChatModeManager.Instance.IsOperatorMode())
+        {
+            PortraitBalloonSimpleManager.Instance.Show();
+            return;
+        }
+
         answerBalloonSimple.SetActive(true);
         answerText.text = string.Empty; // 텍스트 초기화
         StatusManager.Instance.IsAnsweringSimple = true; // StatusManager 상태 업데이트
@@ -95,6 +109,13 @@ public class AnswerBalloonSimpleManager : MonoBehaviour
     {
         // 자동번역 시도
         text = LanguageManager.Instance.Translate(text);
+
+        // Operator 모드일 경우 PortraitBalloonSimpleManager로 라우팅
+        if (ChatModeManager.Instance.IsOperatorMode())
+        {
+            PortraitBalloonSimpleManager.Instance.ModifyText(text);
+            return;
+        }
 
         answerText.text = text; // 텍스트 변경
 
@@ -116,6 +137,13 @@ public class AnswerBalloonSimpleManager : MonoBehaviour
     // 현재(마지막) 오디오 재생 후 AnswerBalloonSimple을 숨기는 코루틴 호출
     public void HideAnswerBalloonSimpleAfterAudio()
     {
+        // Operator 모드일 경우 PortraitBalloonSimpleManager로 라우팅
+        if (ChatModeManager.Instance.IsOperatorMode())
+        {
+            PortraitBalloonSimpleManager.Instance.HideAfterAudio();
+            return;
+        }
+
         AudioClip clip = VoiceManager.Instance.GetAudioClip();
 
         if (clip != null)
@@ -127,6 +155,14 @@ public class AnswerBalloonSimpleManager : MonoBehaviour
     // AnswerBalloonSimple을 숨기는 함수
     public void HideAnswerBalloonSimple()
     {
+        // Operator 모드일 경우 PortraitBalloonSimpleManager로 라우팅
+        if (ChatModeManager.Instance.IsOperatorMode())
+        {
+            PortraitBalloonSimpleManager.Instance.Hide();
+            StatusManager.Instance.IsAnsweringSimple = false;
+            return;
+        }
+
         hideTimer = 0f;  // inf용 초기화
         answerBalloonSimple.SetActive(false);
         StatusManager.Instance.IsAnsweringSimple = false; 
