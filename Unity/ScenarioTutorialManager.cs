@@ -231,6 +231,23 @@ public class ScenarioTutorialManager : MonoBehaviour
                 }
                 break;
 
+            case "A04_2_api_key_input2":  // I03 시나리오에서 진입 (마지막 선택지 = 그만둘래)
+                if (index >= 0 && index <= 2-2)  // 0: Gemini
+                {
+                    string[] apiTypes2 = { "gemini", "openrouter", "chatgpt" };
+                    string selectedApiType2 = apiTypes2[index];
+                    ChoiceInputManager.Instance.ShowInput(selectedApiType2);
+                }
+                else if (index >= 0 && index <= 2-1)  // TODO: 1: OpenRouter
+                {
+                    StartCoroutine(Scenario_A04_2_APIKeyInput_NextVersion());
+                }
+                else  // <그만둘래> → 설정 취소
+                {
+                    StartCoroutine(Scenario_A98_ConfigCancel());
+                }
+                break;
+
             case "A97_connect_test_retry":
                 if (index == 0)  // <다시 시도>
                 {
@@ -703,6 +720,17 @@ public class ScenarioTutorialManager : MonoBehaviour
         ChoiceManager.Instance.ShowChoice(3, "A04_2_api_key_input");  // <Gemini>, <OpenRouter>, <전 선택지로>, //TODO : <ChatGPT>
     }
 
+    public IEnumerator Scenario_A04_2_APIKeyInput2()
+    {
+        float d1 = ScenarioUtil.Narration("A04_2_api_key_input_1", "API KEY 관련 모델을 골라주세요");
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
+        yield return new WaitForSeconds(d1);
+
+        yield return new WaitForSeconds(0.2f);
+        // I03 시나리오에서 진입 시 사용 - 마지막 선택지가 '전 선택지로' 아닌 '그만둘래'
+        ChoiceManager.Instance.ShowChoice(3, "A04_2_api_key_input2");  // <Gemini>, <OpenRouter>, <그만둘래>
+    }
+
      // 다음 버전에 패치할게요.+ 모델을 골라주세요.
     public IEnumerator Scenario_A04_2_APIKeyInput_NextVersion()
     {
@@ -725,37 +753,30 @@ public class ScenarioTutorialManager : MonoBehaviour
         // 연결 시도 전 시간 측정 시작
         float startTime = Time.realtimeSinceStartup;
 
-        // API 키 결정
-        string api_key_Gemini = SettingManager.Instance.settings.api_key_gemini;
-        string api_key_OpenRouter = SettingManager.Instance.settings.api_key_openRouter;
-        string api_key_ChatGPT = "";  // TODO : SettingManager에 입력/저장 가능하게
-        string apiKey = "";
-        switch (target)
-        {
-            case "ChatGPT": apiKey = api_key_ChatGPT ?? ""; break;
-            case "Gemini": apiKey = api_key_Gemini ?? ""; break;
-            case "OpenRouter": apiKey = api_key_OpenRouter ?? ""; break;
-        }
-
-        // TODO : 입력 apiKey가 빈 값일 경우 무료서버로 테스트할지 물어보기 추가.
-
-        string url = $"http://127.0.0.1:5000/health_check_platform?target={target}&api_key={UnityWebRequest.EscapeURL(apiKey)}";
         bool isConnected = false;
 
-        using (UnityWebRequest request = UnityWebRequest.Get(url))
+        if (target == "Gemini")
         {
-            yield return request.SendWebRequest();
-
-            if (request.result == UnityWebRequest.Result.Success)
-            {
-                try
-                {
-                    var json = JObject.Parse(request.downloadHandler.text);
-                    if (json["status"]?.ToString() == "available")
-                        isConnected = true;
-                }
-                catch { }
-            }
+            string apiKey = SettingManager.Instance.settings.api_key_gemini ?? "";
+            // ServerManager.ValidateGeminiAPIKeyAsync 재사용 (async→코루틴 브릿지)
+            bool isDone = false;
+            _ = ServerManager.Instance.ValidateGeminiAPIKeyAsync(apiKey)
+                .ContinueWith(t => { isConnected = t.Result; isDone = true; });
+            yield return new WaitUntil(() => isDone);
+        }
+        else if (target == "OpenRouter")
+        {
+            // TODO : 차후 구현
+            string apiKey = SettingManager.Instance.settings.api_key_openRouter ?? "";
+            // bool isDone = false;
+            // _ = ServerManager.Instance.ValidateOpenRouterAPIKeyAsync(apiKey)
+            //     .ContinueWith(t => { isConnected = t.Result; isDone = true; });
+            // yield return new WaitUntil(() => isDone);
+        }
+        else if (target == "ChatGPT")
+        {
+            // TODO : ChatGPT 검증 구현
+            Debug.LogWarning("[A97] ChatGPT 직접 검증 미구현");
         }
 
         // 경과 시간 계산
@@ -774,7 +795,7 @@ public class ScenarioTutorialManager : MonoBehaviour
             float d2 = ScenarioUtil.Narration("A97_connect_test_2", "성공했어요 선생님");
             ScenarioUtil.ShowEmotion("><");  // 아로나만 표정
             yield return new WaitForSeconds(d2);
-            StartCoroutine(Scenario_A99_ConfigEnd());
+            StartCoroutine(Scenario_A99_ConfigEnd_WithoutServer());
         }
         else
         {
@@ -807,6 +828,25 @@ public class ScenarioTutorialManager : MonoBehaviour
         // 서버 기동하기
         JarvisServerManager.Instance.RunJarvisServerWithCheck();
 
+        float d1 = ScenarioUtil.Narration("A99_config_end_1", "설정이 완료되었어요, 선생님!");
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
+        yield return new WaitForSeconds(d1);
+
+        float d2 = ScenarioUtil.Narration("A99_config_end_2", "필요하실 땐 언제든지 다시 설정하실 수 있어요.");
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
+        yield return new WaitForSeconds(d2);
+
+        float d3 = ScenarioUtil.Narration("A99_config_end_3", "이제 준비가 끝났어요, 선생님. 앞으로 나눌 이야기들이 정말 기대돼요!");
+        ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
+        yield return new WaitForSeconds(d3);
+
+        SettingManager.Instance.settings.isTutorialCompleted = true;
+
+        EndTutorial();
+    }
+
+    private IEnumerator Scenario_A99_ConfigEnd_WithoutServer()
+    {
         float d1 = ScenarioUtil.Narration("A99_config_end_1", "설정이 완료되었어요, 선생님!");
         ScenarioUtil.ShowEmotion("star");  // 아로나만 표정
         yield return new WaitForSeconds(d1);

@@ -93,6 +93,15 @@ public static class ChoiceData
             }
         },
         {
+            // I03(무료 키 소진) 시나리오에서 진입 시 사용 - '전 선택지로' 없이 '그만둘래'로 종료
+            "A04_2_api_key_input2", new List<Dictionary<string, string>>
+            {
+                new Dictionary<string, string> { { "ko", "Gemini" }, { "jp", "Gemini" }, { "en", "Gemini" } },
+                new Dictionary<string, string> { { "ko", "OpenRouter" }, { "jp", "OpenRouter" }, { "en", "OpenRouter" } },
+                new Dictionary<string, string> { { "ko", "그만둘래" }, { "jp", "やめる" }, { "en", "Cancel" } },
+            }
+        },
+        {
             "A97_connect_test_retry", new List<Dictionary<string, string>>
             {
                 new Dictionary<string, string> { { "ko", "다시 시도" }, { "jp", "再試行する" }, { "en", "Try again" } },
@@ -158,6 +167,14 @@ public static class ChoiceData
                 new Dictionary<string, string> { { "ko", "Full (약 16GB)" }, { "jp", "Full（約16GB）" }, { "en", "Full (about 16GB)" } },
                 new Dictionary<string, string> { { "ko", "Full Edition에 대해 설명해줘" }, { "jp", "Full Editionついて説明して" }, {"en", "Tell me about the Full edition"} } ,
                 new Dictionary<string, string> { { "ko", "나중에 설치할게" }, { "jp", "あとでインストールする" }, { "en", "I'll install it later" } }
+            }
+        },
+        {
+            "I03_free_key_exhausted", new List<Dictionary<string, string>>
+            {
+                new Dictionary<string, string> { { "ko", "로컬 서버 설치" }, { "jp", "ローカルサーバーをインストール" }, { "en", "Install local server" } },
+                new Dictionary<string, string> { { "ko", "외부 플랫폼 사용 (API 키 입력)" }, { "jp", "外部プラットフォームを使う（APIキー入力）" }, { "en", "Use external platform (enter API key)" } },
+                new Dictionary<string, string> { { "ko", "나중에할게" }, { "jp", "あとにする" }, { "en", "Maybe later" } }
             }
         }
     };

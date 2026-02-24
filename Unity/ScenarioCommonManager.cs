@@ -81,6 +81,11 @@ public class ScenarioCommonManager : MonoBehaviour
     // 서버 기동 여부 묻는 시나리오
     public IEnumerator Scenario_C02_AskToStartServer()
     {
+
+        // 중복 실행 가능성이 높음 + 이미 다른 시나리오 진행중일 경우 반환
+        if (StatusManager.Instance.isScenario) yield break;
+        StatusManager.Instance.isScenario = true;
+
         float d1 = ScenarioUtil.Narration("C02_ask_start_server_1", "선생님, 안녕하세요!");
         ScenarioUtil.ShowEmotion("smile");
         yield return new WaitForSeconds(d1);
@@ -90,6 +95,8 @@ public class ScenarioCommonManager : MonoBehaviour
         yield return new WaitForSeconds(d2);
 
         yield return new WaitForSeconds(0.2f);
+
+        StatusManager.Instance.isScenario = false;
         ChoiceManager.Instance.ShowChoice(2, "C02_ask_start_server");  // <네>, <아니오>
     }
 
@@ -307,6 +314,22 @@ public class ScenarioCommonManager : MonoBehaviour
     {
         float d1 = ScenarioUtil.Narration("C99_empty_query", "뭔가 말씀하셨나요? 전달된 내용이 없어요 선생님.");
         ScenarioUtil.ShowEmotion("confused");
+        yield return new WaitForSeconds(d1);
+    }
+
+    // VL Planer 알림 (확인 필요 사항 안내)
+    public IEnumerator Run_C99_Alert_from_planner()
+    {
+        float d1 = ScenarioUtil.Narration("C99_alert_from_planner", "확인이 필요한 사항이 생겼어요, 선생님!");
+        ScenarioUtil.ShowEmotion("question");
+        yield return new WaitForSeconds(d1);
+    }
+
+    // 작업 종료 알림
+    public IEnumerator Run_C99_TaskDone()
+    {
+        float d1 = ScenarioUtil.Narration("C99_task_done", "작업이 종료되었어요, 선생님!");
+        ScenarioUtil.ShowEmotion("star");
         yield return new WaitForSeconds(d1);
     }
 

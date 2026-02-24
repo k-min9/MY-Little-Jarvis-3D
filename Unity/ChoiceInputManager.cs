@@ -18,22 +18,23 @@ public class ChoiceInputManager : MonoBehaviour
     }
 
     [Header("UI Components")]
-    public GameObject inputPanel;               // Panel 오브젝트
     public Text labelText;                      // Label 텍스트 (chatgpt, gemini, openrouter 등)
     public TMP_InputField apiKeyInputField;     // InputField 오브젝트
     public Text keyChoiceInputTestResultText;   // Testing... Success Fail
+    public TMP_InputField serverGeminiApiKeyInputField;
+    public TMP_InputField serverOpenRouterApiKeyInputField;
 
     private int currentApiTypeIdx = -1;
 
     private void Start()
     {
-        inputPanel.SetActive(false);
+        // 초기 비활성화는 UIManager.Awake()에서 처리
     }
 
     // 입력 패널을 보여주고 라벨을 지정 - ChatGPT, Gemini, OpenRouter
     public void ShowInput(string apiType)
     {
-        inputPanel.SetActive(true);
+        UIManager.Instance.ShowChoiceInput();
         keyChoiceInputTestResultText.text = "";
 
         currentApiTypeIdx = GetIndexForApiType(apiType);
@@ -52,22 +53,26 @@ public class ChoiceInputManager : MonoBehaviour
     // InputField 변할때마다 값 갱신
     public void SetApiKey(string value)
     {
-        Debug.Log("SetApiKey" + currentApiTypeIdx + ":" + value);
+        // 양쪽 끝 공백/개행 제거
+        string trimmed = value.Trim();
+        Debug.Log($"[ChoiceInputManager] SetApiKey idx={currentApiTypeIdx} value='{trimmed}'");
+
         // 0: Gemini, 1: OpenRouter, 2: ChatGPT
+        // serverXxxApiKeyInputField.text 세팅 → 해당 필드의 OnValueChanged → SetAPIKeyGemini/SetAPIKeyOpenRouter 자동 호출
         if (currentApiTypeIdx == 0)
         {
-            SettingManager.Instance.SetAPIKeyGemini(value);
+            serverGeminiApiKeyInputField.text = trimmed;
         }
         else if (currentApiTypeIdx == 1)
         {
-            SettingManager.Instance.SetAPIKeyOpenRouter(value);
-        } 
+            serverOpenRouterApiKeyInputField.text = trimmed;
+        }
     }
 
     // 입력 패널을 숨깁니다.
     public void HideInput()
     {
-        inputPanel.SetActive(false);
+        UIManager.Instance.HideChoiceInput();
     }
 
     // 종료 버튼으로 전 메뉴로 돌아가기
@@ -84,13 +89,18 @@ public class ChoiceInputManager : MonoBehaviour
         StartCoroutine(ScenarioTutorialManager.Instance.Scenario_A97_ConnectTest(currentApiTypeIdx));  // 선택한 대상 index 전달
     }
 
-    // Test 버튼으로 API 테스트 ;현재는 gemini only
+    // Test 버튼으로 API 테스트
     public void TestApiKey()
     {
-        // Test 전 설정 체크
-        SettingManager.Instance.settings.server_type_idx = 0;
-
-        ServerManager.Instance.CallValidateGeminiAPIKey();
+        if (currentApiTypeIdx == 0) // Gemini
+        {
+            SettingManager.Instance.settings.server_type_idx = 0;
+            ServerManager.Instance.CallValidateGeminiAPIKey();
+        }
+        else if (currentApiTypeIdx == 1) // OpenRouter
+        {
+            ServerManager.Instance.CallValidateOpenRouterAPIKey();
+        }
     }
 
     // 현재 입력된 API Key를 가져옵니다.

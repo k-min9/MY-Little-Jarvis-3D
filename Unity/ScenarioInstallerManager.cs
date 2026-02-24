@@ -167,6 +167,25 @@ public class ScenarioInstallerManager : MonoBehaviour
                 }
                 break;
 
+            case "I03_free_key_exhausted":
+                // <로컬 서버 설치>
+                if (index == 0)
+                {
+                    StartCoroutine(Scenario_I00_CurrentCheckVersion());
+                }
+                // <외부 플랫폼 사용 (API 키 입력)>
+                else if (index == 1)
+                {
+                    EndInstaller();
+                    StartCoroutine(ScenarioTutorialManager.Instance.Scenario_A04_2_APIKeyInput2());
+                }
+                // <나중에할게>
+                else if (index == 2)
+                {
+                    StartCoroutine(Scenario_I01_2_InstallLater());
+                }
+                break;
+
             default:
                 Debug.LogWarning("정의되지 않은 인스톨러 시나리오 선택 분기");
                 break;
@@ -423,9 +442,30 @@ public class ScenarioInstallerManager : MonoBehaviour
         ScenarioUtil.ShowEmotion("><");  // 아로나 표정
         yield return new WaitForSeconds(d2);
 
-        // 서버 기동
-        SampleServerManager.Instance.ShutdownServer();
+        // 서버 기동 (설치 프로그램 프로세스가 완전히 종료될 시간 확보)
         JarvisServerManager.Instance.ShutdownServer();
+        yield return new WaitForSeconds(3f);
         JarvisServerManager.Instance.RunJarvisServerWithCheck();
+    }
+
+    /////////////////////////////////// I03 ///////////////////////////////////////////////
+    // 무료 키 소진 또는 무료 서버 불안정 시 호출
+    public IEnumerator Scenario_I03_FreeKeyExhausted()
+    {
+        StatusManager.Instance.isScenario = true;
+
+        yield return new WaitForSeconds(0.5f);
+
+        float d1 = ScenarioUtil.Narration("I03_free_key_exhausted_1", "선생님, 무료 서버 상태가 좋지 않은 것 같아요.");
+        ScenarioUtil.ShowEmotion("confused");
+        yield return new WaitForSeconds(d1);
+
+        float d2 = ScenarioUtil.Narration("I03_free_key_exhausted_2", "로컬 서버를 설치하거나, 외부 플랫폼을 사용해보실래요?");
+        ScenarioUtil.ShowEmotion("><");
+        yield return new WaitForSeconds(d2);
+
+        yield return new WaitForSeconds(0.2f);
+        // <로컬 서버 설치>, <외부 플랫폼 사용 (API 키 입력)>, <나중에할게>
+        ChoiceManager.Instance.ShowChoice(3, "I03_free_key_exhausted");
     }
 } 
