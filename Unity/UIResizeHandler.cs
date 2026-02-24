@@ -8,7 +8,7 @@ public class UIResizeHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, I
     private RectTransform parentRect;
     private Canvas rootCanvas;
     
-    [SerializeField] private float borderThickness = 10f;
+    [SerializeField] private float borderThickness = 24f;
     [SerializeField] private float minWidth = 90f;  // 60+30
     [SerializeField] private float minHeight = 150f;  // 120+30
 
@@ -151,55 +151,60 @@ public class UIResizeHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, I
         Vector2 delta = localMousePos - initialMousePos;
         Vector2 newSize = initialSize;
         Vector2 newPosition = initialPosition;
+        Vector2 pivot = rectTransform.pivot;
         
         switch (currentDirection)
         {
             case ResizeDirection.Right:
+                // 오른쪽 경계만 이동, 왼쪽 경계 고정
                 newSize.x = Mathf.Max(minWidth, initialSize.x + delta.x);
-                newPosition.x = initialPosition.x + (newSize.x - initialSize.x) * 0.5f;
+                newPosition.x = initialPosition.x + (newSize.x - initialSize.x) * pivot.x;
                 break;
                 
             case ResizeDirection.Left:
+                // 왼쪽 경계만 이동, 오른쪽 경계 고정
                 newSize.x = Mathf.Max(minWidth, initialSize.x - delta.x);
-                newPosition.x = initialPosition.x - (newSize.x - initialSize.x) * 0.5f;
+                newPosition.x = initialPosition.x - (newSize.x - initialSize.x) * (1f - pivot.x);
                 break;
                 
             case ResizeDirection.Top:
+                // 위쪽 경계만 이동, 아래쪽 경계 고정
                 newSize.y = Mathf.Max(minHeight, initialSize.y + delta.y);
-                newPosition.y = initialPosition.y + (newSize.y - initialSize.y) * 0.5f;
+                newPosition.y = initialPosition.y + (newSize.y - initialSize.y) * pivot.y;
                 break;
                 
             case ResizeDirection.Bottom:
+                // 아래쪽 경계만 이동, 위쪽 경계 고정
                 newSize.y = Mathf.Max(minHeight, initialSize.y - delta.y);
-                newPosition.y = initialPosition.y - (newSize.y - initialSize.y) * 0.5f;
+                newPosition.y = initialPosition.y - (newSize.y - initialSize.y) * (1f - pivot.y);
                 break;
                 
             case ResizeDirection.TopRight:
                 newSize.x = Mathf.Max(minWidth, initialSize.x + delta.x);
                 newSize.y = Mathf.Max(minHeight, initialSize.y + delta.y);
-                newPosition.x = initialPosition.x + (newSize.x - initialSize.x) * 0.5f;
-                newPosition.y = initialPosition.y + (newSize.y - initialSize.y) * 0.5f;
+                newPosition.x = initialPosition.x + (newSize.x - initialSize.x) * pivot.x;
+                newPosition.y = initialPosition.y + (newSize.y - initialSize.y) * pivot.y;
                 break;
                 
             case ResizeDirection.TopLeft:
                 newSize.x = Mathf.Max(minWidth, initialSize.x - delta.x);
                 newSize.y = Mathf.Max(minHeight, initialSize.y + delta.y);
-                newPosition.x = initialPosition.x - (newSize.x - initialSize.x) * 0.5f;
-                newPosition.y = initialPosition.y + (newSize.y - initialSize.y) * 0.5f;
+                newPosition.x = initialPosition.x - (newSize.x - initialSize.x) * (1f - pivot.x);
+                newPosition.y = initialPosition.y + (newSize.y - initialSize.y) * pivot.y;
                 break;
                 
             case ResizeDirection.BottomRight:
                 newSize.x = Mathf.Max(minWidth, initialSize.x + delta.x);
                 newSize.y = Mathf.Max(minHeight, initialSize.y - delta.y);
-                newPosition.x = initialPosition.x + (newSize.x - initialSize.x) * 0.5f;
-                newPosition.y = initialPosition.y - (newSize.y - initialSize.y) * 0.5f;
+                newPosition.x = initialPosition.x + (newSize.x - initialSize.x) * pivot.x;
+                newPosition.y = initialPosition.y - (newSize.y - initialSize.y) * (1f - pivot.y);
                 break;
                 
             case ResizeDirection.BottomLeft:
                 newSize.x = Mathf.Max(minWidth, initialSize.x - delta.x);
                 newSize.y = Mathf.Max(minHeight, initialSize.y - delta.y);
-                newPosition.x = initialPosition.x - (newSize.x - initialSize.x) * 0.5f;
-                newPosition.y = initialPosition.y - (newSize.y - initialSize.y) * 0.5f;
+                newPosition.x = initialPosition.x - (newSize.x - initialSize.x) * (1f - pivot.x);
+                newPosition.y = initialPosition.y - (newSize.y - initialSize.y) * (1f - pivot.y);
                 break;
         }
         
