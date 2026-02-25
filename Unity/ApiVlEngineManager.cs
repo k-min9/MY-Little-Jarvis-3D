@@ -1,17 +1,22 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using UnityEngine.Networking;  // UnityWebRequest, UnityWebRequestMultimedia용
 using UnityEngine;
 using UnityEngine.UI;
 
 public class ApiVlEngineManager : MonoBehaviour
 {
+    public const string ScenarioBASkip = "BASkip";
+    public const string ScenarioBAReader = "BAReader";
+
     private static ApiVlEngineManager instance;  // 싱글톤 인스턴스
     public static ApiVlEngineManager Instance
     {
@@ -28,6 +33,11 @@ public class ApiVlEngineManager : MonoBehaviour
     [Header("Click Effect")]
     [SerializeField] private ParticleSystem fx_click;  // 클릭 이펙트
 
+    [Header("VL Engine Config")]
+    [SerializeField] private string defaultScenarioName = ScenarioBASkip;
+    [SerializeField] private string engineFormLang = "ja";
+    [SerializeField] private string engineFormWavFileName = "vl_engine_form_response.wav";
+
     private bool isCanceled = false;  // 취소 요청 플래그
 
     #region 공개 API
@@ -41,13 +51,17 @@ public class ApiVlEngineManager : MonoBehaviour
         Action<JObject> onComplete = null,
         int retryCount = 0,
         int maxRetry = 5,
-        bool verbose = true
+        bool? verbose = null,  // null이면 DevManager에서 자동 결정
+        string scenarioName = ScenarioBASkip
     )
     {
+        // verbose: 명시 전달 시 그 값 사용, null이면 DevManager 상태로 결정
+        bool verboseValue = verbose ?? DevManager.Instance.IsDevModeEnabled();
+        
         isCanceled = false;
         StartCoroutine(ExecuteVlEngineCoroutine(
             query, previousThinkLog, previousAgentState,
-            onEvent, onComplete, retryCount, maxRetry, verbose
+            onEvent, onComplete, retryCount, maxRetry, verboseValue, scenarioName
         ));
     }
 
@@ -71,7 +85,8 @@ public class ApiVlEngineManager : MonoBehaviour
         Action<JObject> onComplete,
         int retryCount,
         int maxRetry,
-        bool verbose
+        bool verbose,
+        string scenarioName
     )
     {
         byte[] imageBytes = null;
@@ -107,7 +122,8 @@ public class ApiVlEngineManager : MonoBehaviour
         JObject lastEventData = null;
         yield return CallEngineStreamApi(
             query, imageBytes, previousThinkLog, previousAgentState,
-            retryCount, maxRetry, verbose, captureOffsetX, captureOffsetY,
+            retryCount, maxRetry, verbose,
+            scenarioName,
             onEvent,
             (lastEvent) => { lastEventData = lastEvent; }
         );
@@ -128,6 +144,24 @@ public class ApiVlEngineManager : MonoBehaviour
             string endMessage = $"[VlEngine] 작업 {kind} - 종료";
             Debug.Log(endMessage);
             ProcessVlMessage(endMessage);
+            
+            // 말풍선 제거
+            NoticeManager.Instance.DeleteNoticeBalloonInstance();
+
+            // done일 경우 yes 풍선 보여주기.
+            if (kind == "done")
+            {
+                EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), "Yes", 2f);
+                StartCoroutine(ScenarioCommonManager.Instance.Run_C99_TaskDone());
+            }
+
+            // fail일 경우 no 풍선 보여주기.
+            if (kind == "fail")
+            {
+                EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), "No", 2f);
+                StartCoroutine(ScenarioCommonManager.Instance.Run_C99_Alert_from_planner());
+            }
+            
             onComplete?.Invoke(lastEventData);
             yield break;
         }
@@ -182,12 +216,78 @@ public class ApiVlEngineManager : MonoBehaviour
                 retryInterval = data["retry_interval"].Value<float>();
             }
 
+            if (kind == "act")
+            {
+                string action = data["action"]?.Value<string>() ?? "";
+
+                if (action == "request_form")
+                {
+                    // 🆕 새로운 action type: engine_form 호출 → 음성 재생 → 클릭
+                    int? x = data["x"]?.Value<int>();
+                    int? y = data["y"]?.Value<int>();
+                    
+                    if (x.HasValue && y.HasValue)
+                    {
+                        string voiceActor = data["voice_actor"]?.Value<string>() ?? "";
+                        string voiceTxt = data["voice_txt"]?.Value<string>() ?? "";
+                        
+                        // Actor 매핑: OCR 이름 → 캐릭터 ID
+                        string mappedActor = MapVoiceActor(voiceActor);
+                        
+                        // TTS 요청 + 재생 대기 + 클릭 (한 번에 처리)
+                        yield return RequestEngineFormVoiceCoroutineWithClick(
+                            mappedActor, voiceTxt, 
+                            x.Value, y.Value, 
+                            captureOffsetX, captureOffsetY,
+                            verbose,
+                            agentState  // 상위 스코프의 agentState 사용
+                        );
+                    }
+                }
+                else if (action == "click")
+                {
+                    // 기존 방식: click + request_voice 플래그 (하위 호환성)
+                    int? x = data["x"]?.Value<int>();
+                    int? y = data["y"]?.Value<int>();
+                    bool requestVoice = data["request_voice"]?.Value<bool>() ?? false;
+
+                    if (x.HasValue && y.HasValue)
+                    {
+                        if (requestVoice)
+                        {
+                            string voiceActor = data["voice_actor"]?.Value<string>() ?? "";
+                            string voiceTxt = data["voice_txt"]?.Value<string>() ?? "";
+
+                            // Actor 매핑: OCR 이름 → 캐릭터 ID
+                            string mappedActor = MapVoiceActor(voiceActor);
+                            
+                            // TTS 요청 + 재생 대기 + 클릭 (한 번에 처리)
+                            yield return RequestEngineFormVoiceCoroutineWithClick(
+                                mappedActor, voiceTxt, 
+                                x.Value, y.Value, 
+                                captureOffsetX, captureOffsetY,
+                                verbose,
+                                agentState  // 상위 스코프의 agentState 사용
+                            );
+                        }
+                        else
+                        {
+                            ExecuteClickFromRelative(x.Value, y.Value, captureOffsetX, captureOffsetY, true, "[VlEngine]");
+                        }
+                    }
+                }
+                else if (action == "alert")
+                {
+                    Debug.Log("[VlEngine] alert 액션 - 알림 효과음 재생 (TODO)");
+                }
+            }
+
             string stateInfo = string.IsNullOrEmpty(expectedStateDisplay) ? "" : $" (expected: {expectedStateDisplay})";
             string waitMessage = $"[VlEngine] {kind} 수신{stateInfo} - {retryInterval}초 후 재요청";
             Debug.Log(waitMessage);
             ProcessVlMessage(waitMessage);
 
-            // retry_interval 대기
+            // retry_interval 대기 후 재귀 호출
             yield return new WaitForSeconds(retryInterval);
 
             // 재귀 호출 (자동 재요청)
@@ -199,7 +299,8 @@ public class ApiVlEngineManager : MonoBehaviour
                 onComplete: onComplete,
                 retryCount: retryCount,  // retryCount는 서버가 관리하므로 그대로 전달
                 maxRetry: maxRetry,
-                verbose: verbose
+                verbose: verbose,
+                scenarioName: scenarioName
             );
             yield break;  // 재귀 호출 후 현재 코루틴 종료
         }
@@ -222,8 +323,7 @@ public class ApiVlEngineManager : MonoBehaviour
         int retryCount,
         int maxRetry,
         bool verbose,
-        int offsetX,
-        int offsetY,
+        string scenarioName,
         Action<JObject> onEvent,
         Action<JObject> onLastEvent
     )
@@ -233,7 +333,10 @@ public class ApiVlEngineManager : MonoBehaviour
         yield return GetBaseUrlCoroutine((url) => { baseUrl = url; });
 
         string apiUrl = baseUrl + "/vl_agent/engine_stream";
-        Debug.Log($"[VlEngine] API 호출: {apiUrl}");
+        string normalizedScenarioName = !string.IsNullOrWhiteSpace(scenarioName) ? scenarioName.Trim()
+            : !string.IsNullOrWhiteSpace(defaultScenarioName) ? defaultScenarioName.Trim()
+            : ScenarioBASkip;
+        Debug.Log($"[VlEngine] API 호출: {apiUrl}, scenario={normalizedScenarioName}");
 
         // memory 가져오기 (첫 요청 시)
         string memoryJson = "";
@@ -262,6 +365,7 @@ public class ApiVlEngineManager : MonoBehaviour
             verbose,
             isCanceledProvider,
             imageBytes,
+            normalizedScenarioName,
             (eventData) => { eventQueue.Enqueue(eventData); }
         ));
 
@@ -271,7 +375,7 @@ public class ApiVlEngineManager : MonoBehaviour
         {
             while (eventQueue.TryDequeue(out JObject eventData))
             {
-                ProcessEngineEvent(eventData, offsetX, offsetY, onEvent);
+                ProcessEngineEvent(eventData, onEvent);
                 lastEvent = eventData;
             }
             yield return null;
@@ -280,7 +384,7 @@ public class ApiVlEngineManager : MonoBehaviour
         // 남은 이벤트 처리
         while (eventQueue.TryDequeue(out JObject eventData))
         {
-            ProcessEngineEvent(eventData, offsetX, offsetY, onEvent);
+            ProcessEngineEvent(eventData, onEvent);
             lastEvent = eventData;
         }
 
@@ -308,6 +412,7 @@ public class ApiVlEngineManager : MonoBehaviour
         bool verbose,
         Func<bool> isCanceledProvider,
         byte[] imageBytes,
+        string scenarioName,
         Action<JObject> onEvent
     )
     {
@@ -330,6 +435,7 @@ public class ApiVlEngineManager : MonoBehaviour
             WriteTextField(writer, boundary, "max_retry", maxRetry.ToString());
             WriteTextField(writer, boundary, "is_canceled", isCanceledProvider != null && isCanceledProvider() ? "true" : "false");
             WriteTextField(writer, boundary, "verbose", verbose ? "true" : "false");
+            WriteTextField(writer, boundary, "scenario_name", scenarioName);
 
             // 이미지 필드
             if (imageBytes != null && imageBytes.Length > 0)
@@ -424,14 +530,18 @@ public class ApiVlEngineManager : MonoBehaviour
 
     #region 이벤트 처리
 
-    // Engine 이벤트 처리 (act 이벤트만 클릭 실행 + thinking 이벤트는 NoticeManager)
-    private void ProcessEngineEvent(JObject eventData, int offsetX, int offsetY, Action<JObject> onEvent)
+    // Engine 이벤트 처리 (UI 로그/알림 표시 전용)
+    private void ProcessEngineEvent(JObject eventData, Action<JObject> onEvent)
     {
         string kind = eventData["kind"]?.Value<string>() ?? "";
         string message = eventData["message"]?.Value<string>() ?? "";
 
         string eventMessage = $"[VlEngine] 이벤트: [{kind}] {message}";
         Debug.Log(eventMessage);
+        
+        // RAW JSON 로깅 (ocr_history 확인용)
+        Debug.Log($"[VlEngine] RAW JSON: {eventData.ToString(Newtonsoft.Json.Formatting.None)}");
+        
         ProcessVlMessage(eventMessage);
 
         // thinking 이벤트: NoticeManager로 안내 말풍선 표시
@@ -439,29 +549,10 @@ public class ApiVlEngineManager : MonoBehaviour
         {
             NoticeManager.Instance.Notice("thinking");
         }
-        // act 이벤트: 클릭 또는 alert 실행
+        // act 이벤트 실행은 lastEventData 처리 시점에 수행
         else if (kind == "act")
         {
-            var data = eventData["data"] as JObject;
-            if (data != null)
-            {
-                string action = data["action"]?.Value<string>() ?? "";
-                if (action == "click")
-                {
-                    int? x = data["x"]?.Value<int>();
-                    int? y = data["y"]?.Value<int>();
-
-                    if (x.HasValue && y.HasValue)
-                    {
-                        ExecuteClickFromRelative(x.Value, y.Value, offsetX, offsetY, true, "[VlEngine]");
-                    }
-                }
-                else if (action == "alert")
-                {
-                    Debug.Log("[VlEngine] alert 액션 - 알림 효과음 재생 (TODO)");
-                    // TODO: 알림 효과음 재생 로직
-                }
-            }
+            // no-op
         }
 
         // 외부 콜백 호출
@@ -471,6 +562,337 @@ public class ApiVlEngineManager : MonoBehaviour
     #endregion
 
     #region 유틸리티 메서드
+
+
+    private string ResolveEngineFormLang()
+    {
+        string lang = engineFormLang;
+
+        if (string.IsNullOrWhiteSpace(lang))
+        {
+            try
+            {
+                lang = SettingManager.Instance.settings.sound_language.ToString();
+            }
+            catch
+            {
+                lang = "ja";
+            }
+        }
+
+        lang = lang.Trim().ToLowerInvariant();
+        if (lang == "jp")
+        {
+            lang = "ja";
+        }
+
+        if (lang != "ko" && lang != "ja" && lang != "en")
+        {
+            lang = "ja";
+        }
+
+        return lang;
+    }
+
+    private float ResolveEngineFormSpeed()
+    {
+        float speed = 1.0f;
+        try
+        {
+            // sound_speedMaster는 퍼센트 단위 (100 = 100%)
+            // 서버는 배율 단위 기대 (1.0 = 정상 속도)
+            speed = SettingManager.Instance.settings.sound_speedMaster / 100f;
+        }
+        catch
+        {
+            speed = 1.0f;
+        }
+
+        if (speed <= 0f)
+        {
+            speed = 1.0f;
+        }
+
+        return speed;
+    }
+
+    private string MapVoiceActor(string actorName)
+    {
+        // 빈 actor는 기본값 "arona"
+        if (string.IsNullOrWhiteSpace(actorName))
+        {
+            Debug.Log("[VlEngine] Actor 비어있음 → 기본값 'arona' 사용");
+            return "arona";
+        }
+
+        // OCRAutoMapManager로 매핑 (OCR 이름 → 캐릭터 ID)
+        try
+        {
+            var actorMap = OCRAutoMapManager.Instance.GetActorMapIncludeCustomMap();
+            
+            if (actorMap.TryGetValue(actorName, out string mappedActor))
+            {
+                Debug.Log($"[VlEngine] Actor 매핑: '{actorName}' → '{mappedActor}'");
+                return mappedActor;
+            }
+            else
+            {
+                Debug.LogWarning($"[VlEngine] Actor '{actorName}' 매핑 실패 → 기본값 'arona' 사용");
+                return "arona";
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[VlEngine] Actor 매핑 오류: {ex.Message} → 기본값 'arona' 사용");
+            return "arona";
+        }
+    }
+
+    // Voice 요청 + 재생 대기 + 클릭 (통합 처리)
+    private IEnumerator RequestEngineFormVoiceCoroutineWithClick(
+        string actor,
+        string txt,
+        int clickX,
+        int clickY,
+        int captureOffsetX,
+        int captureOffsetY,
+        bool verbose,
+        JToken agentState
+    )
+    {
+        // WAV 수신 및 재생 시작, 재생 시간은 콜백으로 받음
+        float durationSec = 0f;
+        yield return RequestEngineFormVoiceCoroutine(actor, txt, verbose, agentState, (d) => durationSec = d);
+
+        // 음성 재생 시간만큼 대기 (X-Audio-Duration 헤더 값 사용)
+        float waitTime = durationSec > 0f ? durationSec : 2f;
+        Debug.Log($"[VlEngine] 음성 재생 대기: {waitTime:F2}초 (duration={durationSec:F2}s)");
+        yield return new WaitForSeconds(waitTime);
+
+        // 클릭 실행
+        ExecuteClickFromRelative(clickX, clickY, captureOffsetX, captureOffsetY, true, "[VlEngine]");
+    }
+
+    private IEnumerator RequestEngineFormVoiceCoroutine(
+        string actor,
+        string txt,
+        bool verbose,
+        JToken agentState,
+        Action<float> onDuration = null
+    )
+    {
+        if (string.IsNullOrWhiteSpace(txt))
+        {
+            Debug.LogWarning("[VlEngine] request_voice=true 이지만 voice_txt가 비어있어 음성 요청을 생략합니다.");
+            yield break;
+        }
+
+        string baseUrl = null;
+        yield return GetBaseUrlCoroutine((url) => { baseUrl = url; });
+
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            Debug.LogWarning("[VlEngine] BaseUrl 없음 - engine_form 요청 생략");
+            yield break;
+        }
+
+        string apiUrl = baseUrl + "/vl_agent/engine_form";
+        string lang = ResolveEngineFormLang();
+        float speed = ResolveEngineFormSpeed();
+
+        // Task로 비동기 실행
+        var task = SendEngineFormRequestAsync(apiUrl, actor ?? "", txt, lang, speed, verbose, agentState);
+        yield return new WaitUntil(() => task.IsCompleted);
+
+        if (task.Exception != null)
+        {
+            string error = task.Exception.InnerException?.Message ?? task.Exception.Message;
+            Debug.LogError($"[VlEngine] engine_form 오류: {error}");
+            yield break;
+        }
+
+        var result = task.Result;
+        if (!result.success || result.wavData == null || result.wavData.Length == 0)
+        {
+            Debug.LogWarning($"[VlEngine] engine_form 실패: {result.errorMsg}");
+            yield break;
+        }
+
+        // WAV 저장 후 비동기 재생 시작
+        string fileName = string.IsNullOrWhiteSpace(engineFormWavFileName) ? "vl_engine_form_response.wav" : engineFormWavFileName.Trim();
+        string filePath = Path.Combine(Application.persistentDataPath, fileName);
+        try
+        {
+            File.WriteAllBytes(filePath, result.wavData);
+            Debug.Log($"[VlEngine] WAV 파일 저장: {filePath} (duration: {result.durationSec:F2}s)");
+
+            string fileUri = "file:///" + filePath.Replace("\\", "/");
+            StartCoroutine(PlayWavFromUri(fileUri));
+            Debug.Log($"[VlEngine] 음성 재생 시작: {fileUri}");
+
+            // 재생 시간 통보 (호출자가 대기 시간 결정에 사용)
+            onDuration?.Invoke(result.durationSec);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[VlEngine] engine_form WAV 저장/재생 실패: {ex.Message}");
+        }
+    }
+
+    private async Task<(bool success, byte[] wavData, float durationSec, string errorMsg)> SendEngineFormRequestAsync(
+        string apiUrl,
+        string actor,
+        string txt,
+        string lang,
+        float speed,
+        bool verbose,
+        JToken agentState
+    )
+    {
+        string boundary = "----WebKitFormBoundary" + DateTime.Now.Ticks.ToString("x");
+
+        HttpWebRequest request = (HttpWebRequest)WebRequest.Create(apiUrl);
+        request.Method = "POST";
+        request.ContentType = "multipart/form-data; boundary=" + boundary;
+        request.Timeout = 120000;
+
+        using (MemoryStream memStream = new MemoryStream())
+        using (StreamWriter writer = new StreamWriter(memStream, Encoding.UTF8, 1024, true))
+        {
+            WriteTextField(writer, boundary, "actor", actor);
+            WriteTextField(writer, boundary, "txt", txt);
+            WriteTextField(writer, boundary, "lang", lang);
+            WriteTextField(writer, boundary, "speed", speed.ToString("0.0###", CultureInfo.InvariantCulture));
+            WriteTextField(writer, boundary, "verbose", verbose ? "true" : "false");
+
+            // verbose 모드일 때 ocr_history_json 추가
+            if (verbose && agentState != null && agentState["ocr_history"] != null)
+            {
+                try
+                {
+                    // {"history": [...]} 형식으로 wrapping
+                    var historyWrapper = new JObject
+                    {
+                        ["history"] = agentState["ocr_history"]
+                    };
+                    string ocrHistoryJson = historyWrapper.ToString(Formatting.None);
+                    WriteTextField(writer, boundary, "ocr_history_json", ocrHistoryJson);
+                    
+                    int historyCount = (agentState["ocr_history"] as JArray)?.Count ?? 0;
+                    Debug.Log($"[VlEngine] ocr_history_json 전송: {historyCount} entries");
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[VlEngine] ocr_history_json 직렬화 실패: {ex.Message}");
+                }
+            }
+
+            writer.WriteLine($"--{boundary}--");
+            writer.Flush();
+
+            request.ContentLength = memStream.Length;
+            using (Stream requestStream = request.GetRequestStream())
+            {
+                memStream.Seek(0, SeekOrigin.Begin);
+                memStream.CopyTo(requestStream);
+            }
+        }
+
+        try
+        {
+            using (HttpWebResponse response = (HttpWebResponse)await request.GetResponseAsync())
+            {
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    return (false, null, 0f, $"HTTP {response.StatusCode}");
+                }
+
+                float durationSec = 0f;
+                string durationHeader = response.Headers["X-Audio-Duration"];
+                if (!string.IsNullOrEmpty(durationHeader))
+                {
+                    float.TryParse(durationHeader, NumberStyles.Float, CultureInfo.InvariantCulture, out durationSec);
+                }
+
+                using (Stream responseStream = response.GetResponseStream())
+                {
+                    if (responseStream == null)
+                    {
+                        return (false, null, durationSec, "Empty response stream");
+                    }
+
+                    byte[] wavData = ReadFully(responseStream);
+                    return (true, wavData, durationSec, "");
+                }
+            }
+        }
+        catch (WebException ex)
+        {
+            if (ex.Response != null)
+            {
+                using (Stream errorStream = ex.Response.GetResponseStream())
+                using (StreamReader errorReader = new StreamReader(errorStream))
+                {
+                    string errorResponse = errorReader.ReadToEnd();
+                    Debug.LogError($"[VlEngine] engine_form 서버 오류: {errorResponse}");
+                    return (false, null, 0f, errorResponse);
+                }
+            }
+
+            return (false, null, 0f, ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return (false, null, 0f, ex.Message);
+        }
+    }
+
+
+    private byte[] ReadFully(Stream input)
+    {
+        using (MemoryStream ms = new MemoryStream())
+        {
+            input.CopyTo(ms);
+            return ms.ToArray();
+        }
+    }
+
+    private IEnumerator PlayWavFromUri(string fileUri)
+    {
+        using (UnityWebRequest uwr = UnityWebRequestMultimedia.GetAudioClip(fileUri, AudioType.WAV))
+        {
+            yield return uwr.SendWebRequest();
+
+            if (uwr.result == UnityWebRequest.Result.ConnectionError || uwr.result == UnityWebRequest.Result.ProtocolError)
+            {
+                Debug.LogError($"[VlEngine] WAV 재생 실패: {uwr.error}");
+                yield break;
+            }
+
+            AudioClip clip = DownloadHandlerAudioClip.GetContent(uwr);
+            if (clip == null)
+            {
+                Debug.LogError("[VlEngine] AudioClip 생성 실패");
+                yield break;
+            }
+
+            // SubVoiceManager의 AudioSource 풀에서 빈 슬롯을 받아 재생
+            AudioSource source = SubVoiceManager.Instance.GetAvailableAudioSource();
+            if (source == null)
+            {
+                Debug.LogWarning("[VlEngine] SubVoiceManager AudioSource 풀 포화 - 재생 건너뜀");
+                yield break;
+            }
+
+            source.clip = clip;
+            source.volume = 1f;
+            try { source.volume = SettingManager.Instance.settings.sound_volumeMaster / 100f; }
+            catch { /* 볼륨 설정 실패 시 기본값 유지 */ }
+
+            source.Play();
+            Debug.Log($"[VlEngine] WAV 재생 시작 (SubVoiceManager)");
+        }
+    }
 
     // Screenshot 영역이 있으면 영역 캡처, 없으면 전체화면 캡처를 수행하고 bytes와 offset(x,y)를 반환
     private IEnumerator CaptureScreenToMemoryWithOffset(
