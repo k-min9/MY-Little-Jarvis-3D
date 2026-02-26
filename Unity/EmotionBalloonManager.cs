@@ -20,6 +20,7 @@ public class EmotionBalloonManager : MonoBehaviour
 
     private Canvas _canvas;
     public GameObject emotionBalloonPrefab;
+    [SerializeField] public RectTransform targetPortraitTransform; // Operator 모드용
 
     // X초 표시 같은데에도 사용
     public Sprite emotionSpriteYes;      // 긍정
@@ -38,6 +39,16 @@ public class EmotionBalloonManager : MonoBehaviour
     public Sprite emotionSpriteWrite;    // 작성
     public Sprite emotionSpriteImage;    // 이미지
 
+    // 발화 대상 표시용 캐릭터 아이콘 (아로프라 채널)
+    public Sprite emotionSpriteSensei;   // 선생 아이콘
+    public Sprite emotionSpriteArona;    // 아로나 아이콘
+    public Sprite emotionSpritePlana;    // 프라나 아이콘
+
+    // VL Agent 상태 표시용 아이콘
+    public Sprite emotionSpriteThink;    // 생각중 (AI 서버 작업중)
+    public Sprite emotionSpriteVerify;   // 검증중 (동작 확인 중)
+    public Sprite emotionSpriteExecute;  // 수행중 (클릭/스크린샷 등)
+
     // Yes/No 전용 쿨타임 관리
     private Dictionary<GameObject, float> yesNoCooldownMap = new Dictionary<GameObject, float>();
     
@@ -51,6 +62,8 @@ public class EmotionBalloonManager : MonoBehaviour
 
     public GameObject ShowEmotionBalloon(GameObject target, string spriteName = "Love", float duration = 60f)
     {
+        Debug.Log($"[EmotionBalloon] ShowEmotionBalloon: {spriteName}, {duration}");
+
         // 말풍선 생성
         GameObject emotionBalloonInstance = Instantiate(emotionBalloonPrefab, _canvas.transform);
 
@@ -86,6 +99,12 @@ public class EmotionBalloonManager : MonoBehaviour
         EmotionBalloonController controller = emotionBalloonInstance.GetComponent<EmotionBalloonController>();
         if (controller != null)
         {
+            // Operator 모드일 때 숨겨진 캐릭터 대신 Portrait에 표시
+            if (ChatModeManager.Instance.IsOperatorMode() && OperatorManager.Instance.portraitTransform != null)
+            {
+                target = OperatorManager.Instance.portraitTransform.gameObject;
+                controller.targetPortraitTransform = this.targetPortraitTransform;  // 주입
+            }
             controller.Initialize(target, duration);
         }
 
@@ -203,6 +222,13 @@ public class EmotionBalloonManager : MonoBehaviour
             case "Listen": return emotionSpriteListen;
             case "Write": return emotionSpriteWrite;
             case "Image": return emotionSpriteImage;
+            case "sensei": return emotionSpriteSensei;
+            case "arona": return emotionSpriteArona;
+            case "plana": return emotionSpritePlana;
+            // VL Agent
+            case "Think": return emotionSpriteThink;
+            case "Verify": return emotionSpriteVerify;
+            case "Execute": return emotionSpriteExecute;
             default: return null;
         }
     }
