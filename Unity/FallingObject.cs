@@ -13,7 +13,7 @@ public class FallingObject : MonoBehaviour
         rectTransform = GetComponent<RectTransform>();
         animator = GetComponent<Animator>();
 
-        Canvas canvas = GetComponentInParent<Canvas>();
+        Canvas canvas = FindObjectOfType<Canvas>();
         // animator.SetBool("IsFalling", isFalling);
 
         // bottomBoundary = -(canvas.GetComponent<RectTransform>().rect.height / 2) + rectTransform.rect.height * 0.5f; // + taskbarHeight; 
@@ -42,6 +42,15 @@ public class FallingObject : MonoBehaviour
             } else {
                 // 이미 낙하중 (가속도 로직 넣으려면 여기)
 
+            }
+
+            // 바닥과 충돌
+            if (newPosition.y <= bottomBoundary)
+            {
+                if (StatusManager.Instance.IsFalling) { 
+                    // 낙하 중지 + 이동거리 재계산
+                    StopFalling();
+                }
             }
             newPosition.y = Mathf.Max(bottomBoundary, newPosition.y);
             rectTransform.anchoredPosition = newPosition;
