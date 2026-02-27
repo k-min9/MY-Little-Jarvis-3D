@@ -146,14 +146,12 @@ public class ApiGeminiMultiClient : MonoBehaviour
 
                 // API 키 로드 (검증된 키 사용)
                 apiKey = await ApiKei.GetValidatedGeminiKey();
-                if (string.IsNullOrEmpty(apiKey))
+                
+                // 카운트 소진으로 null 반환 시 → 시나리오는 이미 트리거됨, 조용히 종료
+                if (apiKey == null)
                 {
-                    apiKey = ApiKei.GetNextGeminiKey();
-                }
-
-                if (string.IsNullOrEmpty(apiKey))
-                {
-                    throw new Exception("유효한 API 키를 찾을 수 없습니다");
+                    Debug.LogWarning("[ApiGeminiMultiClient] API key is null (free count exhausted). Aborting.");
+                    return result;
                 }
 
                 // 프롬프트 생성
@@ -192,9 +190,14 @@ public class ApiGeminiMultiClient : MonoBehaviour
                     return result;
                 }
 
-                // 다음 키로 로테이션
+                // 다음 키로 로테이션 (카운트 소진 시 null → 루프 종료)
                 string nextKey = ApiKei.GetNextGeminiKey();
-                Debug.Log($"[ApiGeminiMultiClient] API 키 로테이션: {(nextKey != null ? "성공" : "실패")}");
+                if (nextKey == null)
+                {
+                    Debug.LogWarning("[ApiGeminiMultiClient] Free key count exhausted during retry. Aborting.");
+                    return result;
+                }
+                Debug.Log($"[ApiGeminiMultiClient] API 키 로테이션: 성공");
 
                 await Task.Delay(1000);  // 잠시 대기 후 재시도
             }

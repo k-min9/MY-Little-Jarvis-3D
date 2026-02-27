@@ -94,6 +94,13 @@ public class ApiGeminiDirectClient : MonoBehaviour
             {
                 // API 키 로드 (검증된 키 사용)
                 apiKey = await ApiKei.GetValidatedGeminiKey();
+                
+                // 카운트 소진으로 null 반환 시 → 시나리오는 이미 트리거됨, 조용히 종료
+                if (apiKey == null)
+                {
+                    Debug.LogWarning("[GeminiDirect] API key is null (free count exhausted). Aborting.");
+                    return;
+                }
 
                 // 프롬프트 생성
                 string prompt = ApiGeminiPromptBuilder.BuildGemmaPrompt(
