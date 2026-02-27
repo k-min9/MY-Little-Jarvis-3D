@@ -16,11 +16,24 @@ public static class LanguageData
         new Dictionary<string, string> { { "ko", "기동 시 서버 실행" }, { "jp", "起動時にサーバー実行" }, { "en", "Start Server On Init" } },
         new Dictionary<string, string> { { "ko", "서버 STT 사용(고품질)" }, { "jp", "サーバーSTT使用(高品質)" }, { "en", "Use Server STT(High Quality)" } },
         new Dictionary<string, string> { { "ko", "에디션 업데이트 제안" }, { "jp", "エディションアップデート提案" }, { "en", "Suggest Edition update" } },
-
         new Dictionary<string, string> { { "ko", "중력 적용" }, { "jp", "重力を適用" }, { "en", "Apply Gravity" } },
         new Dictionary<string, string> { { "ko", "윈도우 충돌" }, { "jp", "ウィンドウ衝突" }, { "en", "Windows Collision" } },
         new Dictionary<string, string> { { "ko", "마지막 캐릭터로 시작" }, { "jp", "最後のキャラで開始" }, { "en", "Start With Last Character" } },
         new Dictionary<string, string> { { "ko", "캐릭터별 의상 기억" }, { "jp", "キャラ別衣装を記憶" }, { "en", "Remember Char Outfits" } },
+
+        new Dictionary<string, string> { { "ko", "사용자 의도 확인" }, { "jp", "ユーザー意図を確認" }, { "en", "Confirm user's intent" } },
+        new Dictionary<string, string> { { "ko", "스크린샷에 캐릭터 포함" }, { "jp", "スクリーンショットにキャラを含める" }, { "en", "Include Char in Screenshot" } },
+        new Dictionary<string, string> { { "ko", "스크린샷에 UI 포함" }, { "jp", "スクリーンショットにUIを含める" }, { "en", "Include UI in Screenshot" } },
+        new Dictionary<string, string> { { "ko", "멀티모달 모델 변경 요청" }, { "jp", "マルチモーダルモデル変更を確認" }, { "en", "Ask to change Multimodal model" } },
+        new Dictionary<string, string> { { "ko", "번역" }, { "jp", "翻訳" }, { "en", "Translation" } },
+        new Dictionary<string, string> { { "ko", "결과 표시" }, { "jp", "結果を表示" }, { "en", "Show Result" } },
+        new Dictionary<string, string> { { "ko", "결과 읽기" }, { "jp", "結果を読み上げ" }, { "en", "Read Result" } },
+        new Dictionary<string, string> { { "ko", "화자" }, { "jp", "話者" }, { "en", "Actor" } },
+        new Dictionary<string, string> { { "ko", "자동" }, { "jp", "自動" }, { "en", "Auto" } },
+        new Dictionary<string, string> { { "ko", "번역 결과 읽기" }, { "jp", "翻訳結果を読み上げ" }, { "en", "Read Translated Result" } },
+        new Dictionary<string, string> { { "ko", "AI 읽기 보정" }, { "jp", "AI読み上げ補正" }, { "en", "AI Reading Correction" } },
+        new Dictionary<string, string> { { "ko", "텍스트 병합" }, { "jp", "テキストを結合" }, { "en", "Merge Text" } },
+
 
         // Menu
         new Dictionary<string, string> { { "ko", "안내" }, { "jp", "案内" }, { "en", "Inform" } },
@@ -223,6 +236,10 @@ public static class LanguageData
         new Dictionary<string, string> { { "ko", "설치가 완료되었어요!" }, { "jp", "インストールが完了しました！" }, { "en", "The installation is complete!" } },
         new Dictionary<string, string> { { "ko", "바로 서버를 시작해볼게요, 선생님!" }, { "jp", "すぐにサーバーを起動しますね、先生！" }, { "en", "I'll start the server right away, sir!" } },
 
+        // I03 - 무료 키 소진 / 무료 서버 불안정 안내
+        new Dictionary<string, string> { { "ko", "선생님, 무료 서버 상태가 좋지 않은 것 같아요." }, { "jp", "先生、無料サーバーの状態があまり良くないようです。" }, { "en", "Sensei, it seems like the free server isn't in good shape." } },
+        new Dictionary<string, string> { { "ko", "로컬 서버를 설치하거나, 외부 플랫폼을 사용해보실래요?" }, { "jp", "ローカルサーバーをインストールするか、外部プラットフォームを使ってみますか？" }, { "en", "Would you like to install a local server or try using an external platform?" } },
+
         // C01 - 서버 준비 완료 알림
         new Dictionary<string, string> { { "ko", "선생님, 서버가 준비되었어요!" }, { "jp", "先生、サーバーの準備ができましたよ！" }, { "en", "Sensei, the server is now ready!" }},
 
@@ -252,6 +269,10 @@ public static class LanguageData
         new Dictionary<string, string> { { "ko", "API 키를 발급받아 입력하시면 무료 또는 유료 서버와 연결하실 수 있어요." }, { "jp", "APIキーを発行して入力すれば、無料または有料のサーバーに接続できますよ。" }, { "en", "If you obtain and enter an API key, you can connect to either free or paid servers." } },
         new Dictionary<string, string> { { "ko", "구글에서 더 이상 해당 무료 AI 모델을 이용할 수 없는 것 같아요." }, { "jp", "Googleではその無料AIモデルはもう利用できないようです。" }, { "en", "It seems that this free AI model is no longer available from Google." } },
 
+        // C92 - 마이크 미검지 대응
+        new Dictionary<string, string> { { "ko", "마이크가 감지되지 않아요 선생님. 일단 시도는 해볼까요?" }, { "jp", "マイクが検知されていません、先生。ひとまず試してみましょうか？" }, { "en", "The microphone isn't detected, Sensei. Shall we try anyway?" } },
+        new Dictionary<string, string> { { "ko", "네, 이대로 진행할게요." }, { "jp", "はい、このまま進めますね。" }, { "en", "Okay, I'll proceed as is." } },
+
         // C98 - 진행 확인(설정 초기화, Return To Default)
         new Dictionary<string, string> { { "ko", "정말 진행하시겠어요?" }, { "jp", "本当に続行しますか？" }, { "en", "Do you really want to proceed?" } },
 
@@ -259,6 +280,10 @@ public static class LanguageData
         new Dictionary<string, string> { { "ko", "선생님, 죄송해요 아직 준비가 되지 않았어요..." }, { "jp", "先生、ごめんなさい。まだ準備ができていません..." }, { "en", "Sorry, Sensei... I'm not ready yet." } },
         new Dictionary<string, string> { { "ko", "곧 지원할 예정이에요. 기다려주세요 선생님!" }, { "jp", "まもなく対応予定です。待っていてください、先生！" }, { "en", "Support will be available soon. Please wait, Sensei!" } },
         new Dictionary<string, string> { { "ko", "관련 안내가 필요하실까요, 선생님?" }, { "jp", "ご案内が必要ですか、先生？" }, { "en", "Would you like me to guide you, Sensei?" } },
+        new Dictionary<string, string> { { "ko", "선생님, 이 기능은 Windows에서만 사용할 수 있어요." }, { "jp", "先生、この機能はWindowsでのみ使用できます。" }, { "en", "Sensei, this feature is only available on Windows." } },
+        new Dictionary<string, string> { { "ko", "뭔가 말씀하셨나요? 전달된 내용이 없어요 선생님." }, { "jp", "何かおっしゃいましたか？ 伝わった内容がありません、先生。" }, { "en", "Did you say something? There's no content delivered, Sensei." } },
+        new Dictionary<string, string> { { "ko", "확인이 필요한 사항이 생겼어요, 선생님!" }, { "jp", "確認が必要な事項がありますよ、先生！" }, { "en", "Something needs your attention, Sensei!" } },
+        new Dictionary<string, string> { { "ko", "작업이 종료되었어요, 선생님!" }, { "jp", "作業が終わりましたよ、先生！" }, { "en", "The task is done, Sensei!" } },
 
 
         // 단어 정보

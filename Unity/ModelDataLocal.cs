@@ -4,27 +4,23 @@ public static class ModelDataLocal
 {
     // 모델 이름과 고유 ID (표시용 텍스트, 내부값)
     public static readonly List<ModelOption> ModelOptions = new List<ModelOption>
-    {
-        new ModelOption("qwen-8b",  "Qwen3(8B)", new List<ModelFileInfo> {
-            new ModelFileInfo("Qwen3-8B-Q4_K_M.gguf", "https://huggingface.co/Qwen/Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q4_K_M.gguf", "4.68GB", 5024063488L)
-        }, "4.68GB"),
-        
-        new ModelOption("qwen-14b", "Qwen3(14B)", new List<ModelFileInfo> {
-            new ModelFileInfo("Qwen3-14B-Q4_K_M.gguf", "https://huggingface.co/Qwen/Qwen3-14B-GGUF/resolve/main/Qwen3-14B-Q4_K_M.gguf", "8.38GB", 8999632896L)
-        }, "8.38GB"),
-        
-        new ModelOption("qwen-32b", "Qwen3(32B)", new List<ModelFileInfo> {
-            new ModelFileInfo("Qwen3-32B-Q4_K_M.gguf", "https://huggingface.co/Qwen/Qwen3-32B-GGUF/resolve/main/Qwen3-32B-Q4_K_M.gguf", "18.40GB", 19759480832L)
-        }, "18.40GB"),
-        
-        new ModelOption("qwen-30b-a3b-2507", "Qwen3(30B-A3B)", new List<ModelFileInfo> {
-            new ModelFileInfo("Qwen3-30B-A3B-Instruct-2507-Q4_K_M.gguf", "https://huggingface.co/lmstudio-community/Qwen3-30B-A3B-Instruct-2507-GGUF/resolve/main/Qwen3-30B-A3B-Instruct-2507-Q4_K_M.gguf", "17.20GB", 18468397056L)
-        }, "17.20GB"),
-        
+    {     
         new ModelOption("qwen3vl-8b", "Qwen3VL(8B)", new List<ModelFileInfo> {
             new ModelFileInfo("Qwen3VL-8B-Instruct-Q4_K_M.gguf", "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/Qwen3VL-8B-Instruct-Q4_K_M.gguf?download=true", "8.71GB", 9348464640L),
             new ModelFileInfo("mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf", "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf?download=true", "752MB", 788529152L)
         }, "9.46GB"),
+        new ModelOption("qwen-8b",  "Qwen3(8B)", new List<ModelFileInfo> {
+            new ModelFileInfo("Qwen3-8B-Q4_K_M.gguf", "https://huggingface.co/Qwen/Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q4_K_M.gguf", "4.68GB", 5024063488L)
+        }, "4.68GB"),
+        new ModelOption("qwen-14b", "Qwen3(14B)", new List<ModelFileInfo> {
+            new ModelFileInfo("Qwen3-14B-Q4_K_M.gguf", "https://huggingface.co/Qwen/Qwen3-14B-GGUF/resolve/main/Qwen3-14B-Q4_K_M.gguf", "8.38GB", 8999632896L)
+        }, "8.38GB"),
+        new ModelOption("qwen-32b", "Qwen3(32B)", new List<ModelFileInfo> {
+            new ModelFileInfo("Qwen3-32B-Q4_K_M.gguf", "https://huggingface.co/Qwen/Qwen3-32B-GGUF/resolve/main/Qwen3-32B-Q4_K_M.gguf", "18.40GB", 19759480832L)
+        }, "18.40GB"),
+        new ModelOption("qwen-30b-a3b-2507", "Qwen3(30B-A3B)", new List<ModelFileInfo> {
+            new ModelFileInfo("Qwen3-30B-A3B-Instruct-2507-Q4_K_M.gguf", "https://huggingface.co/lmstudio-community/Qwen3-30B-A3B-Instruct-2507-GGUF/resolve/main/Qwen3-30B-A3B-Instruct-2507-Q4_K_M.gguf", "17.20GB", 18468397056L)
+        }, "17.20GB"),
 
         // 추후 ModelOption 추가
     };
