@@ -33,8 +33,8 @@ public class DevManager : MonoBehaviour
 
     private void Update()
     {
-        // F12 키를 누르면 개발자 설정 탭 토글
-        if (Input.GetKeyDown(KeyCode.F12))
+        // F8 키를 누르면 개발자 설정 탭 토글
+        if (Input.GetKeyDown(KeyCode.F8))
         {
             ToggleShowSettingDevTab();
         }
@@ -48,6 +48,12 @@ public class DevManager : MonoBehaviour
         {
             SettingDevContent.SetActive(nextActive);
         }
+    }
+
+    // DevMode 활성화 여부 확인
+    public bool IsDevModeEnabled()
+    {
+        return SettingDevTab != null && SettingDevTab.activeSelf;
     }
 
     // Interactable 가능하게 변경
