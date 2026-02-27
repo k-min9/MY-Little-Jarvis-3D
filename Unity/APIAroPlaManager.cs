@@ -49,7 +49,7 @@ public class APIAroPlaManager : MonoBehaviour
     }
 
 
-    private string GetFileName()
+    public string GetFileName()
     {
         string filename = "aropla_conversation_memory.json";
 
@@ -1282,7 +1282,7 @@ public class APIAroPlaManager : MonoBehaviour
             if (mainChar != null)
             {
                 // 메인 캐릭터의 스케일을 그대로 사용
-                Vector3 mainScale = mainChar.transform.localScale;
+                Vector3 mainScale = mainChar.transform.localScale * 0.9f;
                 planaInstance.transform.localScale = mainScale;
                 
                 LogToFile($"Plana size set to match main character: {mainScale}");

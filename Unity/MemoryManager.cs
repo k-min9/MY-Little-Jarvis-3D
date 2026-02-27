@@ -58,6 +58,12 @@ public class MemoryManager : MonoBehaviour
 
     private string GetFileName()
     {
+        // Operator 모드일 경우
+        if (ChatModeManager.Instance.IsAroplaMode())
+        {
+            return Path.Combine(Application.persistentDataPath, "aropla_conversation_memory.json");
+        }
+
         string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
         string filename = "conversation_memory_" + nickname + ".json";
 
@@ -188,6 +194,12 @@ public class MemoryManager : MonoBehaviour
     // 대화 내용 초기화 및 안내
     public void ResetConversationMemoryAndGuide(string filename = null)
     {
+        // Operator 모드일 경우
+        if (ChatModeManager.Instance.IsAroplaMode())
+        {
+            filename = APIAroPlaManager.Instance.GetFileName();
+        }
+
         ResetConversationMemory(filename);
         AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
         AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Memory Erased");
