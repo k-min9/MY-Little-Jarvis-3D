@@ -29,7 +29,18 @@ public class EmotionFacePlanaController : EmotionFaceController
 
     void Update()
     {
-        bool current = StatusManager.Instance.isMouthActive;
+        // Aropla 모드일 때는 IsSpeaking(this.gameObject) 체크, 그 외에는 isMouthActive 사용
+        bool current = false;
+        if (ChatModeManager.Instance.IsAroplaMode())
+        {
+            // Aropla 모드: 이 캐릭터가 말하고 있을 때만 입 움직임
+            current = StatusManager.Instance.IsSpeaking(this.gameObject);
+        }
+        else
+        {
+            // 기본 모드: 전역 isMouthActive 사용
+            current = StatusManager.Instance.isMouthActive;
+        }
 
         if (current != lastMouthState)
         {
@@ -232,7 +243,9 @@ public class EmotionFacePlanaController : EmotionFaceController
         int blendShapeIndex = GetBlendShapeIndex("u");
         if (blendShapeIndex == -1) yield break;
 
-        while (StatusManager.Instance.isMouthActive)
+        // Aropla 모드일 때는 IsSpeaking 체크, 그 외에는 isMouthActive 사용
+        while ((ChatModeManager.Instance.IsAroplaMode() && StatusManager.Instance.IsSpeaking(this.gameObject)) ||
+               (ChatModeManager.Instance == null || !ChatModeManager.Instance.IsAroplaMode()) && StatusManager.Instance.isMouthActive)
         {
             float randomValue = Random.Range(10f, 100f);
             skinnedMeshRenderer.SetBlendShapeWeight(blendShapeIndex, randomValue);

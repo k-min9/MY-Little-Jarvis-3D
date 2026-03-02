@@ -21,7 +21,12 @@ public class EmotionFaceAronaController : EmotionFaceController
     {
         bool current = false;
 
-        if (charType == "Operator")
+        // Aropla 모드일 때는 IsSpeaking(this.gameObject) 체크
+        if (ChatModeManager.Instance.IsAroplaMode())
+        {
+            current = StatusManager.Instance.IsSpeaking(this.gameObject);
+        }
+        else if (charType == "Operator")
         {
             current = StatusManager.Instance.IsAnsweringPortrait;
         }
@@ -202,8 +207,11 @@ public class EmotionFaceAronaController : EmotionFaceController
         int blendShapeIndex = GetBlendShapeIndex("mouth-a");
         if (blendShapeIndex == -1) yield break;
 
-        while ((charType == "Operator" && StatusManager.Instance.IsAnsweringPortrait) ||
-            (charType == "Main" && StatusManager.Instance.isMouthActive))
+        // Aropla 모드일 때는 IsSpeaking 체크, 그 외에는 기존 로직
+        while ((ChatModeManager.Instance.IsAroplaMode() && StatusManager.Instance.IsSpeaking(this.gameObject)) ||
+               ((ChatModeManager.Instance == null || !ChatModeManager.Instance.IsAroplaMode()) &&
+                ((charType == "Operator" && StatusManager.Instance.IsAnsweringPortrait) ||
+                 (charType == "Main" && StatusManager.Instance.isMouthActive))))
         {
             float randomValue = Random.Range(10f, 100f);
             skinnedMeshRenderer.SetBlendShapeWeight(blendShapeIndex, randomValue);
