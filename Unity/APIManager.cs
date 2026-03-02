@@ -34,9 +34,6 @@ public class APIManager : MonoBehaviour
     private string pendingSmallTalkContent = "";  // 대기 중인 잡담 내용
     private DateTime smallTalkTimestamp = DateTime.MinValue;  // 잡담 발생 시간
     private bool isSmallTalkPending = false;  // 트리거 활성 상태
-
-    private GameObject webEmotionBalloonInstance;
-    private GameObject questionEmotionBalloonInstance;
     
     // 스크린샷 전송 방식 (true: 캡처→전송→저장, false: 기존 파일 전송)
     private bool isSendScreenshotFirst = true;
@@ -119,7 +116,7 @@ public class APIManager : MonoBehaviour
         }
         lastSmallTalkCallTime = now;
         isSmallTalkWaiting = true;
-        ShowQuestionBalloon();
+        NoticeManager.Instance.ShowNoticeEmotionBalloon("Question");
 
         // SmallTalk 타이머 리셋 (요청 시작 시)
         GlobalTimeVariableManager.Instance.smallTalkTimer = 0f;
@@ -332,7 +329,32 @@ public class APIManager : MonoBehaviour
                                     try
                                     {
                                         string intent_info_is_intent_web = jsonObject["intent_info"]["is_intent_web"].ToString();
-                                        if (intent_info_is_intent_web == "on") AnswerBalloonManager.Instance.ShowWebImage();
+                                        if (intent_info_is_intent_web == "on")
+                                        {
+                                            AnswerBalloonManager.Instance.ShowWebImage();
+
+                                            // 웹 검색 메타데이터 파싱 및 로깅
+                                            try
+                                            {
+                                                string webKeyword = jsonObject["intent_info"]["web_search_keyword"]?.ToString() ?? "";
+                                                string webMethod = jsonObject["intent_info"]["web_search_method"]?.ToString() ?? "";
+                                                string webContent = jsonObject["intent_info"]["web_search_content"]?.ToString() ?? "";
+
+                                                Debug.Log($"[Web Search] Keyword: {webKeyword}");
+                                                Debug.Log($"[Web Search] Method: {webMethod}");
+                                                Debug.Log($"[Web Search] Content Length: {webContent.Length}");
+
+                                                // DebugBalloonManager2에 웹 로그 추가
+                                                if (!string.IsNullOrEmpty(webKeyword) || !string.IsNullOrEmpty(webMethod))
+                                                {
+                                                    DebugBalloonManager2.Instance.AddWebLog(webKeyword, webMethod, webContent);
+                                                }
+                                            }
+                                            catch (Exception webEx)
+                                            {
+                                                Debug.Log($"Web metadata parsing error: {webEx.Message}");
+                                            }
+                                        }
                                     }
                                     catch (Exception ex)
                                     {
@@ -401,7 +423,7 @@ public class APIManager : MonoBehaviour
             // 잡담 최종 종료
             isSmallTalkWaiting = false;
             isCompleted = true;
-            DestroyQuestionBalloon();
+            NoticeManager.Instance.DeleteNoticeBalloonInstance();
             AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteNormal();
             
             // 말풍선이 현재 활성화되어 있을 때만 30초 후 자동 종료 설정
@@ -1003,13 +1025,6 @@ public class APIManager : MonoBehaviour
 
                     // 안내 말풍선 숨기기
                     NoticeManager.Instance.DeleteNoticeBalloonInstance();
-
-                    // 전송시작 말풍선 제거
-                    if (webEmotionBalloonInstance != null)
-                    {
-                        Destroy(webEmotionBalloonInstance);
-                        webEmotionBalloonInstance = null;
-                    }
                     
                     // AnswerBalloon 표시
                     AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
@@ -1070,12 +1085,30 @@ public class APIManager : MonoBehaviour
     // 최종 반환 완료 시 호출될 함수
     private void OnFinalResponseReceived()
     {
+        // 최종 응답이 비어있는지 체크
+        if (replyListKo.Count == 0)
+        {
+            // 말풍선 숨기기 (표시된 경우)
+            AnswerBalloonManager.Instance.HideAnswerBalloon();
+            AnswerBalloonSimpleManager.Instance.HideAnswerBalloonSimple();
+            
+            // EmotionBalloon 표시
+            EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), "No", 2f);
+            
+            Debug.LogWarning("[APIManager] No valid response received from API - all sentences were filtered out");
+            LogToFile("ProcessReply completed with no valid response.");
+            NoticeManager.Instance.DeleteNoticeBalloonInstance();
+            
+            isCompleted = true;
+            return; // 이후 처리 스킵
+        }
+        
         isCompleted = true;
         AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteNormal();  // 대답완료 sprite
 
         Debug.Log("All replies have been received.");
         LogToFile("ProcessReply completed."); // ProcessReply 완료 로그
-        DestroyQuestionBalloon();
+        NoticeManager.Instance.DeleteNoticeBalloonInstance();
 
         // 다국어 답변 조립
         string replyKo = string.Join(" ", replyListKo);
@@ -1125,14 +1158,6 @@ public class APIManager : MonoBehaviour
 
         string boundary = "----WebKitFormBoundary" + DateTime.Now.Ticks.ToString("x");
         string contentType = "multipart/form-data; boundary=" + boundary;
-
-        // 전송시작 말풍선
-        if (webEmotionBalloonInstance != null)
-        {
-            Destroy(webEmotionBalloonInstance);
-            webEmotionBalloonInstance = null;
-        }
-        webEmotionBalloonInstance = EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), "Question");
 
         try
         {
@@ -1231,14 +1256,7 @@ public class APIManager : MonoBehaviour
                                     // 생각중 등등의 답변타입체크
                                     string replyType = jsonObject["type"]?.ToString() ?? "reply";
                                     if (replyType == "thinking") // "생각 중" 상태
-                                    {
-                                        // 기존의 풍선 있을경우 파괴
-                                        if (webEmotionBalloonInstance != null)
-                                        {
-                                            Destroy(webEmotionBalloonInstance);
-                                            webEmotionBalloonInstance = null;
-                                        }
-                                        
+                                    {                                        
                                         NoticeManager.Instance.Notice("thinking");
                                     }
                                     else if (replyType == "webSearch")
@@ -1278,13 +1296,6 @@ public class APIManager : MonoBehaviour
 
                                             // 안내 말풍선 숨기기
                                             NoticeManager.Instance.DeleteNoticeBalloonInstance();
-
-                                            // 전송시작 말풍선 제거
-                                            if (webEmotionBalloonInstance != null)
-                                            {
-                                                Destroy(webEmotionBalloonInstance);
-                                                webEmotionBalloonInstance = null;
-                                            }
 
                                             AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
                                             AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();  // 대답중 sprite
@@ -1339,7 +1350,32 @@ public class APIManager : MonoBehaviour
                                                 string intent_info_is_intent_image = jsonObject["intent_info"]["is_intent_image"].ToString();  // on, off
                                                 string intent_info_image_info = jsonObject["intent_info"]["image_info"].ToString();
 
-                                                if (intent_info_is_intent_web == "on") AnswerBalloonManager.Instance.ShowWebImage();
+                                                if (intent_info_is_intent_web == "on")
+                                                {
+                                                    AnswerBalloonManager.Instance.ShowWebImage();
+
+                                                    // 웹 검색 메타데이터 파싱 및 로깅
+                                                    try
+                                                    {
+                                                        string webKeyword = jsonObject["intent_info"]["web_search_keyword"]?.ToString() ?? "";
+                                                        string webMethod = jsonObject["intent_info"]["web_search_method"]?.ToString() ?? "";
+                                                        string webContent = jsonObject["intent_info"]["web_search_content"]?.ToString() ?? "";
+
+                                                        Debug.Log($"[Web Search] Keyword: {webKeyword}");
+                                                        Debug.Log($"[Web Search] Method: {webMethod}");
+                                                        Debug.Log($"[Web Search] Content Length: {webContent.Length}");
+
+                                                        // DebugBalloonManager2에 웹 로그 추가
+                                                        if (!string.IsNullOrEmpty(webKeyword) || !string.IsNullOrEmpty(webMethod))
+                                                        {
+                                                            DebugBalloonManager2.Instance.AddWebLog(webKeyword, webMethod, webContent);
+                                                        }
+                                                    }
+                                                    catch (Exception webEx)
+                                                    {
+                                                        Debug.Log($"Web metadata parsing error: {webEx.Message}");
+                                                    }
+                                                }
                                             }
                                             catch (Exception ex)
                                             {
@@ -1404,13 +1440,6 @@ public class APIManager : MonoBehaviour
                 }
             }
 
-            // 오류 안내 말풍선      
-            if (webEmotionBalloonInstance != null)
-            {
-                Destroy(webEmotionBalloonInstance);
-                webEmotionBalloonInstance = null;
-            }
-
             Debug.Log("API error");
             EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), "No", 2f);
             return;
@@ -1418,13 +1447,6 @@ public class APIManager : MonoBehaviour
         catch (Exception ex)
         {
             Debug.LogError($"Exception: {ex.Message}");
-
-            // 오류 안내 말풍선      
-            if (webEmotionBalloonInstance != null)
-            {
-                Destroy(webEmotionBalloonInstance);
-                webEmotionBalloonInstance = null;
-            }
 
             Debug.Log("API error");
             EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), "No", 2f);
@@ -1441,9 +1463,26 @@ public class APIManager : MonoBehaviour
         public string furigana;
         public string original;
         public string time;
+        public string log_path;  // verbose=True일 때 서버가 보냄
+        public string message;   // THINKING 타입일 때 서버가 보냄
+        public string stages;    // stage 메타정보 (Debug용)
     }
     
     // Furigana 변환 API 호출
+    public async Task<string> CallFuriganaAPIAsync(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            Debug.LogWarning("[APIManager] Furigana: Empty text provided");
+            return text;
+        }
+        
+        var tcs = new TaskCompletionSource<string>();
+        StartCoroutine(CallFuriganaAPICoroutine(text, (result) => tcs.SetResult(result)));
+        return await tcs.Task;
+    }
+    
+    // Furigana 변환 API 호출 (콜백 버전 - 호환성 유지)
     public void CallFuriganaAPI(string text, System.Action<string> callback)
     {
         StartCoroutine(CallFuriganaAPICoroutine(text, callback));
@@ -1477,8 +1516,12 @@ public class APIManager : MonoBehaviour
             
             if (request.result == UnityWebRequest.Result.Success)
             {
+                // 서버 응답 전체 출력
+                string rawResponse = request.downloadHandler.text;
+                Debug.Log($"[APIManager] Furigana RAW response:\n{rawResponse}");
+                
                 // 스트리밍 응답 파싱
-                string[] lines = request.downloadHandler.text.Split('\n');
+                string[] lines = rawResponse.Split('\n');
                 string furiganaResult = null;
                 
                 foreach (string line in lines)
@@ -1492,6 +1535,12 @@ public class APIManager : MonoBehaviour
                         {
                             furiganaResult = response.furigana;
                             Debug.Log($"[APIManager] Furigana result: {furiganaResult}");
+                            
+                            // stages 메타데이터 로깅 (있을 경우)
+                            if (!string.IsNullOrEmpty(response.stages))
+                            {
+                                Debug.Log($"[APIManager] Furigana stages metadata: {response.stages}");
+                            }
                         }
                     }
                     catch (Exception e)
@@ -1500,6 +1549,7 @@ public class APIManager : MonoBehaviour
                     }
                 }
                 
+                Debug.Log($"[APIManager] Furigana parsed result: '{furiganaResult}'");
                 callback?.Invoke(furiganaResult ?? text);
             }
             else
@@ -1889,12 +1939,7 @@ public class APIManager : MonoBehaviour
         TTSManager.Instance.BeginTtsSession(chatIdxNum);
         
         // 전송시작 말풍선
-        if (webEmotionBalloonInstance != null)
-        {
-            Destroy(webEmotionBalloonInstance);
-            webEmotionBalloonInstance = null;
-        }
-        webEmotionBalloonInstance = EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), "Question");
+        NoticeManager.Instance.ShowNoticeEmotionBalloon("Time");
 
         // 닉네임 가져오기
         string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
@@ -2176,25 +2221,6 @@ public class APIManager : MonoBehaviour
         }
     }
 
-    private void ShowQuestionBalloon()
-    {
-        if (questionEmotionBalloonInstance != null)
-        {
-            Destroy(questionEmotionBalloonInstance);
-            questionEmotionBalloonInstance = null;
-        }
-        questionEmotionBalloonInstance = EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), "Question");
-    }
-
-    private void DestroyQuestionBalloon()
-    {
-        if (questionEmotionBalloonInstance != null)
-        {
-            Destroy(questionEmotionBalloonInstance);
-            questionEmotionBalloonInstance = null;
-        }
-    }
-
     // 현재 선택된 모델 ID 가져오기
     private string GetCurrentModelId()
     {
@@ -2239,6 +2265,7 @@ public class APIManager : MonoBehaviour
         bool saveResult = true,
         bool saveImage = true,
         bool isDebug = true,
+        bool isWhiteOnly = true,
         System.Action<OCRResult> callback = null)
     {
         if (imageBytes == null || imageBytes.Length == 0)
@@ -2265,8 +2292,9 @@ public class APIManager : MonoBehaviour
             // dev_ocr_translate 사용 여부 (설치 상태 또는 DevOCR 토글)
             else
             {
-                bool shouldUseDevServer = SettingManager.Instance.GetInstallStatus() < 2   // no install, lite
-                                        || SettingManager.Instance.IsDevOCREnabled();    // DevOCR 토글 또는 Android
+            bool shouldUseDevServer = (SettingManager.Instance.GetInstallStatus() < 2   // no install, lite
+                                    || SettingManager.Instance.IsDevSoundEnabled())    // DevSound 토글 또는 Android
+                                    && string.IsNullOrEmpty(baseUrl);                  // 연결된 서버가 없을 때만
                 if (shouldUseDevServer)
                 {
                     // TaskCompletionSource를 사용하여 콜백을 async/await로 변환
@@ -2311,7 +2339,8 @@ public class APIManager : MonoBehaviour
                 { "save_image", saveImage ? "true" : "false" },
                 { "is_debug", isDebug ? "true" : "false" },
                 { "is_sentence", isSentence ? "true" : "false" },
-                { "merge_threshold", mergeThreshold.ToString() }
+                { "merge_threshold", mergeThreshold.ToString() },
+                { "is_white_only", isWhiteOnly ? "true" : "false" }
             };
 
             // 번역 사용 시 추가 파라미터
@@ -2377,6 +2406,9 @@ public class APIManager : MonoBehaviour
                 }
             }
 
+            // OCR 작업 시작 시 "Search" 말풍선 표시 (30초)
+            NoticeManager.Instance.ShowNoticeEmotionBalloon("Search", 30f);
+
             Debug.Log("[PaddleOCR] Request sent, waiting for response...");
 
             // 응답 받기
@@ -2399,10 +2431,12 @@ public class APIManager : MonoBehaviour
                         OCRResult ocrResult = new OCRResult
                         {
                             labels = new List<string>(),
-                            quad_boxes = new List<List<List<float>>>()
+                            quad_boxes = new List<List<List<float>>>(),
+                            labels_origin = new List<string>(),
+                            quad_boxes_origin = new List<List<List<float>>>()
                         };
 
-                        // labels 파싱
+                        // labels 파싱 (번역된 텍스트)
                         if (ocrData["labels"] != null)
                         {
                             foreach (var label in ocrData["labels"])
@@ -2411,7 +2445,7 @@ public class APIManager : MonoBehaviour
                             }
                         }
 
-                        // quad_boxes 파싱 및 형식 변환
+                        // quad_boxes 파싱 및 형식 변환 (번역된 텍스트 좌표)
                         // PaddleOCR: [x1,y1,x2,y2,x3,y3,x4,y4] (평탄 리스트)
                         // 내부 형식: [[[x1,y1],[x2,y2],[x3,y3],[x4,y4]]] (중첩 리스트)
                         if (ocrData["quad_boxes"] != null)
@@ -2441,25 +2475,88 @@ public class APIManager : MonoBehaviour
                             }
                         }
 
+                        // 원문 텍스트 파싱 (ocr_with_region_origin)
+                        if (jsonResponse["ocr_with_region_origin"] != null)
+                        {
+                            var ocrDataOrigin = jsonResponse["ocr_with_region_origin"];
+                            
+                            // labels_origin 파싱
+                            if (ocrDataOrigin["labels"] != null)
+                            {
+                                foreach (var label in ocrDataOrigin["labels"])
+                                {
+                                    ocrResult.labels_origin.Add(label.ToString());
+                                }
+                            }
+                            
+                            // quad_boxes_origin 파싱
+                            if (ocrDataOrigin["quad_boxes"] != null)
+                            {
+                                foreach (var quadBox in ocrDataOrigin["quad_boxes"])
+                                {
+                                    List<List<float>> quad = new List<List<float>>();
+                                    
+                                    List<float> coords = new List<float>();
+                                    foreach (var coord in quadBox)
+                                    {
+                                        coords.Add((float)coord);
+                                    }
+                                    
+                                    if (coords.Count >= 8)
+                                    {
+                                        for (int i = 0; i < 8; i += 2)
+                                        {
+                                            List<float> point = new List<float> { coords[i], coords[i + 1] };
+                                            quad.Add(point);
+                                        }
+                                        ocrResult.quad_boxes_origin.Add(quad);
+                                    }
+                                }
+                            }
+                            
+                            Debug.Log($"[PaddleOCR] Parsed {ocrResult.labels_origin.Count} origin text regions");
+                        }
+
                         Debug.Log($"[PaddleOCR] Parsed {ocrResult.labels.Count} text regions");
+                        
+                        // OCR 작업 완료 시 말풍선 제거
+                        NoticeManager.Instance.DeleteNoticeBalloonInstance();
+                        
                         callback?.Invoke(ocrResult);
                     }
                     else
                     {
                         Debug.LogWarning("[PaddleOCR] No ocr_with_region data in response or status is not success");
+                        
+                        // 결과 없음 시 말풍선 제거
+                        NoticeManager.Instance.DeleteNoticeBalloonInstance();
+                        
                         callback?.Invoke(null);
                     }
                 }
                 catch (Exception ex)
                 {
                     Debug.LogError($"[PaddleOCR] Failed to parse response: {ex.Message}");
+                    
+                    // 파싱 에러 시 말풍선 제거 후 에러 표시
+                    NoticeManager.Instance.ShowNoticeEmotionBalloon("No", 2f);
+                    
                     callback?.Invoke(null);
                 }
             }
+
+            // API 호출 완료 시 말풍선 제거
+            EmotionBalloonManager.Instance.RemoveEmotionBalloonForTarget(CharManager.Instance.GetCurrentCharacter());
+            Debug.Log("[PaddleOCR] Search balloon removed (API completed)");
+
         }
         catch (Exception ex)
         {
             Debug.LogError($"[PaddleOCR] Exception: {ex.Message}");
+            
+            // 서버 연결 에러 시 "No" 말풍선 표시
+            NoticeManager.Instance.ShowNoticeEmotionBalloon("No", 2f);
+            
             callback?.Invoke(null);
         }
     }
