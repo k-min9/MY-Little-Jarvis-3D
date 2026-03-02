@@ -33,10 +33,7 @@ public class NoticeManager : MonoBehaviour
             // AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Thinking...");
 
             // 기존 안내풍선(감정) 삭제 후 재생성
-            if (noticeEmotionBalloonInstance != null)
-            {
-                Destroy(noticeEmotionBalloonInstance);
-            }
+            DeleteNoticeBalloonInstance();
             noticeEmotionBalloonInstance = EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), "Time");
         }
         else if (notice == "webSearch") // "생각 중" 상태
@@ -46,13 +43,11 @@ public class NoticeManager : MonoBehaviour
             // AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Searching Web...");
 
             // 기존 안내풍선(감정) 삭제 후 재생성
-            if (noticeEmotionBalloonInstance != null)
-            {
-                Destroy(noticeEmotionBalloonInstance);
-            }
+            DeleteNoticeBalloonInstance();
             noticeEmotionBalloonInstance = EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), "Search");
         }
     }
+    
     
     // 안내 말풍선용 get set delete
     public GameObject GetNoticeBalloonInstance()
@@ -72,5 +67,21 @@ public class NoticeManager : MonoBehaviour
             Destroy(noticeEmotionBalloonInstance);
             noticeEmotionBalloonInstance = null;
         }
+    }
+
+    // 통합 EmotionBalloon 표시 (기존 것 자동 삭제 후 생성)
+    public GameObject ShowNoticeEmotionBalloon(string spriteName, float duration = 60f)
+    {
+        // 기존 것 파괴
+        DeleteNoticeBalloonInstance();
+        
+        // 새로 생성
+        noticeEmotionBalloonInstance = EmotionBalloonManager.Instance.ShowEmotionBalloon(
+            CharManager.Instance.GetCurrentCharacter(), 
+            spriteName, 
+            duration
+        );
+        
+        return noticeEmotionBalloonInstance;
     }
 }
