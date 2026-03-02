@@ -8,7 +8,6 @@ using System.IO;
 // MicrophoneNormal과 VADController에서 중복되던 STT 로직을 통합
 public static class STTUtil
 {
-    private static GameObject writeEmotionBalloonInstance;
 
     // STT API 응답 데이터 구조
     [System.Serializable]
@@ -400,7 +399,7 @@ public static class STTUtil
         // dev : 발언 음성 재생
         if (query != "" && SettingManager.Instance.settings.isDevHowling)
         { 
-            APIManager.Instance.GetHowlingFromAPI(query);
+            TTSManager.Instance.GetHowlingFromAPI(query);
         }
 
         // 기존 음성 중지 및 초기화
@@ -411,20 +410,11 @@ public static class STTUtil
     private static void ShowWriteBalloon()
     {
         if (EmotionBalloonManager.Instance == null) return;
-
-        if (writeEmotionBalloonInstance != null)
-        {
-            UnityEngine.Object.Destroy(writeEmotionBalloonInstance);
-        }
-        writeEmotionBalloonInstance = EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), "Write", 15f);
+        NoticeManager.Instance.ShowNoticeEmotionBalloon("Write", 15f);
     }
 
     private static void DestroyWriteBalloon()
     {
-        if (writeEmotionBalloonInstance != null)
-        {
-            UnityEngine.Object.Destroy(writeEmotionBalloonInstance);
-            writeEmotionBalloonInstance = null;
-        }
+        NoticeManager.Instance.DeleteNoticeBalloonInstance();
     }
 }
