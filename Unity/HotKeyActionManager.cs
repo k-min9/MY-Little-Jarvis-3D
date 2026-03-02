@@ -72,17 +72,17 @@ public enum HotKeyActionType
     [DisplayText("OCR3")]
     ActionOCR3,
 
-    [DisplayText("VL_TEST")]
-    ActionVL_TEST,
+    // [DisplayText("VL_TEST")]
+    // ActionVL_TEST,
 
-    [DisplayText("VL_RUN")]
-    ActionVL_RUN,
+    // [DisplayText("VL_RUN")]
+    // ActionVL_RUN,
 
-    [DisplayText("VL_Special1")]
-    ActionVL_Special1,
+    [DisplayText("VL_BASkip")]
+    ActionVL_BASkip,
 
-    [DisplayText("VL_Special2")]
-    ActionVL_Special2,
+    [DisplayText("VL_BAReader")]
+    ActionVL_BAReader,
 
     [DisplayText("Dev Mode")]
     ActionDevMode,
@@ -321,54 +321,57 @@ public class HotKeyActionManager : MonoBehaviour
             );
         };
 
-        // VL Planer Special 실행 (MomoTalk 미독 순회 등)
-        actions["ActionVL_Special1"] = () =>
+        // VL Engine BASkip 실행
+        actions["ActionVL_BASkip"] = () =>
         {
-            Debug.Log("VL_Special1 실행 - VL Planer Special 스트리밍");
-            ApiVlAgentManager.Instance.ExecuteVlPlanerRunSpecial(
-                query: "",  // Special은 쿼리 선택적
-                onEvent: (eventData) =>
-                {
-                    string kind = (string)eventData["kind"] ?? "unknown";
-                    string message = (string)eventData["message"] ?? "";
-                    Debug.Log($"[VL_Special1] Event: kind={kind}, message={message}");
-                },
-                onComplete: (success, errorMsg) =>
-                {
-                    if (success)
-                    {
-                        Debug.Log("[VL_Special1] VL Planer Special 실행 완료");
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"[VL_Special1] VL Planer Special 실패: {errorMsg}");
-                    }
-                }
-            );
-        };
-
-        // VL Engine 실행 (시나리오 기반 엔진)
-        actions["ActionVL_Special2"] = () =>
-        {
-            Debug.Log("VL_Special2 실행 - VL Engine 스트리밍");
+            Debug.Log("VL_BASkip 실행 - 모모토크 스킵 시나리오");
             ApiVlEngineManager.Instance.ExecuteVlEngine(
                 query: "",
+                scenarioName: ApiVlEngineManager.ScenarioBASkip,
                 onEvent: (eventData) =>
                 {
                     string kind = (string)eventData["kind"] ?? "unknown";
                     string message = (string)eventData["message"] ?? "";
-                    Debug.Log($"[VL_Special2] Event: kind={kind}, message={message}");
+                    Debug.Log($"[BASkip] Event: kind={kind}, message={message}");
                 },
                 onComplete: (response) =>
                 {
                     if (response != null)
                     {
                         string kind = (string)response["kind"] ?? "unknown";
-                        Debug.Log($"[VL_Special2] VL Engine 완료: {kind}");
+                        Debug.Log($"[BASkip] 완료: {kind}");
                     }
                     else
                     {
-                        Debug.LogWarning("[VL_Special2] VL Engine 실패: 응답 없음");
+                        Debug.LogWarning("[BASkip] 실패: 응답 없음");
+                    }
+                }
+            );
+        };
+
+        // VL Engine BAReader 실행
+        actions["ActionVL_BAReader"] = () =>
+        {
+            Debug.Log("VL_BAReader 실행 - 인연스토리 읽기 시나리오");
+            ApiVlEngineManager.Instance.ExecuteVlEngine(
+                query: "",
+                scenarioName: ApiVlEngineManager.ScenarioBAReader,
+                onEvent: (eventData) =>
+                {
+                    string kind = (string)eventData["kind"] ?? "unknown";
+                    string message = (string)eventData["message"] ?? "";
+                    Debug.Log($"[BAReader] Event: kind={kind}, message={message}");
+                },
+                onComplete: (response) =>
+                {
+                    if (response != null)
+                    {
+                        string kind = (string)response["kind"] ?? "unknown";
+                        Debug.Log($"[BAReader] 완료: {kind}");
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[BAReader] 실패: 응답 없음");
                     }
                 }
             );
@@ -471,4 +474,3 @@ public class HotKeyActionManager : MonoBehaviour
         return texts.ToArray();
     }
 }
-

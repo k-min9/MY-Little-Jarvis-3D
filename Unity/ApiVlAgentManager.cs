@@ -31,6 +31,8 @@ public class ApiVlAgentManager : MonoBehaviour
 
     // Stateless 재요청용 상태 (Unity가 들고 있음)
     private JArray pendingThinkLog = null;
+    private JToken pendingAgentState = null;      // 재요청용 agent_state (서버가 내려줌)
+    private float pendingCaptureDelaySec = 1.0f;  // request_observation에서 내려준 캡처 지연 시간
     private bool shouldRequestNewObservation = false;
     private int currentOffsetX = 0;
     private int currentOffsetY = 0;
@@ -40,8 +42,34 @@ public class ApiVlAgentManager : MonoBehaviour
     private Action<JObject> currentOnEvent = null;
     private Action<bool, string> currentOnComplete = null;
 
+    // 디버그/상세 로그 (임시 파라미터)
+    private bool isVerbose = true;
+    private bool isDebug = true;
+
     // VL Agent 상태 표시용 말풍선 (EmotionBalloonManager)
     private GameObject vlStatusBalloon = null;  // 진행 상태 말풍선 (전송시작/생각중/검증중/수행중 - 매번 교체)
+
+    #region VL 메시지 처리
+
+    /// <summary>
+    /// VL Agent 메시지 처리 (AnswerBalloonSimple + DebugBalloonManager2 둘 다 업데이트)
+    /// </summary>
+    private void ProcessVlMessage(string message)
+    {
+        // AnswerBalloonSimple에 표시
+        if (AnswerBalloonSimpleManager.Instance != null)
+        {
+            AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText(message);
+        }
+
+        // DebugBalloonManager2에 기록
+        if (DebugBalloonManager2.Instance != null)
+        {
+            DebugBalloonManager2.Instance.AddVlAgentLog(message);
+        }
+    }
+
+    #endregion
 
     // API 응답 모델
     [System.Serializable]
@@ -321,24 +349,14 @@ public class ApiVlAgentManager : MonoBehaviour
         SetVlStatusBalloon("Question");
     }
 
-    // VL Planer Run Special 스트리밍 실행 (/vl_agent/run_special)
-    public void ExecuteVlPlanerRunSpecial(
-        string query,
-        Action<JObject> onEvent = null,
-        Action<bool, string> onComplete = null,
-        int maxRetry = 30
-    )
-    {
-        ExecutePlannerRunCore("/vl_agent/run_special", query, onEvent, onComplete, maxRetry, "VL Special 시작...", "VL Special 재시작...");
-        SetVlStatusBalloon("Question");
-    }
-
     // 작업 취소 요청
     public void CancelVlPlanerRun()
     {
         isCanceled = true;
         shouldRequestNewObservation = false;
         pendingThinkLog = null;
+        pendingAgentState = null;
+        pendingCaptureDelaySec = 1.0f;
         Debug.Log("[VlPlanerRun] 취소 요청됨");
     }
 
@@ -357,16 +375,23 @@ public class ApiVlAgentManager : MonoBehaviour
         currentOnComplete = onComplete;
         isCanceled = false;
 
+        // 새 실행이면 재요청 상태 초기화
+        pendingThinkLog = null;
+        pendingAgentState = null;
+        pendingCaptureDelaySec = 1.0f;
+        shouldRequestNewObservation = false;
+
         var memoryList = MemoryManager.Instance.GetAllConversationMemory();
         string memoryJson = JsonConvert.SerializeObject(memoryList);
 
-        StartCoroutine(ExecutePlannerRunCoreCoroutine(endpoint, query, memoryJson, null, 0, maxRetry, startText, restartText, onEvent, onComplete));
+        StartCoroutine(ExecutePlannerRunCoreCoroutine(endpoint, query, memoryJson, null, null, 0, maxRetry, startText, restartText, onEvent, onComplete));
     }
 
-    // think_log 포함 재요청
-    private void ExecutePlannerRunCoreWithThinkLog(string endpoint, JArray thinkLog, int retryCount, int maxRetry, string restartText)
+    // think_log + agent_state 포함 재요청
+    private void ExecutePlannerRunCoreWithResumeState(string endpoint, JArray thinkLog, JToken agentState, float captureDelaySec, int retryCount, int maxRetry, string restartText)
     {
-        StartCoroutine(ExecutePlannerRunCoreCoroutine(endpoint, "", "", thinkLog, retryCount, maxRetry, restartText, restartText, currentOnEvent, currentOnComplete));
+        pendingCaptureDelaySec = captureDelaySec;
+        StartCoroutine(ExecutePlannerRunCoreCoroutine(endpoint, "", "", thinkLog, agentState, retryCount, maxRetry, restartText, restartText, currentOnEvent, currentOnComplete));
     }
 
     // Planer Run 공통 코루틴: 캡처 후 스트리밍 API 호출
@@ -375,6 +400,7 @@ public class ApiVlAgentManager : MonoBehaviour
         string query,
         string memoryJson,
         JArray thinkLog,
+        JToken agentState,
         int retryCount,
         int maxRetry,
         string startText,
@@ -418,7 +444,7 @@ public class ApiVlAgentManager : MonoBehaviour
         Debug.Log($"[{endpoint}] 캡처 완료: {imageBytes.Length} bytes, {(isResume ? "재요청" : "첫 요청")}");
 
         // API 호출 (스트리밍)
-        yield return CallPlannerRunStreamingApi(endpoint, query, memoryJson, thinkLog, retryCount, maxRetry, imageBytes, captureOffsetX, captureOffsetY, startText, restartText, onEvent, onComplete);
+        yield return CallPlannerRunStreamingApi(endpoint, query, memoryJson, thinkLog, agentState, retryCount, maxRetry, imageBytes, captureOffsetX, captureOffsetY, startText, restartText, onEvent, onComplete);
     }
 
     // Planer Run 스트리밍 API 호출 공통: BaseUrl 확보, 스트리밍 이벤트 큐 처리, 재요청 처리, 완료 처리
@@ -427,6 +453,7 @@ public class ApiVlAgentManager : MonoBehaviour
         string query,
         string memoryJson,
         JArray thinkLog,
+        JToken agentState,
         int retryCount,
         int maxRetry,
         byte[] imageBytes,
@@ -452,6 +479,7 @@ public class ApiVlAgentManager : MonoBehaviour
 
         // think_log JSON 직렬화
         string thinkLogJson = thinkLog != null ? thinkLog.ToString(Formatting.None) : "";
+        string agentStateJson = agentState != null ? agentState.ToString(Formatting.None) : "";
 
         // Task로 비동기 스트리밍 요청 처리 (이벤트 큐와 함께)
         var eventQueue = new System.Collections.Concurrent.ConcurrentQueue<JObject>();
@@ -462,10 +490,13 @@ public class ApiVlAgentManager : MonoBehaviour
             query,
             memoryJson,
             thinkLogJson,
+            agentStateJson,
             retryCount,
             maxRetry,
             isCanceledProvider,
             imageBytes,
+            isVerbose,
+            isDebug,
             (eventData) =>
             {
                 eventQueue.Enqueue(eventData);
@@ -492,7 +523,8 @@ public class ApiVlAgentManager : MonoBehaviour
         {
             string errorMsg = task.Exception.InnerException?.Message ?? task.Exception.Message;
             Debug.LogError($"[{endpoint}] API 오류: {errorMsg}");
-            AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText($"{endpoint} 오류: {errorMsg}");
+            ClearVlStatusBalloon();
+            ProcessVlMessage($"{endpoint} 오류: {errorMsg}");
             onComplete?.Invoke(false, errorMsg);
             yield break;
         }
@@ -508,10 +540,11 @@ public class ApiVlAgentManager : MonoBehaviour
             // 검증중 이펙트
             SetVlStatusBalloon("Verify");
 
-            yield return new WaitForSeconds(1.0f);
+            float waitSec = pendingCaptureDelaySec > 0.0f ? pendingCaptureDelaySec : 1.0f;
+            yield return new WaitForSeconds(waitSec);
 
-            Debug.Log($"[{endpoint}] 재요청 시작");
-            ExecutePlannerRunCoreWithThinkLog(endpoint, pendingThinkLog, pendingRetryCount, pendingMaxRetry, restartText);
+            Debug.Log($"[{endpoint}] 재요청 시작 (delay={waitSec})");
+            ExecutePlannerRunCoreWithResumeState(endpoint, pendingThinkLog, pendingAgentState, pendingCaptureDelaySec, pendingRetryCount, pendingMaxRetry, restartText);
             yield break;
         }
 
@@ -523,7 +556,7 @@ public class ApiVlAgentManager : MonoBehaviour
         EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), resultSprite, 3f, 0f);
 
         string statusText = result.success ? "완료" : "실패";
-        AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText($"{endpoint} {statusText}됨");
+        ProcessVlMessage($"{endpoint} {statusText}됨");
 
         onComplete?.Invoke(result.success, result.errorMsg);
     }
@@ -535,7 +568,7 @@ public class ApiVlAgentManager : MonoBehaviour
         string message = (string)eventData["message"] ?? "";
 
         // 상태 표시 업데이트
-        AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText($"[{kind}] {message}");
+        ProcessVlMessage($"[{kind}] {message}");
 
         // 이벤트 종류별 이펙트 처리
         UpdateVlStatusBalloonByKind(kind);
@@ -555,14 +588,14 @@ public class ApiVlAgentManager : MonoBehaviour
         }
         else if (kind == "act")
         {
-            HandleActPreview(eventData, offsetX, offsetY);
+            HandleActEvent(eventData, offsetX, offsetY);
         }
 
         // 외부 콜백 호출
         onEvent?.Invoke(eventData);
     }
 
-    // request_observation: 클릭 요청 처리 및 재요청용 상태 저장
+    // request_observation: 재요청용 상태 저장 (think_log + agent_state) + (구버전 호환) click_request 처리
     private void HandleRequestObservation(JObject eventData, int offsetX, int offsetY)
     {
         var data = eventData["data"] as JObject;
@@ -573,9 +606,9 @@ public class ApiVlAgentManager : MonoBehaviour
         // 요청 수행중 이펙트
         SetVlStatusBalloon("Execute");
 
-        // click_request가 있으면 클릭 수행
         if (data != null)
         {
+            // 구버전 호환: click_request가 있으면 클릭 수행
             var clickRequest = data["click_request"] as JObject;
             if (clickRequest != null)
             {
@@ -583,13 +616,34 @@ public class ApiVlAgentManager : MonoBehaviour
                 int? y = (int?)clickRequest["y"];
                 if (x.HasValue && y.HasValue)
                 {
-                    ExecuteClickFromRelative(x.Value, y.Value, offsetX, offsetY, true, "[VlPlanerRun] 클릭 실행");
+                    ExecuteClickFromRelative(x.Value, y.Value, offsetX, offsetY, true, "[VlPlanerRun] 클릭 실행 (request_observation)");
                 }
             }
 
             // retry_count, max_retry 저장
             pendingRetryCount = data["retry_count"]?.Value<int>() ?? 0;
             pendingMaxRetry = data["max_retry"]?.Value<int>() ?? 5;
+
+            // special/stateless: agent_state 저장
+            if (data["agent_state"] != null)
+            {
+                pendingAgentState = data["agent_state"];
+            }
+
+            // special: 캡처 지연 시간
+            float delaySec = 1.0f;
+            if (data["capture_delay_sec"] != null)
+            {
+                try
+                {
+                    delaySec = data["capture_delay_sec"].Value<float>();
+                }
+                catch (Exception)
+                {
+                    delaySec = 1.0f;
+                }
+            }
+            pendingCaptureDelaySec = delaySec;
         }
 
         // think_log 저장 및 재요청 플래그 설정
@@ -597,12 +651,14 @@ public class ApiVlAgentManager : MonoBehaviour
         shouldRequestNewObservation = true;
     }
 
-    // done: request_type 처리
+    // done: request_type 처리 (구버전) + special done은 request_type이 비어있을 수 있음
     private void HandleDoneEvent(JObject eventData, int offsetX, int offsetY)
     {
         Debug.Log("[VlPlanerRun] 작업 완료 (done)");
         shouldRequestNewObservation = false;
         pendingThinkLog = null;
+        pendingAgentState = null;
+        pendingCaptureDelaySec = 1.0f;
 
         var data = eventData["data"] as JObject;
         if (data == null)
@@ -665,10 +721,12 @@ public class ApiVlAgentManager : MonoBehaviour
         Debug.Log("[VlPlanerRun] 작업 실패 (fail)");
         shouldRequestNewObservation = false;
         pendingThinkLog = null;
+        pendingAgentState = null;
+        pendingCaptureDelaySec = 1.0f;
     }
 
-    // act: grounding 후보 미리보기
-    private void HandleActPreview(JObject eventData, int offsetX, int offsetY)
+    // act: special은 클릭 수행, 일반은 grounding 후보 미리보기
+    private void HandleActEvent(JObject eventData, int offsetX, int offsetY)
     {
         var data = eventData["data"] as JObject;
         if (data == null)
@@ -676,6 +734,27 @@ public class ApiVlAgentManager : MonoBehaviour
             return;
         }
 
+        // special: data.action == "click" 인 경우 실제 클릭 수행
+        string action = data["action"]?.Value<string>() ?? "";
+        if (action == "click")
+        {
+            int? x = (int?)data["x"];
+            int? y = (int?)data["y"];
+            if (x.HasValue && y.HasValue)
+            {
+                ExecuteClickFromRelative(x.Value, y.Value, offsetX, offsetY, true, "[VlPlanerRun] 클릭 실행 (act)");
+            }
+
+            // agent_state가 있으면 저장
+            if (data["agent_state"] != null)
+            {
+                pendingAgentState = data["agent_state"];
+            }
+
+            return;
+        }
+
+        // 일반: grounding 후보 미리보기 (구버전 유지)
         var result = data["result"] as JObject;
         if (result == null)
         {
@@ -694,15 +773,15 @@ public class ApiVlAgentManager : MonoBehaviour
             return;
         }
 
-        int? x = (int?)firstCandidate["x"];
-        int? y = (int?)firstCandidate["y"];
-        if (!x.HasValue || !y.HasValue)
+        int? px = (int?)firstCandidate["x"];
+        int? py = (int?)firstCandidate["y"];
+        if (!px.HasValue || !py.HasValue)
         {
             return;
         }
 
-        (int absoluteX, int absoluteY) = ConvertRelativeToAbsolute(x.Value, y.Value, offsetX, offsetY);
-        Debug.Log($"[VlPlanerRun] Grounding 결과 - 첫 번째 후보: ({x.Value}, {y.Value}) = ({absoluteX}, {absoluteY})");
+        (int absoluteX, int absoluteY) = ConvertRelativeToAbsolute(px.Value, py.Value, offsetX, offsetY);
+        Debug.Log($"[VlPlanerRun] Grounding 결과 - 첫 번째 후보: ({px.Value}, {py.Value}) = ({absoluteX}, {absoluteY})");
         ShowClickPosition(absoluteX, absoluteY, 1f);
     }
 
@@ -713,10 +792,13 @@ public class ApiVlAgentManager : MonoBehaviour
         string query,
         string memoryJson,
         string thinkLogJson,
+        string agentStateJson,
         int retryCount,
         int maxRetry,
         Func<bool> isCanceledProvider,
         byte[] imageBytes,
+        bool verbose,
+        bool debug,
         Action<JObject> onEvent
     )
     {
@@ -753,6 +835,27 @@ public class ApiVlAgentManager : MonoBehaviour
                 writer.WriteLine();
                 writer.WriteLine(thinkLogJson);
             }
+
+            // agent_state 필드 (재요청/누적 상태)
+            if (!string.IsNullOrEmpty(agentStateJson))
+            {
+                writer.WriteLine($"--{boundary}");
+                writer.WriteLine("Content-Disposition: form-data; name=\"agent_state\"");
+                writer.WriteLine();
+                writer.WriteLine(agentStateJson);
+            }
+
+            // verbose 필드 (임시 파라미터)
+            writer.WriteLine($"--{boundary}");
+            writer.WriteLine("Content-Disposition: form-data; name=\"verbose\"");
+            writer.WriteLine();
+            writer.WriteLine(verbose ? "true" : "false");
+
+            // debug 필드
+            writer.WriteLine($"--{boundary}");
+            writer.WriteLine("Content-Disposition: form-data; name=\"debug\"");
+            writer.WriteLine();
+            writer.WriteLine(debug ? "true" : "false");
 
             // retry_count 필드
             writer.WriteLine($"--{boundary}");
@@ -955,18 +1058,13 @@ public class ApiVlAgentManager : MonoBehaviour
     // 상태 말풍선을 spriteKey로 교체 표시합니다.
     private void SetVlStatusBalloon(string spriteKey)
     {
-        ClearVlStatusBalloon();
-        vlStatusBalloon = EmotionBalloonManager.Instance.ShowEmotionBalloon(CharManager.Instance.GetCurrentCharacter(), spriteKey);
+        NoticeManager.Instance.ShowNoticeEmotionBalloon(spriteKey);
     }
 
     // 상태 말풍선을 제거합니다.
     private void ClearVlStatusBalloon()
     {
-        if (vlStatusBalloon != null)
-        {
-            Destroy(vlStatusBalloon);
-            vlStatusBalloon = null;
-        }
+        NoticeManager.Instance.DeleteNoticeBalloonInstance();
     }
 
     // AnswerBalloonSimple에 시작 또는 재시작 텍스트를 표시합니다.
