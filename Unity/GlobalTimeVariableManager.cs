@@ -18,21 +18,24 @@ public class GlobalTimeVariableManager : MonoBehaviour
     }
 
     // 플레이 타임 
-    private float sessionPlaySeconds = 0f;      // 이번 실행 세션의 플레이타임(초)
-    private float totalPlaySeconds = 0f;        // 누적 플레이타임(초) - config/time.json 저장/로드
+    public float sessionPlaySeconds = 0f;
+    public float totalPlaySeconds = 0f;
 
     // SmallTalk 타이머 
-    [SerializeField] private float smallTalkIntervalSeconds = 60f;
-    private float smallTalkTimer = 0f;
-    private bool smallTalkEnabled = false;
-
-    // 채팅 관련 시간 
-    private float currentChatElapsedSeconds = 0f;      // 현재 채팅 경과 시간(초)
+    public float smallTalkIntervalSeconds = 60f;
+    public float smallTalkTimer = 0f;
+    public bool smallTalkEnabled = false;
 
     // 기타 옵션
     [SerializeField] private bool autoSavePlaytime = false; // 주기적으로 누적 저장
     private float autosaveTimer = 0f;
     private const float autosaveInterval = 10f; // 10초마다 저장
+    
+    // 설정 동기화
+    private float settingsSyncTimer = 0f;
+    private const float settingsSyncInterval = 10f;
+    private bool lastSyncedEnabled = false;
+    private float lastSyncedInterval = 60f;
 
     private void Awake()
     {
@@ -48,8 +51,8 @@ public class GlobalTimeVariableManager : MonoBehaviour
         }
 
         LoadTimeData();
-        ResetSmallTalkTimer();
-        StartNewChat();
+        smallTalkTimer = 0f;
+        SyncSettingsFromManager();
     }
 
     private void FixedUpdate()
@@ -71,23 +74,18 @@ public class GlobalTimeVariableManager : MonoBehaviour
             }
         }
 
-        // SmallTalk 타이머 (대화/옵션 중에는 일시정지)
-        if (smallTalkEnabled)
+        // 10초마다 설정 동기화
+        UpdateSettingsSync(dt);
+
+        // 대화 중이면 타이머 리셋
+        if (StatusManager.Instance.IsConversationing || StatusManager.Instance.IsOptioning)
         {
-            bool shouldPause = StatusManager.Instance != null && (StatusManager.Instance.IsConversationing || StatusManager.Instance.IsOptioning);
-            if (!shouldPause)
-            {
-                smallTalkTimer += dt;
-                if (smallTalkTimer >= smallTalkIntervalSeconds)
-                {
-                    TryTriggerSmallTalk();
-                    ResetSmallTalkTimer();
-                }
-            }
+            smallTalkTimer = 0f;
+            return;
         }
 
-        // 현재 채팅 경과 (FixedUpdate 기반)
-        currentChatElapsedSeconds += dt;
+        // SmallTalk 타이머
+        UpdateSmallTalkTimer(dt);
     }
 
     private void OnApplicationQuit()
@@ -95,17 +93,39 @@ public class GlobalTimeVariableManager : MonoBehaviour
         SaveTimeData();
     }
 
+    // 설정 동기화 업데이트
+    private void UpdateSettingsSync(float dt)
+    {
+        settingsSyncTimer += dt;
+        if (settingsSyncTimer >= settingsSyncInterval)
+        {
+            settingsSyncTimer = 0f;
+            SyncSettingsFromManager();
+        }
+    }
+
+    // SmallTalk 타이머 업데이트
+    private void UpdateSmallTalkTimer(float dt)
+    {        
+        if (smallTalkEnabled)
+        {
+            smallTalkTimer += dt;
+            if (smallTalkTimer >= smallTalkIntervalSeconds)
+            {
+                TryTriggerSmallTalk();
+                smallTalkTimer = 0f;
+            }
+        }
+    }
+
     // SmallTalk 호출 시도 (가드 조건 포함)
     private void TryTriggerSmallTalk()
     {
         try
         {
-            if (StatusManager.Instance != null)
+            if (StatusManager.Instance.IsConversationing || StatusManager.Instance.IsOptioning)
             {
-                if (StatusManager.Instance.IsConversationing || StatusManager.Instance.IsOptioning)
-                {
-                    return;
-                }
+                return;
             }
 
             string purpose = "잡담";
@@ -125,37 +145,30 @@ public class GlobalTimeVariableManager : MonoBehaviour
     }
 
     // ===== Public API =====
-
-    // SmallTalk
-    public void EnableSmallTalk(bool enable)
+    
+    // 설정 값 가져오기
+    private void SyncSettingsFromManager()
     {
-        smallTalkEnabled = enable;
-        if (enable) ResetSmallTalkTimer();
+        if (SettingManager.Instance == null) return;
+        
+        bool currentEnabled = SettingManager.Instance.settings.isCharAutoSmallTalk;
+        float currentInterval = SettingManager.Instance.settings.charAutoSmallTalkInterval;
+        
+        // 활성화 상태 변경
+        if (currentEnabled != lastSyncedEnabled)
+        {
+            smallTalkEnabled = currentEnabled;
+            if (currentEnabled) smallTalkTimer = 0f;
+            lastSyncedEnabled = currentEnabled;
+        }
+        
+        // 간격 변경
+        if (Mathf.Abs(currentInterval - lastSyncedInterval) > 0.1f)
+        {
+            smallTalkIntervalSeconds = Mathf.Max(5f, currentInterval);
+            lastSyncedInterval = currentInterval;
+        }
     }
-    public bool IsSmallTalkEnabled() { return smallTalkEnabled; }
-    public void SetSmallTalkInterval(float seconds)
-    {
-        smallTalkIntervalSeconds = Mathf.Max(5f, seconds);
-        ResetSmallTalkTimer();
-    }
-    public float GetSmallTalkInterval() { return smallTalkIntervalSeconds; }
-    public void ResetSmallTalkTimer() { smallTalkTimer = 0f; }
-
-    // 플레이타임
-    public float GetSessionPlaySeconds() { return sessionPlaySeconds; }
-    public float GetTotalPlaySeconds() { return totalPlaySeconds; }
-    public void SetTotalPlaySeconds(float seconds)
-    {
-        totalPlaySeconds = Mathf.Max(0f, seconds);
-        SaveTimeData();
-    }
-
-    // 채팅 단위 관리
-    public void StartNewChat()
-    {
-        currentChatElapsedSeconds = 0f;
-    }
-    public float GetCurrentChatElapsedSeconds() { return currentChatElapsedSeconds; }
 
     // 내부 저장/로드 - config/time.json
     [Serializable]
@@ -175,21 +188,9 @@ public class GlobalTimeVariableManager : MonoBehaviour
             string json = JsonUtility.ToJson(data, true);
             File.WriteAllText(timeFilePath, json);
         }
-        catch (UnauthorizedAccessException e)
-        {
-            Debug.LogError("Access denied: " + e.Message);
-        }
-        catch (DirectoryNotFoundException e)
-        {
-            Debug.LogError("Directory not found: " + e.Message);
-        }
-        catch (IOException e)
-        {
-            Debug.LogError("I/O error occurred: " + e.Message);
-        }
         catch (Exception e)
         {
-            Debug.LogError("An error occurred: " + e.Message);
+            Debug.LogError("SaveTimeData error: " + e.Message);
         }
     }
 
@@ -210,24 +211,9 @@ public class GlobalTimeVariableManager : MonoBehaviour
                 totalPlaySeconds = 0f;
             }
         }
-        catch (UnauthorizedAccessException e)
-        {
-            Debug.LogError("Access denied: " + e.Message);
-            totalPlaySeconds = 0f;
-        }
-        catch (DirectoryNotFoundException e)
-        {
-            Debug.LogError("Directory not found: " + e.Message);
-            totalPlaySeconds = 0f;
-        }
-        catch (IOException e)
-        {
-            Debug.LogError("I/O error occurred: " + e.Message);
-            totalPlaySeconds = 0f;
-        }
         catch (Exception e)
         {
-            Debug.LogError("An error occurred: " + e.Message);
+            Debug.LogError("LoadTimeData error: " + e.Message);
             totalPlaySeconds = 0f;
         }
     }
