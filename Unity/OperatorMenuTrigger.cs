@@ -158,14 +158,18 @@ public class OperatorMenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerU
             }
         }
 
-        m_ContextMenu.Clear();
+        // 여기서부터 복제
+        this.m_ContextMenu.Clear();
 
-        string targetLang = SettingManager.Instance.settings.ui_language;
-        bool isSampleVer = SettingManager.Instance.GetInstallStatus() == 0;
+        // 메뉴 추가
+        string menuName = "";
+        string targetLang = SettingManager.Instance.settings.ui_language; // 0 : ko, 1 : jp, 2: en 
+        bool isSampleVer = SettingManager.Instance.GetInstallStatus() == 0;  // 0이면 sample ver
 #if UNITY_EDITOR
         isSampleVer = false;
 #endif
 
+        // DevMode 체크: UNITY_EDITOR이거나 F12를 눌러서 DevMode를 활성화했을 경우 true
         bool isDevModeEnabled = false;
 #if UNITY_EDITOR
         isDevModeEnabled = true;
@@ -176,38 +180,39 @@ public class OperatorMenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerU
         }
 #endif
 
-        // Settings
+        // setting
+        // menuName = LanguageData.Translate("Settings", targetLang);  // Setting은 언어 상관없이 영어로
         m_ContextMenu.AddMenuItem("Settings", delegate {
             UIManager.Instance.showSettings();
         });
 
-        // Character 서브메뉴
+        // 캐릭터 분류
         m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Character", targetLang), new List<(string, UnityAction)>
         {
             (LanguageData.Translate("Action", targetLang), delegate { OnPointerDownRadialMenuAction(); }),
             (LanguageData.Translate("Change Char", targetLang), delegate { UIManager.Instance.ShowCharChange();}),
             (LanguageData.Translate("Summon Char", targetLang), delegate { UIManager.Instance.ShowCharSummon(); }),
             (LanguageData.Translate("Change Clothes", targetLang),
-                (_charAttributes != null && (_charAttributes.toggleClothes != null || _charAttributes.changeClothes != null))
+                (_charAttributes.toggleClothes != null || _charAttributes.changeClothes != null)
                 ? (UnityAction)(() => {
                     CharManager.Instance.ChangeClothes();
                 })
-                : null
+                : null  // 회색 글씨
             ),
         });
 
-        // Chat 서브메뉴
+        // Chat - 채팅
         m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Chat", targetLang), new List<(string, UnityAction)>
         {
-            (LanguageData.Translate("Guideline", targetLang), delegate { UIManager.Instance.ShowGuideLine(); }),
-            (LanguageData.Translate("Situation", targetLang), delegate { UIManager.Instance.ShowUIChatSituation(); }),
+            (LanguageData.Translate("Guideline", targetLang), delegate { UIManager.Instance.ShowGuideLine(); }), 
+            (LanguageData.Translate("Situation", targetLang), delegate { UIManager.Instance.ShowUIChatSituation(); }), 
             (LanguageData.Translate("New Chat", targetLang), delegate {
                 MemoryManager.Instance.ResetConversationMemoryAndGuide();
             }),
             (LanguageData.Translate("Chat History", targetLang), delegate { UIManager.Instance.ShowChatHistory(); }),
         });
 
-        // Control 서브메뉴
+        // Control - 제어
         m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Control", targetLang), new List<(string, UnityAction)>
         {
             (LanguageData.Translate("Show Voice Panel", targetLang), delegate { TalkMenuManager.Instance.ShowTalkMenu(); }),
@@ -227,10 +232,12 @@ public class OperatorMenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerU
                 }
             ),
             (LanguageData.Translate("Set Screenshot Area", targetLang), async delegate {
+                // Full 버전 이상인지 확인
                 if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
                 {
                     return;
                 }
+
                 ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
                 if (sm != null) sm.ToggleScreenshotArea();
             }),
@@ -241,70 +248,243 @@ public class OperatorMenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerU
             }),
         });
 
-        // Talk 서브메뉴
+        // Talk
         m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Talk", targetLang), new List<(string, UnityAction)>
         {
             (LanguageData.Translate("Edition 튜토리얼", targetLang), delegate { ScenarioInstallerManager.Instance.StartInstaller(); }),
-            (LanguageData.Translate("Idle Talk", targetLang), async delegate {
+            // (LanguageData.Translate("Setting 튜토리얼", targetLang), delegate { ScenarioTutorialManager.Instance.StartTutorial(); }),
+            (LanguageData.Translate("Idle Talk", targetLang), async delegate { 
+                // Full 버전 이상인지 확인
                 if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
                 {
                     return;
                 }
-                string purpose = "잡담";
+                string purpose = "잡담"; // 기본 목적
                 APIManager.Instance.CallSmallTalkStream(purpose);
-            }),
+            }), // 잡담
         });
 
-        // Dev 모드 메뉴 (DevMode가 활성화된 경우에만)
+        // // Util
+        // m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Experiment", targetLang), new List<(string, UnityAction)>
+        // {
+        //     // (LanguageData.Translate("Alarm", targetLang), true ? null : delegate { Debug.Log("[Alarm] 알람 기능 호출됨"); }),
+        //     (LanguageData.Translate("20 Questions Game", targetLang), async delegate {
+        //         // Full 버전 이상인지 확인
+        //         if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+        //         {
+        //             return;
+        //         }
+
+        //         // 스무고개 게임 모드 토글
+        //         MiniGame20QManager.Instance.Toggle20QMode();
+        //         string status = MiniGame20QManager.Instance.Is20QMode() ? "활성화" : "비활성화";
+        //         Debug.Log($"[20Q] 스무고개 게임 모드 {status}");
+                
+        //         // 상태 표시
+        //         if (MiniGame20QManager.Instance.Is20QMode())
+        //         {
+        //             // 게임 시작 메시지는 서버에서 오므로 여기서는 표시만
+        //             // AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+        //             // AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("스무고개 게임 시작...");
+
+        //             // Panel 표시
+        //             UIGame20QPanelManager.Instance.ShowPanel();
+        //         }
+        //         else
+        //         {
+        //             AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+        //             AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("스무고개 게임 종료됨");
+
+        //             // Panel 숨기기
+        //             UIGame20QPanelManager.Instance.HidePanel();
+        //         }
+        //      }),
+        //     (LanguageData.Translate("AROPLA CHANNEL", targetLang), async delegate {
+        //         // Full 버전 이상인지 확인
+        //         if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+        //         {
+        //             return;
+        //         }
+
+        //         // 아로프라 채널 모드 토글
+        //         if (APIAroPlaManager.Instance != null)
+        //         {
+        //             APIAroPlaManager.Instance.ToggleAroplaMode();
+        //             string status = APIAroPlaManager.Instance.IsAroplaMode() ? "활성화" : "비활성화";
+        //             Debug.Log($"아로프라 채널 모드 {status}");
+                    
+        //             // 상태 표시
+        //             AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+        //             AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText($"아로프라 채널 {status}됨");
+        //         }
+        //         else
+        //         {
+        //             Debug.LogError("APIAroPlaManager 인스턴스를 찾을 수 없습니다.");
+        //         }
+        //      }),
+        //     (LanguageData.Translate("Set Screenshot Area", targetLang), async delegate {
+        //         // Full 버전 이상인지 확인
+        //         if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+        //         {
+        //             return;
+        //         }
+
+        //         ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+        //         if (sm != null) sm.ToggleScreenshotArea();
+        //     }),
+        //     (LanguageData.Translate("Show Screenshot Result", targetLang), async delegate {
+        //         // Full 버전 이상인지 확인
+        //         if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+        //         {
+        //             return;
+        //         }
+
+        //         ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+        //         if (sm != null) {
+        //             sm.ShowScreenshotImage();
+        //         }
+        //     }),
+        //     (LanguageData.Translate("Save and Show Screenshot", targetLang), async delegate {
+        //         // Full 버전 이상인지 확인
+        //         if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+        //         {
+        //             return;
+        //         }
+
+        //         ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+        //         if (sm != null) {
+        //             sm.SaveAndShowScreenshot();
+        //         }
+        //     })
+        // });
+
+        // Dev - UNITY_EDITOR이거나 DevMode가 활성화된 경우에만 표시
         if (isDevModeEnabled)
         {
+            // Util
             m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Experiment", targetLang), new List<(string, UnityAction)>
             {
-                (LanguageData.Translate("20 Questions Game", targetLang), async delegate {
-                    if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
-                    {
-                        return;
-                    }
-                    MiniGame20QManager.Instance.Toggle20QMode();
-                    string status = MiniGame20QManager.Instance.Is20QMode() ? "활성화" : "비활성화";
-                    Debug.Log($"[20Q] 스무고개 게임 모드 {status}");
-                    if (MiniGame20QManager.Instance.Is20QMode())
-                    {
-                        UIGame20QPanelManager.Instance.ShowPanel();
-                    }
-                    else
-                    {
-                        AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
-                        AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("스무고개 게임 종료됨");
-                        UIGame20QPanelManager.Instance.HidePanel();
-                    }
-                }),
+                // (LanguageData.Translate("Alarm", targetLang), true ? null : delegate { Debug.Log("[Alarm] 알람 기능 호출됨"); }),
+                // (LanguageData.Translate("20 Questions Game", targetLang), async delegate {
+                //     // Full 버전 이상인지 확인
+                //     if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+                //     {
+                //         return;
+                //     }
+
+                //     // 스무고개 게임 모드 토글
+                //     MiniGame20QManager.Instance.Toggle20QMode();
+                //     string status = MiniGame20QManager.Instance.Is20QMode() ? "활성화" : "비활성화";
+                //     Debug.Log($"[20Q] 스무고개 게임 모드 {status}");
+                    
+                //     // 상태 표시
+                //     if (MiniGame20QManager.Instance.Is20QMode())
+                //     {
+                //         // 게임 시작 메시지는 서버에서 오므로 여기서는 표시만
+                //         // AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+                //         // AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("스무고개 게임 시작...");
+
+                //         // Panel 표시
+                //         UIGame20QPanelManager.Instance.ShowPanel();
+                //     }
+                //     else
+                //     {
+                //         AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+                //         AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("스무고개 게임 종료됨");
+
+                //         // Panel 숨기기
+                //         UIGame20QPanelManager.Instance.HidePanel();
+                //     }
+                //  }),
                 (LanguageData.Translate("AROPLA CHANNEL", targetLang), async delegate {
+                    // Full 버전 이상인지 확인
                     if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
                     {
                         return;
                     }
-                    // ChatModeManager 사용
+
+                    // 아로프라 채널 모드 토글 
                     ChatModeManager.Instance.ToggleMode(ChatMode.Aropla);
                     string status = ChatModeManager.Instance.IsAroplaMode() ? "활성화" : "비활성화";
                     Debug.Log($"아로프라 채널 모드 {status}");
+                    
+                    // 상태 표시
                     AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
                     AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText($"아로프라 채널 {status}됨");
-                }),
-                // Operator Mode 종료 옵션 (ChatModeManager 사용)
-                ("Exit Operator Mode", delegate {
-                    ChatModeManager.Instance.SetMode(ChatMode.Chat);
-                    AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
-                    AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Operator 모드 종료됨");
-                }),
-            });
 
-            m_ContextMenu.AddMenuItem(LanguageData.Translate("Debug", targetLang), delegate
-            {
-                EmotionManager.Instance.NextEmotion();
-                DebugBalloonManager.Instance.ToggleDebugBalloon();
+                }),
+                (LanguageData.Translate("OPERATOR MODE", targetLang), delegate {
+                    // Operator 모드 토글 
+                    ChatModeManager.Instance.ToggleMode(ChatMode.Operator);
+                    string status = ChatModeManager.Instance.IsOperatorMode() ? "활성화" : "비활성화";
+                    Debug.Log($"Operator 모드 {status}");
+                        
+                    // 상태 표시
+                    AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
+                    AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText($"Operator 모드 {status}됨");
+                }),
+                (LanguageData.Translate("Show Screenshot Result", targetLang), async delegate {
+                    // Full 버전 이상인지 확인
+                    if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+                    {
+                        return;
+                    }
+
+                    ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+                    if (sm != null) {
+                        sm.ShowScreenshotImage();
+                    }
+                }),
+                (LanguageData.Translate("Save and Show Screenshot", targetLang), async delegate {
+                    // Full 버전 이상인지 확인
+                    if (!await InstallStatusManager.Instance.CheckAndOperateFullAsync())
+                    {
+                        return;
+                    }
+
+                    ScreenshotManager sm = FindObjectOfType<ScreenshotManager>();
+                    if (sm != null) {
+                        sm.SaveAndShowScreenshot();
+                    }
+                }),
             });
         }
+
+#if UNITY_EDITOR
+        if(isDevModeEnabled)
+        {
+            m_ContextMenu.AddMenuItem(LanguageData.Translate("Debug", targetLang), delegate
+            {
+                StartCoroutine(ScenarioTutorialManager.Instance.Scenario_A04_2_APIKeyInput2());
+            });
+            m_ContextMenu.AddSubMenuItem(LanguageData.Translate("Dev", targetLang), new List<(string, UnityAction)>
+            {
+                (LanguageData.Translate("Test", targetLang), delegate {
+                    ClipboardManager.Instance.GetContentFromClipboard();
+                }),
+                (LanguageData.Translate("Test2", targetLang), delegate { 
+
+                }),
+                (LanguageData.Translate("Test3", targetLang), delegate {
+                    Debug.Log("Test3 실행 - 전체화면 OCR");
+
+                    // OCROptions 생성 (전체화면 OCR)
+                    OCROptions options = new OCROptions
+                    {
+                        useTranslate = false,
+                        displayResults = true,
+                        displayOrigin = false,
+                        useTTS = false,
+                        useAutoClick = false,
+                        targetLang = "",
+                        targetLangAutoDetect = false
+                    };
+                    
+                    ScreenshotOCRManager.Instance.ExecuteFullScreenOCR(options);
+                })
+            });
+        }
+#endif
 
         // Version
         m_ContextMenu.AddMenuItem(LanguageData.Translate("Version", targetLang), delegate {
@@ -316,9 +496,12 @@ public class OperatorMenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerU
             Application.Quit();
         });
 
-        // 메뉴 표시
-        m_ContextMenu.Show();
+        // 메뉴 보이기
+        this.m_ContextMenu.Show();
+
+        // StatusManager 관리 (1초 후)
         StatusManager.Instance.IsOptioning = true;
+
         chkTimer = 1f;
         itemChkFlag = true;
     }
