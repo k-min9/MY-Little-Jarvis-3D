@@ -68,6 +68,20 @@ public class ClipboardManager : MonoBehaviour
     [DllImport("user32.dll")]
     private static extern uint GetClipboardSequenceNumber();
 
+    [DllImport("user32.dll")]
+    private static extern bool EmptyClipboard();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GlobalAlloc(uint uFlags, UIntPtr dwBytes);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GlobalFree(IntPtr hMem);
+
+    private const uint GMEM_MOVEABLE = 0x0002;
+
     private const uint CF_DIB = 8;
     private const uint CF_BITMAP = 2;
     private const uint CF_TEXT = 1;
@@ -491,6 +505,87 @@ public class ClipboardManager : MonoBehaviour
             Debug.LogError($"Clipboard 텍스트 가져오기 실패: {ex.Message}");
             clipboardText = "";
             return null;
+        }
+    }
+
+    // 클립보드에 이미지를 복사 (byte[]를 클립보드에 쓰기)
+    public bool SetImageToClipboard(byte[] imageBytes)
+    {
+        if (imageBytes == null || imageBytes.Length == 0)
+        {
+            Debug.LogWarning("[ClipboardManager] 이미지 데이터가 없습니다.");
+            return false;
+        }
+
+        try
+        {
+            // byte[]를 Bitmap으로 변환
+            System.Drawing.Bitmap bitmap;
+            using (MemoryStream ms = new MemoryStream(imageBytes))
+            {
+                bitmap = new System.Drawing.Bitmap(ms);
+            }
+
+            // 클립보드 열기
+            if (!OpenClipboard(IntPtr.Zero))
+            {
+                Debug.LogWarning("[ClipboardManager] Clipboard를 열 수 없습니다.");
+                bitmap.Dispose();
+                return false;
+            }
+
+            try
+            {
+                // 클립보드 비우기
+                EmptyClipboard();
+
+                // Bitmap을 HBitmap으로 변환
+                IntPtr hBitmap = bitmap.GetHbitmap();
+                
+                // 클립보드에 설정
+                IntPtr result = SetClipboardData(CF_BITMAP, hBitmap);
+                
+                if (result == IntPtr.Zero)
+                {
+                    Debug.LogWarning("[ClipboardManager] 클립보드에 이미지 설정 실패");
+                    DeleteObject(hBitmap);
+                    return false;
+                }
+
+                Debug.Log($"[ClipboardManager] 이미지를 클립보드에 복사했습니다: {imageBytes.Length} bytes");
+                return true;
+            }
+            finally
+            {
+                CloseClipboard();
+                bitmap.Dispose();
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[ClipboardManager] 클립보드에 이미지 복사 실패: {ex.Message}");
+            return false;
+        }
+    }
+
+    // 파일 경로의 이미지를 클립보드에 복사
+    public bool SetImageToClipboard(string imagePath)
+    {
+        if (!File.Exists(imagePath))
+        {
+            Debug.LogWarning($"[ClipboardManager] 파일이 존재하지 않습니다: {imagePath}");
+            return false;
+        }
+
+        try
+        {
+            byte[] imageBytes = File.ReadAllBytes(imagePath);
+            return SetImageToClipboard(imageBytes);
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[ClipboardManager] 파일 읽기 실패: {ex.Message}");
+            return false;
         }
     }
 }
