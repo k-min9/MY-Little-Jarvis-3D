@@ -10,6 +10,21 @@ using DevionGames.UIWidgets;
 
 public class ScreenshotManager : MonoBehaviour
 {
+
+    // 싱글톤 인스턴스
+    public static ScreenshotManager instance;
+    public static ScreenshotManager Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = FindObjectOfType<ScreenshotManager>();
+            }
+            return instance;
+        }
+    }
+
     public GameObject screenshotArea; // Panel acting as screenshot area (with borders)
     public GameObject backgroundOverlayPanel; // Panel for background overlay
     
@@ -20,8 +35,10 @@ public class ScreenshotManager : MonoBehaviour
     private Dictionary<string, List<GameObject>> exclusiveObjectGroups;
 
     private Canvas _canvas;
-    private bool isSelectingArea = false;
+    private bool isSelectingArea = false; // 영역 선택 중인지 여부
+    private bool isAreaSet = false; // 영역이 설정되어 있는지 여부
     private Vector3 startMousePosition;
+    private Coroutine selectAreaCoroutine; // 영역 선택 코루틴 참조
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetDC(IntPtr hwnd);
@@ -95,6 +112,9 @@ public class ScreenshotManager : MonoBehaviour
         bool shouldIncludeChar = SettingManager.Instance.settings.includeCharInScreenshot;
         bool shouldIncludeUI = SettingManager.Instance.settings.includeUIInScreenshot;
         
+        // 디버그: 설정값 확인
+        Debug.Log($"{logPrefix} 설정 확인 - includeChar: {shouldIncludeChar}, includeUI: {shouldIncludeUI}");
+        
         // 케이스 분기 판단
         state.shouldExcludeUnity = !shouldIncludeChar && !shouldIncludeUI; // 둘 다 제외
         state.shouldUseLayerDeactivation = (!shouldIncludeChar && shouldIncludeUI) || (shouldIncludeChar && !shouldIncludeUI); // 하나만 제외
@@ -161,7 +181,7 @@ public class ScreenshotManager : MonoBehaviour
             // Unity 창 제외 모드: 2프레임 + 50ms 대기
             yield return new WaitForEndOfFrame();
             yield return new WaitForEndOfFrame();
-            yield return new WaitForSeconds(0.05f);
+            // yield return new WaitForSeconds(0.05f);  // 케바케
         }
         else if (state.shouldUseLayerDeactivation)
         {
@@ -204,6 +224,10 @@ public class ScreenshotManager : MonoBehaviour
         int width = (int)(end.x - start.x);
         int height = (int)(start.y - end.y);
         
+        // 캡쳐 영역값 방어 로직: 음수/0 방지
+        width = Mathf.Max(1, Mathf.Abs(width));
+        height = Mathf.Max(1, Mathf.Abs(height));
+        
         return (x, y, width, height);
     }
     
@@ -218,26 +242,86 @@ public class ScreenshotManager : MonoBehaviour
         // Unity 창 핸들 획득
         _unityWindowHandle = GetActiveWindow();
         Debug.Log($"Unity Window Handle: {_unityWindowHandle}");
+        
+        // 초기 영역 설정 상태 확인
+        RectTransform panelRectTransform = screenshotArea.GetComponent<RectTransform>();
+        if (panelRectTransform != null)
+        {
+            isAreaSet = panelRectTransform.sizeDelta.x > 0 && panelRectTransform.sizeDelta.y > 0;
+        }
     }
 
+    // 스크린샷 영역 설정 시작
     public void SetScreenshotArea()
     {
+        // 이미 영역 설정 중이면 무시
+        if (isSelectingArea)
+        {
+            Debug.LogWarning("[ScreenshotManager] Screenshot area selection is already in progress");
+            return;
+        }
+        
         isSelectingArea = true;
-
-        backgroundOverlayPanel.SetActive(true); // Activate background
-
-        StartCoroutine(SelectArea());
+        backgroundOverlayPanel.SetActive(true);
+        selectAreaCoroutine = StartCoroutine(SelectArea());
+    }
+    
+    // 스크린샷 영역 설정 취소 및 초기화
+    public void CancelScreenshotArea()
+    {
+        // 영역 선택 중이 아니고 설정된 영역도 없으면 무시
+        if (!isSelectingArea && !isAreaSet)
+        {
+            return;
+        }
+        
+        // 영역 선택 중이면 중단
+        if (isSelectingArea)
+        {
+            isSelectingArea = false;
+            
+            if (selectAreaCoroutine != null)
+            {
+                StopCoroutine(selectAreaCoroutine);
+                selectAreaCoroutine = null;
+            }
+            
+            backgroundOverlayPanel.SetActive(false);
+            screenshotArea.SetActive(false);
+        }
+        
+        // 설정된 영역 초기화
+        if (isAreaSet)
+        {
+            RectTransform panelRectTransform = screenshotArea.GetComponent<RectTransform>();
+            if (panelRectTransform != null)
+            {
+                panelRectTransform.sizeDelta = Vector2.zero;
+            }
+            isAreaSet = false;
+        }
+        
+        Debug.Log("[ScreenshotManager] Screenshot area cancelled and cleared");
+    }
+    
+    // 스크린샷 영역 설정 토글
+    public void ToggleScreenshotArea()
+    {
+        // 영역 선택 중이거나 이미 설정되어 있으면 취소
+        if (isSelectingArea || isAreaSet)
+        {
+            CancelScreenshotArea();
+        }
+        else
+        {
+            SetScreenshotArea();
+        }
     }
 
     // 스크린샷 영역이 설정되었는지 확인
     public bool IsScreenshotAreaSet()
     {
-        if (screenshotArea == null) return false;
-        
-        RectTransform panelRectTransform = screenshotArea.GetComponent<RectTransform>();
-        if (panelRectTransform == null) return false;
-        
-        return panelRectTransform.sizeDelta.x > 0 && panelRectTransform.sizeDelta.y > 0;
+        return isAreaSet;
     }
 
     // Unity 창을 캡처에서 제외/포함 설정
@@ -458,7 +542,7 @@ public class ScreenshotManager : MonoBehaviour
     #endregion
 
     // 영역을 전체로 잡고 Capture
-    private Texture2D CaptureFullScreen()
+    public Texture2D CaptureFullScreen()
     {
         byte[] imageBytes = CaptureDesktopAreaToMemory(0, 0, Screen.width, Screen.height);
         
@@ -488,8 +572,10 @@ public class ScreenshotManager : MonoBehaviour
                 }
 
                 isSelectingArea = false;
+                isAreaSet = true; // 영역 설정 완료
                 screenshotArea.SetActive(false);
                 backgroundOverlayPanel.SetActive(false); // Deactivate background
+                selectAreaCoroutine = null; // 코루틴 종료
                 
                 // 스크린샷 영역 설정 완료 - ChatBalloonManager에 알림
                 if (ChatBalloonManager.Instance != null)
@@ -733,9 +819,45 @@ public class ScreenshotManager : MonoBehaviour
             // 전체 화면 캡처
             int width = GetSystemMetrics(SM_CXSCREEN);
             int height = GetSystemMetrics(SM_CYSCREEN);
+            
+            // 캡쳐 영역값 방어 로직
+            width = Mathf.Max(1, width);
+            height = Mathf.Max(1, height);
+            
             Debug.Log($"[Screenshot FullScreen] Capturing primary monitor: {width}x{height}");
             
             imageBytes = CaptureDesktopAreaToMemory(0, 0, width, height);
+        }
+        finally
+        {
+            // 후처리 - 예외 발생 여부와 관계없이 반드시 실행
+            CleanupCapture(state);
+        }
+        
+        // 콜백 호출
+        callback?.Invoke(imageBytes);
+    }
+
+    // 특정 영역 캡처 (OCR Custom Rect용)
+    public IEnumerator CaptureAreaToMemory(int x, int y, int width, int height, System.Action<byte[]> callback)
+    {
+        // 전처리
+        CaptureState state = PrepareCapture("[Screenshot Area]");
+        
+        byte[] imageBytes = null;
+        
+        try
+        {
+            // 렌더링 대기
+            yield return WaitForCapture(state);
+            
+            // 영역값 방어 로직
+            width = Mathf.Max(1, width);
+            height = Mathf.Max(1, height);
+            
+            Debug.Log($"[Screenshot Area] Capturing area: x={x}, y={y}, w={width}, h={height}");
+            
+            imageBytes = CaptureDesktopAreaToMemory(x, y, width, height);
         }
         finally
         {
