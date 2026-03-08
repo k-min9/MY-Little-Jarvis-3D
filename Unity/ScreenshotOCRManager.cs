@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 using System.IO;
@@ -33,7 +34,7 @@ public class ScreenshotOCRManager : MonoBehaviour
     // API 호출 제어 변수
     private bool isProcessing = false;
     private float lastCallTime = -999f;
-    private const float COOLDOWN_TIME = 5f;
+    private float cooldownTime = 5f;
 
     // 싱글톤 인스턴스 접근
     public static ScreenshotOCRManager Instance
@@ -75,6 +76,43 @@ public class ScreenshotOCRManager : MonoBehaviour
     public void ExecuteAreaOCR(OCROptions options)
     {
         StartCoroutine(ExecuteAreaOCRCoroutine(options));
+    }
+
+    // 커스텀 범위 OCR 실행 (슬롯별 저장된 영역 사용)
+    public void ExecuteCustomRectOCR(OCROptions options, int slot)
+    {
+        if (ScreenshotOCRRectManager.Instance == null || !ScreenshotOCRRectManager.Instance.HasCustomRect(slot))
+        {
+            Debug.LogWarning($"[ScreenshotOCR_new] No custom rect set for slot {slot}, falling back to full screen");
+            ExecuteFullScreenOCR(options);
+            return;
+        }
+        StartCoroutine(ExecuteCustomRectOCRCoroutine(options, slot));
+    }
+
+    // OCR 실행 (슬롯 기반) - 커스텀 범위 우선 체크
+    // 우선순위: 1. 커스텀 범위 → 2. Screenshot 영역 → 3. 전체화면
+    public void ExecuteOCRWithSlot(OCROptions options, int slot)
+    {
+        // 1. 커스텀 범위 체크 (ScreenshotOCRRectManager)
+        if (ScreenshotOCRRectManager.Instance.HasCustomRect(slot))
+        {
+            Debug.Log($"[ScreenshotOCR_new] 슬롯 {slot}: 커스텀 범위 OCR 실행");
+            ExecuteCustomRectOCR(options, slot);
+            return;
+        }
+
+        // 2. Screenshot 영역 체크 (ScreenshotManager)
+        if (ScreenshotManager.Instance.IsScreenshotAreaSet())
+        {
+            Debug.Log($"[ScreenshotOCR_new] 슬롯 {slot}: Screenshot 영역 OCR 실행");
+            ExecuteAreaOCR(options);
+            return;
+        }
+
+        // 3. 전체화면 OCR
+        Debug.Log($"[ScreenshotOCR_new] 슬롯 {slot}: 전체화면 OCR 실행");
+        ExecuteFullScreenOCR(options);
     }
 
     // === 전체화면 OCR 코루틴 ===
@@ -170,6 +208,63 @@ public class ScreenshotOCRManager : MonoBehaviour
         yield return CallOCRAPICoroutine(areaBytes, options, captureWidth, captureHeight, captureX, captureY);
     }
 
+    // === 커스텀 범위 OCR 코루틴 ===
+    
+    private IEnumerator ExecuteCustomRectOCRCoroutine(OCROptions options, int slot)
+    {
+        Debug.Log($"[ScreenshotOCR_new] Starting custom rect OCR for slot {slot}");
+
+        // 기존 오버레이 제거
+        ClearOCROverlay();
+
+        // ScreenshotManager 찾기
+        ScreenshotManager screenshotManager = FindObjectOfType<ScreenshotManager>();
+        if (screenshotManager == null)
+        {
+            Debug.LogError("[ScreenshotOCR_new] ScreenshotManager not found");
+            yield break;
+        }
+
+        // 커스텀 범위 좌표 가져오기
+        var (captureX, captureY, captureWidth, captureHeight) = ScreenshotOCRRectManager.Instance.GetCustomRect(slot);
+        
+        Debug.Log($"[ScreenshotOCR_new] Custom rect: x={captureX}, y={captureY}, w={captureWidth}, h={captureHeight}");
+
+        // 캡처 수행 (ScreenshotManager의 CaptureDesktopAreaToMemory 활용을 위해 새 코루틴)
+        byte[] imageBytes = null;
+        bool captureCompleted = false;
+
+        yield return CaptureCustomRectCoroutine(screenshotManager, captureX, captureY, captureWidth, captureHeight, (bytes) =>
+        {
+            imageBytes = bytes;
+            captureCompleted = true;
+        });
+
+        while (!captureCompleted)
+        {
+            yield return null;
+        }
+
+        if (imageBytes == null || imageBytes.Length == 0)
+        {
+            Debug.LogError("[ScreenshotOCR_new] Failed to capture custom rect");
+            yield break;
+        }
+
+        Debug.Log($"[ScreenshotOCR_new] Custom rect captured: {imageBytes.Length} bytes");
+
+        // OCR API 호출
+        yield return CallOCRAPICoroutine(imageBytes, options, captureWidth, captureHeight, captureX, captureY);
+    }
+
+    // 커스텀 범위 캡처 코루틴
+    private IEnumerator CaptureCustomRectCoroutine(ScreenshotManager screenshotManager, int x, int y, int width, int height, System.Action<byte[]> callback)
+    {
+        // ScreenshotManager의 풀스크린 캡처 방식을 참조하여 특정 영역만 캡처
+        // PrepareCapture/WaitForCapture/CleanupCapture 패턴 사용
+        yield return screenshotManager.CaptureAreaToMemory(x, y, width, height, callback);
+    }
+
     // === OCR API 호출 (번역 여부에 따라 분기) ===
     
     private IEnumerator CallOCRAPICoroutine(byte[] imageBytes, OCROptions options, int captureWidth, int captureHeight, int offsetX, int offsetY)
@@ -181,11 +276,20 @@ public class ScreenshotOCRManager : MonoBehaviour
             yield break;
         }
 
-        // 쿨타임 체크
+        // 쿨타임 체크 : 로컬 서버 연결 또는 DevMode 활성화 시 0.5초, 아니면 5초
+        string resolvedUrl = null;
+        bool urlResolved = false;
+        ServerManager.Instance.GetBaseUrl((urlResult) => { resolvedUrl = urlResult; urlResolved = true; });
+        yield return new WaitUntil(() => urlResolved);
+
+        bool isLocalConnected = !string.IsNullOrEmpty(resolvedUrl);
+        bool isDevMode = DevManager.Instance.IsDevModeEnabled();
+        cooldownTime = (isLocalConnected || isDevMode) ? 0.5f : 5f;
+
         float timeSinceLastCall = Time.time - lastCallTime;
-        if (timeSinceLastCall < COOLDOWN_TIME)
+        if (timeSinceLastCall < cooldownTime)
         {
-            float remainingTime = COOLDOWN_TIME - timeSinceLastCall;
+            float remainingTime = cooldownTime - timeSinceLastCall;
             Debug.LogWarning($"[ScreenshotOCR_new] OCR cooldown active. Please wait {remainingTime:F1} more seconds.");
             yield break;
         }
@@ -194,14 +298,12 @@ public class ScreenshotOCRManager : MonoBehaviour
         isProcessing = true;
         lastCallTime = Time.time;
 
-        // OCR 작업 시작 시 "Search" 말풍선 표시 (30초)
-        GameObject currentChar = CharManager.Instance.GetCurrentCharacter();
-        EmotionBalloonManager.Instance.SetEmotionBalloonForTarget(currentChar, "Search", 30f);
-
         bool apiCallCompleted = false;
         OCRResult result = null;
 
         // OCR API 호출 (use_translate 파라미터로 번역 여부 제어)
+        bool isWhiteOnly = (options.actorType == "Auto");  // Auto일 때만 true
+        
         APIManager.Instance.CallPaddleOCR(
             imageBytes,
             targetLang: options.targetLang,
@@ -214,6 +316,7 @@ public class ScreenshotOCRManager : MonoBehaviour
             saveResult: options.saveResult,
             saveImage: options.saveImage,
             isDebug: options.isDebug,
+            isWhiteOnly: isWhiteOnly,
             callback: (ocrResult) =>
             {
                 result = ocrResult;
@@ -227,14 +330,10 @@ public class ScreenshotOCRManager : MonoBehaviour
             yield return null;
         }
 
-        // API 호출 완료 시 말풍선 제거
-        EmotionBalloonManager.Instance.RemoveEmotionBalloonForTarget(currentChar);
-        Debug.Log("[ScreenshotOCR_new] Search balloon removed (API completed)");
-
         if (result == null)
         {
             Debug.LogError("[ScreenshotOCR_new] OCR API call failed");
-            ShowNoResultUI();
+            ShowNoResultUI("OCR Server\nConnection Failed");
             isProcessing = false;
             yield break;
         }
@@ -263,7 +362,7 @@ public class ScreenshotOCRManager : MonoBehaviour
             Debug.LogWarning("[ScreenshotOCR_new] No OCR results to process");
             if (options.displayResults)
             {
-                ShowNoResultUI();
+                ShowNoResultUI("No Text Detected");
             }
             return;
         }
@@ -297,50 +396,56 @@ public class ScreenshotOCRManager : MonoBehaviour
 
     // === TTS 실행 ===
     
-    private void ExecuteTTS(OCRResult result, OCROptions options)
+    private async void ExecuteTTS(OCRResult result, OCROptions options)
     {
         Debug.Log($"[ScreenshotOCR→TTS] Starting TTS (readTranslatedResult: {options.readTranslatedResult}, aiCorrection: {options.aiReadingCorrection})");
         
-        // 언어 결정
+        // 언어 결정 (번역된 텍스트 읽기: targetLang, 원문 읽기: originLang)
         string targetLang = options.readTranslatedResult ? options.targetLang : options.originLang;
         bool isJapanese = (targetLang == "ja");
         
-        // 텍스트 소스 선택
-        List<string> textLabels;
-        List<List<List<float>>> textBoxes;
+        // Actor 감지용 원본 텍스트 (항상 labels_origin 사용)
+        List<string> originLabels = (result.labels_origin != null && result.labels_origin.Count > 0) 
+            ? result.labels_origin 
+            : result.labels;
+        List<List<List<float>>> originBoxes = (result.quad_boxes_origin != null && result.quad_boxes_origin.Count > 0)
+            ? result.quad_boxes_origin
+            : result.quad_boxes;
+        
+        // TTS용 텍스트 소스 선택
+        List<string> ttsLabels;
+        List<List<List<float>>> ttsBoxes;
         
         if (options.readTranslatedResult && options.useTranslate)
         {
             // 번역된 텍스트 사용
-            textLabels = result.labels;
-            textBoxes = result.quad_boxes;
+            ttsLabels = result.labels;
+            ttsBoxes = result.quad_boxes;
             Debug.Log($"[ScreenshotOCR→TTS] Using translated text (ToLang: {options.targetLang})");
         }
         else
         {
             // 원문 텍스트 사용
-            textLabels = (result.labels_origin != null && result.labels_origin.Count > 0) 
-                ? result.labels_origin 
-                : result.labels;
-            textBoxes = (result.quad_boxes_origin != null && result.quad_boxes_origin.Count > 0)
-                ? result.quad_boxes_origin
-                : result.quad_boxes;
+            ttsLabels = originLabels;
+            ttsBoxes = originBoxes;
             Debug.Log($"[ScreenshotOCR→TTS] Using original text (FromLang: {options.originLang})");
         }
         
-        // 공통 처리: Actor 감지, 필터링, 정렬 → (옵션) Furigana 변환 → TTS
-        StartCoroutine(ProcessTTSCoroutine(textLabels, textBoxes, options, isJapanese));
+        // 공통 처리: Actor 감지(원본), 필터링, 정렬 → (옵션) Furigana 변환 → TTS
+        await ProcessTTSAsync(originLabels, originBoxes, ttsLabels, ttsBoxes, options, isJapanese, targetLang);
     }
     
-    private IEnumerator ProcessTTSCoroutine(List<string> labels, List<List<List<float>>> boxes, OCROptions options, bool isJapanese)
+    private async Task ProcessTTSAsync(List<string> originLabels, List<List<List<float>>> originBoxes, 
+                                        List<string> ttsLabels, List<List<List<float>>> ttsBoxes, 
+                                        OCROptions options, bool isJapanese, string targetLang)
     {
-        // 1. Actor 감지, 필터링, 정렬
-        string sortedText = GetSortedAndFilteredText(labels, boxes, options, out string detectedActor);
+        // 1. Actor 감지(원본), 필터링, 정렬
+        string sortedText = GetSortedAndFilteredText(originLabels, originBoxes, ttsLabels, ttsBoxes, options, out string detectedActor);
         
         if (string.IsNullOrWhiteSpace(sortedText))
         {
             Debug.LogWarning("[ScreenshotOCR→TTS] No text to process after filtering");
-            yield break;
+            return;
         }
         
         Debug.Log($"[ScreenshotOCR→TTS] Sorted text: '{sortedText}'");
@@ -351,47 +456,55 @@ public class ScreenshotOCRManager : MonoBehaviour
         {
             Debug.Log($"[ScreenshotOCR→TTS] Requesting Furigana conversion...");
             
-            bool furiganaCompleted = false;
-            string furiganaText = null;
-            
-            APIManager.Instance.CallFuriganaAPI(sortedText, (result) =>
+            try
             {
-                furiganaText = result;
-                furiganaCompleted = true;
-            });
-            
-            yield return new WaitUntil(() => furiganaCompleted);
-            
-            if (!string.IsNullOrEmpty(furiganaText))
-            {
-                Debug.Log($"[ScreenshotOCR→TTS] Furigana converted: {furiganaText}");
-                finalText = furiganaText;
+                string furiganaText = await APIManager.Instance.CallFuriganaAPIAsync(sortedText);
+                
+                if (!string.IsNullOrEmpty(furiganaText))
+                {
+                    Debug.Log($"[ScreenshotOCR→TTS] Furigana converted: {furiganaText}");
+                    finalText = furiganaText;
+                }
+                else
+                {
+                    Debug.LogWarning("[ScreenshotOCR→TTS] Furigana conversion failed, using original text");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                Debug.LogWarning("[ScreenshotOCR→TTS] Furigana conversion failed, using original text");
+                Debug.LogError($"[ScreenshotOCR→TTS] Furigana conversion error: {ex.Message}");
+                // fallback to original text
             }
         }
         
         // 3. TTS 호출
-        CallTTSWithText(finalText, detectedActor, options);
+        CallTTSWithText(finalText, detectedActor, targetLang, options);
     }
     
+    
     // Actor 감지, 필터링, 정렬된 텍스트 반환
-    private string GetSortedAndFilteredText(List<string> labels, List<List<List<float>>> boxes, OCROptions options, out string detectedActor)
+    private string GetSortedAndFilteredText(List<string> originLabels, List<List<List<float>>> originBoxes,
+                                            List<string> ttsLabels, List<List<List<float>>> ttsBoxes,
+                                            OCROptions options, out string detectedActor)
     {
-        // Actor 결정
+        // Actor 결정 (항상 원본 텍스트로 감지)
         detectedActor = "arona"; // 기본값
+        int matchedActorIndex = -1; // 감지된 Actor의 index
+        
         if (options.actorType == "Auto")
         {
-            // 자동 감지 모드
-            foreach (string label in labels)
+            // 자동 감지 모드 (원본 텍스트에서 감지)
+            // OCRAutoMapManager가 커스텀 매핑 + STTDataActor 매핑을 모두 확인
+            for (int i = 0; i < originLabels.Count; i++)
             {
-                string actor = STTDataActor.GetActorFromText(label);
+                string label = originLabels[i];
+                string actor = OCRAutoMapManager.Instance.GetActorFromText(label);
+                
                 if (!string.IsNullOrEmpty(actor))
                 {
                     detectedActor = actor;
-                    Debug.Log($"[ScreenshotOCR→TTS] Actor auto-detected: {detectedActor}");
+                    matchedActorIndex = i;
+                    Debug.Log($"[ScreenshotOCR→TTS] Actor auto-detected: {detectedActor} at index {i} (originLabel: {label})");
                     break;
                 }
             }
@@ -403,17 +516,15 @@ public class ScreenshotOCRManager : MonoBehaviour
             Debug.Log($"[ScreenshotOCR→TTS] Actor manually set: {detectedActor}");
         }
 
-        // === TTS용 텍스트 필터링 및 정렬 (검토용: false로 변경 시 원본 텍스트 사용) ===
+        // === TTS용 텍스트 필터링 및 정렬 ===
         if (true)
-        // if (options.useTTS) // TODO : 테스트용
         {
             // 텍스트 필터링 및 정렬
             List<(string text, float x, float y)> textItems = new List<(string, float, float)>();
-            string detectedActorText = STTDataActor.GetActorTextFromActorId(detectedActor);
 
-            for (int i = 0; i < labels.Count; i++)
+            for (int i = 0; i < ttsLabels.Count; i++)
             {
-                string text = labels[i];
+                string text = ttsLabels[i];
                 
                 // 길이 필터 (3자 미만 제외)
                 if (text.Length < 3) continue;
@@ -421,14 +532,35 @@ public class ScreenshotOCRManager : MonoBehaviour
                 // 블랙리스트 필터
                 if (STTDataActor.IsBlacklisted(text)) continue;
                 
-                // Actor 텍스트 제외
-                if (!string.IsNullOrEmpty(detectedActorText) && text.Contains(detectedActorText)) continue;
-
-                if (boxes != null && i < boxes.Count)
+                // Actor 텍스트 제외 (같은 index 제거)
+                if (matchedActorIndex >= 0 && i == matchedActorIndex)
                 {
-                    float x = boxes[i][0][0];
-                    float y = boxes[i][0][1];
-                    textItems.Add((text, x, y));
+                    try
+                    {
+                        // 원본과 번역 텍스트 모두 로그 출력
+                        string originText = (i < originLabels.Count) ? originLabels[i] : "N/A";
+                        Debug.Log($"[ScreenshotOCR→TTS] Removing actor text at index {i}: origin='{originText}', tts='{text}'");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning($"[ScreenshotOCR→TTS] Error logging actor removal: {ex.Message}");
+                    }
+                    continue;
+                }
+
+                // 좌표 정보와 함께 저장
+                try
+                {
+                    if (ttsBoxes != null && i < ttsBoxes.Count)
+                    {
+                        float x = ttsBoxes[i][0][0];
+                        float y = ttsBoxes[i][0][1];
+                        textItems.Add((text, x, y));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[ScreenshotOCR→TTS] Error accessing box at index {i}: {ex.Message}");
                 }
             }
 
@@ -485,14 +617,14 @@ public class ScreenshotOCRManager : MonoBehaviour
         else
         {
             // 필터링/정렬 없이 원본 텍스트 그대로 사용
-            string rawText = string.Join(" ", labels);
+            string rawText = string.Join(" ", ttsLabels);
             Debug.Log($"[ScreenshotOCR→TTS] Raw text (no filtering): '{rawText}'");
             return rawText;
         }
     }
     
     // 최종 텍스트로 TTS 호출
-    private void CallTTSWithText(string finalText, string detectedActor, OCROptions options)
+    private void CallTTSWithText(string finalText, string detectedActor, string targetLang, OCROptions options)
     {
         if (string.IsNullOrWhiteSpace(finalText))
         {
@@ -506,39 +638,15 @@ public class ScreenshotOCRManager : MonoBehaviour
             SettingManager.Instance.settings.isDevSound = true;
         }
 
-        Debug.Log($"[ScreenshotOCR→TTS] Final text for TTS: '{finalText}'");
+        Debug.Log($"[ScreenshotOCR→TTS] Final text for TTS: '{finalText}', targetLang: {targetLang}");
 
         // TTS 호출
         string chatIdx = GameManager.Instance.chatIdxSuccess;
         
-        if (options.ttsAutoDetectLang)
-        {
-            // 자동 감지 모드
-            string soundLang = "en";
-            try
-            {
-                soundLang = SettingManager.Instance.settings.sound_language ?? "en";
-            }
-            catch { }
-
-            if (soundLang == "ko" || soundLang == "en")
-            {
-                APIManager.Instance.GetKoWavFromAPI(finalText, chatIdx, detectedActor);
-            }
-            else if (soundLang == "jp" || soundLang == "ja")
-            {
-                APIManager.Instance.GetJpWavFromAPI(finalText, chatIdx, detectedActor);
-            }
-            else
-            {
-                APIManager.Instance.GetJpWavFromAPI(finalText, chatIdx, detectedActor);
-            }
-        }
-        else
-        {
-            // 일본어 기본값
-            APIManager.Instance.GetJpWavFromAPI(finalText, chatIdx, detectedActor);
-        }
+        Debug.Log($"[ScreenshotOCR→TTS] TTS request: text='{finalText}', lang={targetLang}, actor={detectedActor}");
+        
+        // 세션 기반 TTS 요청 (TTSManager가 ko, ja, en 모두 직접 처리)
+        APIManager.Instance.RequestTTS(finalText, chatIdx, targetLang, detectedActor);
     }
 
     // === 자동 클릭 실행 ===
@@ -998,7 +1106,7 @@ public class ScreenshotOCRManager : MonoBehaviour
 
     // === No Result UI ===
     
-    private void ShowNoResultUI()
+    private void ShowNoResultUI(string message = "No Text Detected")
     {
         Canvas canvas = FindObjectOfType<Canvas>();
         if (canvas == null) return;
@@ -1019,7 +1127,7 @@ public class ScreenshotOCRManager : MonoBehaviour
         GameObject textObj = new GameObject("NoResultText");
         textObj.transform.SetParent(ocrOverlayContainer.transform, false);
         TextMeshProUGUI tmpText = textObj.AddComponent<TextMeshProUGUI>();
-        tmpText.text = "No Text Detected";
+        tmpText.text = message;
         tmpText.font = null;
         tmpText.fontSize = 48;
         tmpText.color = Color.white;
