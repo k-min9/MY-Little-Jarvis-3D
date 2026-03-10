@@ -55,6 +55,35 @@ public class AnimationManager : MonoBehaviour
         catch
         {
             Debug.Log("No AnimationManager for Dance");
+
+            // TODO : 안내 메시지
+        }
+    }
+
+    // Talk은 2D용인데, 다른 동작과 겹칠 수 있으므로 토글식으로 별도관리
+    public void TalkStart()
+    {
+        try
+        {
+            Animator _animator = CharManager.Instance.GetCurrentCharacter().GetComponent<Animator>();
+            _animator.SetBool("isTalk", true);
+        }
+        catch
+        {
+            Debug.Log("No AnimationManager for Talk");
+        }
+    }
+
+    public void TalkEnd()
+    {
+        try
+        {
+            Animator _animator = CharManager.Instance.GetCurrentCharacter().GetComponent<Animator>();
+            _animator.SetBool("isTalk", false);
+        }
+        catch
+        {
+            Debug.Log("No AnimationManager for TalkEnd");
         }
     }
 
@@ -118,6 +147,7 @@ public class AnimationManager : MonoBehaviour
             _animator.SetBool("isRun", false);
             _animator.SetBool("isPick", false);
             _animator.SetBool("isDance", false);
+            _animator.SetBool("isListen", false);
             _animator.SetTrigger("doHide");
         }
         catch
@@ -136,6 +166,7 @@ public class AnimationManager : MonoBehaviour
             _animator.SetBool("isRun", false);
             _animator.SetBool("isPick", false);
             _animator.SetBool("isDance", false);
+            _animator.SetBool("isListen", false);
             _animator.SetTrigger("doShow");
         }
         catch

@@ -1,5 +1,7 @@
 using UnityEngine;
 
+// AnimationController에서 idle 애니메이션 순환 관리
+// PhysicsHandler에서 방향초기화 관리.
 public class AnimationController : MonoBehaviour
 {
     [SerializeField] public Animator _animator;
