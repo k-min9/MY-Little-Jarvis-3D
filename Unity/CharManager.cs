@@ -21,7 +21,7 @@ public class CharManager : MonoBehaviour
     }
 
     // 캐릭터 프리팹 리스트
-    public List<GameObject> charList;
+    public List<GameObject> charList = new List<GameObject>();
 
     public ParticleSystem fx_change;  // 캐릭터 변경시 이펙트
 
@@ -41,8 +41,54 @@ public class CharManager : MonoBehaviour
         // 선행작업 로딩
         SettingManager.Instance.LoadSettings();
 
+        // JSON에서 캐릭터 프리팹 리스트 로드
+        LoadCharacterListFromJSON();
+
         // InitCharacter 호출해서 첫 번째 캐릭터를 생성
         InitCharacter();
+    }
+
+    private void LoadCharacterListFromJSON()
+    {
+        string databaseFilePath = System.IO.Path.Combine(Application.streamingAssetsPath, "config", "character_database.json");
+        if (System.IO.File.Exists(databaseFilePath))
+        {
+            try
+            {
+                string json = System.IO.File.ReadAllText(databaseFilePath);
+                // ChangeCharManager에 정의된 CharacterDatabaseData 사용
+                CharacterDatabaseData data = JsonUtility.FromJson<CharacterDatabaseData>(json);
+                
+                if (data != null && data.characters != null)
+                {
+                    charList.Clear();
+                    foreach (var charInfo in data.characters)
+                    {
+                        foreach (var clothes in charInfo.clothesList)
+                        {
+                            if (!string.IsNullOrEmpty(clothes.prefabAddress))
+                            {
+                                var handle = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<GameObject>(clothes.prefabAddress);
+                                GameObject prefab = handle.WaitForCompletion();
+                                if (prefab != null && !charList.Contains(prefab))
+                                {
+                                    charList.Add(prefab);
+                                }
+                            }
+                        }
+                    }
+                    Debug.Log($"Loaded {charList.Count} character prefabs from JSON via Addressables.");
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError("Failed to load character list from JSON: " + e.Message);
+            }
+        }
+        else
+        {
+            Debug.LogError("Character database JSON not found at " + databaseFilePath);
+        }
     }
 
     void Start()
