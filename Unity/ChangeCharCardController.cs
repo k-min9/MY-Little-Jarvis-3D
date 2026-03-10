@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 
 public class ChangeCharCardController : MonoBehaviour
 {
@@ -101,23 +103,37 @@ public class ChangeCharCardController : MonoBehaviour
     // UI 버튼 - 즐겨찾기 별모양
     public void OnClickFavorite()
     {
-        // 데이터 상태 반전
+        // 데이터 상태 반전 (데이터 참조를 공유하므로 1번만 뒤집으면 됨)
         charData.isFavorite = !charData.isFavorite;
-        UpdateFavoriteUI();
 
-        // [TODO] 실제 저장 로직 추가 (추후 구현)
+        // 저장후 UI 갱신
+        ChangeCharManager.Instance.SaveFavorites();
+        ChangeCharManager.Instance.RefreshAllSlotsFavoriteUI();
     }
 
     // 의상 인덱스에 맞춰서 아이콘과 텍스트 업데이트
-    private void UpdateClothesUI()
+    private async void UpdateClothesUI()
     {
         ChangeCharClothesInfo currentClothes = charData.clothesList[currentClothesIndex];
         
         clothesText.text = currentClothes.text;
-        characterIcon.sprite = currentClothes.sprite;
 
         // 점(Dot) 색상 업데이트 호출
         UpdatePaginationDotsUI();
+
+        if (string.IsNullOrEmpty(currentClothes.spriteAddress)) return;
+
+        AsyncOperationHandle<Sprite> handle = Addressables.LoadAssetAsync<Sprite>(currentClothes.spriteAddress);
+        await handle.Task;
+
+        if (handle.Status == AsyncOperationStatus.Succeeded)
+        {
+            characterIcon.sprite = handle.Result;
+        }
+        else
+        {
+            Debug.LogError($"Failed to load sprite from addressable: {currentClothes.spriteAddress}");
+        }
     }
 
     // 페이지네이션 점 색상 업데이트 로직
@@ -138,9 +154,12 @@ public class ChangeCharCardController : MonoBehaviour
         }
     }
 
-    // 즐겨찾기 데이터 상태에 맞춰서 별 이미지 업데이트
-    private void UpdateFavoriteUI()
+    // 즐겨찾기 데이터 상태에 맞춰서 별 이미지 업데이트 (Manager에서도 호출할 수 있게 public 개방)
+    public void UpdateFavoriteUI()
     {
+        // 최상단 널 체크: 복제용 원본(Sample)처럼 데이터가 주입되지 않은 빈 슬롯은 갱신 패스
+        if (charData == null || favoriteImage == null) return;
+
         // 삼항 연산자 대신 명시적인 if-else 사용
         if (charData.isFavorite)
         {
@@ -155,9 +174,22 @@ public class ChangeCharCardController : MonoBehaviour
     }
 
     // 캐릭터 (의상) 최종 변경 적용
-    public void ChangeChar()
+    public async void ChangeChar()
     {
         ChangeCharClothesInfo currentClothes = charData.clothesList[currentClothesIndex];
-        CharManager.Instance.ChangeCharacterFromGameObject(currentClothes.prefab);
+        
+        if (string.IsNullOrEmpty(currentClothes.prefabAddress)) return;
+
+        AsyncOperationHandle<GameObject> handle = Addressables.LoadAssetAsync<GameObject>(currentClothes.prefabAddress);
+        await handle.Task;
+
+        if (handle.Status == AsyncOperationStatus.Succeeded)
+        {
+             CharManager.Instance.ChangeCharacterFromGameObject(handle.Result);
+        }
+        else
+        {
+             Debug.LogError($"Failed to load character prefab from addressable: {currentClothes.prefabAddress}");
+        }
     }
 }
