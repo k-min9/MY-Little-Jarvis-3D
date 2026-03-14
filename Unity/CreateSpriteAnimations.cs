@@ -7,8 +7,31 @@ using UnityEngine.UI;
 
 public class CreateSpriteAnimations : Editor
 {
+    // Sprite가 붙어 있는 자식 경로
+    static readonly string SPRITE_TARGET_PATH = "Size/Image";
+
+    // Scale을 줄 부모 경로
+    static readonly string SCALE_TARGET_PATH = "Size";
+
     [MenuItem("Assets/Sprite To Anim")]
     static void CreateAnim()
+    {
+        CreateAnimInternal(1.0f, "");
+    }
+
+    [MenuItem("Assets/Sprite To Anim to 1.2")]
+    static void CreateAnimTo12()
+    {
+        CreateAnimInternal(1.2f, "_scale12");
+    }
+
+    [MenuItem("Assets/Sprite To Anim to 0.8")]
+    static void CreateAnimTo08()
+    {
+        CreateAnimInternal(0.8f, "_scale08");
+    }
+
+    static void CreateAnimInternal(float targetScale, string fileSuffix)
     {
         UnityEngine.Object[] selectedObjects = Selection.objects;
 
@@ -64,13 +87,13 @@ public class CreateSpriteAnimations : Editor
         if (spriteList.Count == 1)
         {
             string singleAssetPath = AssetDatabase.GetAssetPath(spriteList[0]);
-            CreateSingleClip(singleAssetPath, spriteList[0]);
-            Debug.Log("단일 애니메이션 클립 생성 완료: " + spriteList[0].name + ".anim");
+            CreateSingleClip(singleAssetPath, spriteList[0], targetScale, fileSuffix);
+            Debug.Log("단일 애니메이션 클립 생성 완료: " + spriteList[0].name + fileSuffix + ".anim");
         }
         else
         {
-            CreateCombinedClipFromSelectedSprites(spriteList);
-            Debug.Log("통합 애니메이션 클립 생성 완료: " + spriteList[0].name + ".anim");
+            CreateCombinedClipFromSelectedSprites(spriteList, targetScale, fileSuffix);
+            Debug.Log("통합 애니메이션 클립 생성 완료: " + spriteList[0].name + fileSuffix + ".anim");
         }
 
         AssetDatabase.SaveAssets();
@@ -140,7 +163,7 @@ public class CreateSpriteAnimations : Editor
     }
 
     // Sprite 1장짜리 clip 생성
-    static void CreateSingleClip(string assetPath, Sprite sprite)
+    static void CreateSingleClip(string assetPath, Sprite sprite, float targetScale, string fileSuffix)
     {
         AnimationClip clip = new AnimationClip();
         clip.frameRate = 60f;
@@ -148,21 +171,15 @@ public class CreateSpriteAnimations : Editor
         // 자동 반복 재생 켜기
         SetLoopTime(clip, true);
 
-        EditorCurveBinding curveBinding = new EditorCurveBinding();
-        curveBinding.type = typeof(Image);
-        curveBinding.path = "";
-        curveBinding.propertyName = "m_Sprite";
+        // Sprite 커브 추가
+        AddSpriteCurveSingle(clip, sprite);
 
-        ObjectReferenceKeyframe[] keyframes = new ObjectReferenceKeyframe[1];
-        keyframes[0] = new ObjectReferenceKeyframe();
-        keyframes[0].time = 0f;
-        keyframes[0].value = sprite;
-
-        AnimationUtility.SetObjectReferenceCurve(clip, curveBinding, keyframes);
+        // Scale 커브 추가
+        AddConstantScaleCurve(clip, clip.frameRate, 1, targetScale);
 
         // 1장짜리는 Sprite 이름 기준으로 저장
         string folderPath = Path.GetDirectoryName(assetPath);
-        string clipPath = Path.Combine(folderPath, sprite.name + ".anim");
+        string clipPath = Path.Combine(folderPath, sprite.name + fileSuffix + ".anim");
         clipPath = clipPath.Replace("\\", "/");
 
         DeleteIfExists(clipPath);
@@ -170,7 +187,7 @@ public class CreateSpriteAnimations : Editor
     }
 
     // 여러 개 선택한 Sprite를 하나의 clip으로 생성
-    static void CreateCombinedClipFromSelectedSprites(List<Sprite> spriteList)
+    static void CreateCombinedClipFromSelectedSprites(List<Sprite> spriteList, float targetScale, string fileSuffix)
     {
         AnimationClip clip = new AnimationClip();
 
@@ -180,9 +197,44 @@ public class CreateSpriteAnimations : Editor
         // 자동 반복 재생 켜기
         SetLoopTime(clip, true);
 
+        // Sprite 커브 추가
+        AddSpriteCurveMultiple(clip, spriteList);
+
+        // Scale 커브 추가
+        AddConstantScaleCurve(clip, clip.frameRate, spriteList.Count, targetScale);
+
+        // 파일명은 정렬 후 첫 번째 Sprite 이름 사용
+        string firstSpritePath = AssetDatabase.GetAssetPath(spriteList[0]);
+        string folderPath = Path.GetDirectoryName(firstSpritePath);
+        string clipPath = Path.Combine(folderPath, spriteList[0].name + fileSuffix + ".anim");
+        clipPath = clipPath.Replace("\\", "/");
+
+        DeleteIfExists(clipPath);
+        AssetDatabase.CreateAsset(clip, clipPath);
+    }
+
+    // 단일 Sprite 커브 생성
+    static void AddSpriteCurveSingle(AnimationClip clip, Sprite sprite)
+    {
         EditorCurveBinding curveBinding = new EditorCurveBinding();
         curveBinding.type = typeof(Image);
-        curveBinding.path = "";
+        curveBinding.path = SPRITE_TARGET_PATH;
+        curveBinding.propertyName = "m_Sprite";
+
+        ObjectReferenceKeyframe[] keyframes = new ObjectReferenceKeyframe[1];
+        keyframes[0] = new ObjectReferenceKeyframe();
+        keyframes[0].time = 0f;
+        keyframes[0].value = sprite;
+
+        AnimationUtility.SetObjectReferenceCurve(clip, curveBinding, keyframes);
+    }
+
+    // 여러 Sprite 커브 생성
+    static void AddSpriteCurveMultiple(AnimationClip clip, List<Sprite> spriteList)
+    {
+        EditorCurveBinding curveBinding = new EditorCurveBinding();
+        curveBinding.type = typeof(Image);
+        curveBinding.path = SPRITE_TARGET_PATH;
         curveBinding.propertyName = "m_Sprite";
 
         ObjectReferenceKeyframe[] keyframes = new ObjectReferenceKeyframe[spriteList.Count];
@@ -196,15 +248,53 @@ public class CreateSpriteAnimations : Editor
         }
 
         AnimationUtility.SetObjectReferenceCurve(clip, curveBinding, keyframes);
+    }
 
-        // 파일명은 정렬 후 첫 번째 Sprite 이름 사용
-        string firstSpritePath = AssetDatabase.GetAssetPath(spriteList[0]);
-        string folderPath = Path.GetDirectoryName(firstSpritePath);
-        string clipPath = Path.Combine(folderPath, spriteList[0].name + ".anim");
-        clipPath = clipPath.Replace("\\", "/");
+    // 전체 구간 동안 동일한 scale 유지
+    static void AddConstantScaleCurve(AnimationClip clip, float frameRate, int frameCount, float targetScale)
+    {
+        EditorCurveBinding scaleXBinding = new EditorCurveBinding();
+        scaleXBinding.type = typeof(RectTransform);
+        scaleXBinding.path = SCALE_TARGET_PATH;
+        scaleXBinding.propertyName = "m_LocalScale.x";
 
-        DeleteIfExists(clipPath);
-        AssetDatabase.CreateAsset(clip, clipPath);
+        EditorCurveBinding scaleYBinding = new EditorCurveBinding();
+        scaleYBinding.type = typeof(RectTransform);
+        scaleYBinding.path = SCALE_TARGET_PATH;
+        scaleYBinding.propertyName = "m_LocalScale.y";
+
+        EditorCurveBinding scaleZBinding = new EditorCurveBinding();
+        scaleZBinding.type = typeof(RectTransform);
+        scaleZBinding.path = SCALE_TARGET_PATH;
+        scaleZBinding.propertyName = "m_LocalScale.z";
+
+        AnimationCurve curveX = new AnimationCurve();
+        AnimationCurve curveY = new AnimationCurve();
+        AnimationCurve curveZ = new AnimationCurve();
+
+        float endTime = 0f;
+
+        if (frameCount > 1)
+        {
+            endTime = frameCount / frameRate;
+        }
+        else
+        {
+            endTime = 1f / frameRate;
+        }
+
+        curveX.AddKey(0f, targetScale);
+        curveX.AddKey(endTime, targetScale);
+
+        curveY.AddKey(0f, targetScale);
+        curveY.AddKey(endTime, targetScale);
+
+        curveZ.AddKey(0f, 1f);
+        curveZ.AddKey(endTime, 1f);
+
+        AnimationUtility.SetEditorCurve(clip, scaleXBinding, curveX);
+        AnimationUtility.SetEditorCurve(clip, scaleYBinding, curveY);
+        AnimationUtility.SetEditorCurve(clip, scaleZBinding, curveZ);
     }
 
     // Animation Clip의 Loop Time을 켭니다
