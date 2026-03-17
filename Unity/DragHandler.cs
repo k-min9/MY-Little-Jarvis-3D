@@ -140,9 +140,6 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
             Debug.LogWarning($"BlendPick 파라미터가 존재하지 않음: {e.Message}");
         }
         _animator.SetBool("isPick", true);
-        if (charAttributes.type=="2D") {
-            CharManager.Instance.setCharSize(70);
-        }
         StatusManager.Instance.IsPicking = true;
     }
 
@@ -179,10 +176,6 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
             // 얼굴 표정 초기화
             EmotionManager.Instance.ShowEmotion("idle");
         }
-
-        if (charAttributes.type=="2D") {
-            CharManager.Instance.setCharSize(100);
-        }
         StatusManager.Instance.IsPicking = false;
     }
 
@@ -216,8 +209,12 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
             currentScale.z * emotionFxMultiRate
         );
 
-        // 얼굴 표정 정도 변경
-        EmotionManager.Instance.ShowEmotion("><");
+        // 아로나일 경우 얼굴 표정 정도 변경
+        string nickname = CharManager.Instance.GetNickname(this.transform.parent.gameObject);
+        if (nickname == "arona")        
+        {
+            EmotionManager.Instance.ShowEmotion("><");
+        }
 
         // 음성재생 (메인 캐릭터일 때만)
         if (IsCurrentMainCharacter())
