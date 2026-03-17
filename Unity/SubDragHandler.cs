@@ -55,10 +55,6 @@ public class SubDragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IE
         subStatusManager.isDragging = true;
         // StatusManager.Instance.IsDragging = true;
         _animator.SetBool("isPick", true);
-        if (charAttributes.type=="2D") {
-            SubCharManager.Instance.setCharSize(transform.parent.gameObject, 70);
-            // CharManager.Instance.setCharSize(70);
-        }
         // StatusManager.Instance.IsPicking = true;
         subStatusManager.isPicking = true;
     }
@@ -69,10 +65,6 @@ public class SubDragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IE
         // StatusManager.Instance.IsDragging = false;
         subStatusManager.isDragging = false;
         _animator.SetBool("isPick", false);
-        if (charAttributes.type=="2D") {
-            SubCharManager.Instance.setCharSize(transform.parent.gameObject, 100);
-            CharManager.Instance.setCharSize(100);
-        }
         // StatusManager.Instance.IsPicking = false;
         subStatusManager.isPicking = false;
     }

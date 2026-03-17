@@ -155,7 +155,11 @@ public class PhysicsManager : MonoBehaviour
         if (charAttributes.type == "3D") {
             rectTransform.localEulerAngles = new Vector3(rectTransform.localEulerAngles.x, -90, rectTransform.localEulerAngles.z);
         } else {
-            rectTransform.localEulerAngles = new Vector3(rectTransform.localEulerAngles.x, 0, rectTransform.localEulerAngles.z);
+            if (charAttributes.is2DWalkDirectionRight) {
+                rectTransform.localEulerAngles = new Vector3(rectTransform.localEulerAngles.x, -180, rectTransform.localEulerAngles.z);
+            } else {
+                rectTransform.localEulerAngles = new Vector3(rectTransform.localEulerAngles.x, 0, rectTransform.localEulerAngles.z);
+            }
         }
         
         currentCoroutine = StartCoroutine(MoveLeft());
@@ -174,7 +178,11 @@ public class PhysicsManager : MonoBehaviour
         if (charAttributes.type == "3D") {
             rectTransform.localEulerAngles = new Vector3(rectTransform.localEulerAngles.x, -270, rectTransform.localEulerAngles.z);
         } else {
-            rectTransform.localEulerAngles = new Vector3(rectTransform.localEulerAngles.x, -180, rectTransform.localEulerAngles.z);
+            if (charAttributes.is2DWalkDirectionRight) {
+                rectTransform.localEulerAngles = new Vector3(rectTransform.localEulerAngles.x, 0, rectTransform.localEulerAngles.z);
+            } else {
+                rectTransform.localEulerAngles = new Vector3(rectTransform.localEulerAngles.x, -180, rectTransform.localEulerAngles.z);
+            }        
         }
         currentCoroutine = StartCoroutine(MoveRight());
     }
