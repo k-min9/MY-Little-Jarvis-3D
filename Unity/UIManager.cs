@@ -14,6 +14,10 @@ public class UIManager : MonoBehaviour
     [SerializeField] public GameObject chatHistory; // chatHistory
     [SerializeField] public GameObject guideLine; // guideLine
     [SerializeField] public GameObject situation; // UIChatSituation
+    [SerializeField] public GameObject ocrAutoMapper; // OCRAutoMapper
+    [SerializeField] public GameObject choiceInputImage; // APIInput
+
+    [SerializeField] public GameObject debugBalloon2; // VL, Web 등 정보 보여주기
 
     // 싱글톤 인스턴스
     private static UIManager instance;
@@ -50,6 +54,9 @@ public class UIManager : MonoBehaviour
         chatHistory.SetActive(false);
         // guideLine.SetActive(false);
         // situation.SetActive(false);
+        ocrAutoMapper.SetActive(false);
+        choiceInputImage.SetActive(false);
+        debugBalloon2.SetActive(false);
 
         // UIWidget 존재하면 Close
         TryCloseWidget(charChange);
@@ -59,6 +66,7 @@ public class UIManager : MonoBehaviour
         TryCloseWidget(chatHistory);
         TryCloseWidget(guideLine);
         TryCloseWidget(situation);
+        TryCloseWidget(ocrAutoMapper);
 
         //         // 안드로이드 or 테스트용
         // #if UNITY_ANDROID || UNITY_EDITOR
@@ -101,7 +109,7 @@ public class UIManager : MonoBehaviour
     public void CloseCharChange()
     {
         UIWidget uIWidget = charChange.GetComponent<UIWidget>();
-
+        
         uIWidget.Close();
     }
 
@@ -362,5 +370,58 @@ public class UIManager : MonoBehaviour
         {
             ShowChatHistory();
         }
+    }
+
+    // OCRAutoMapper-UIWidget의 Show 작동
+    public void ShowOCRAutoMapper()
+    {
+        UIWidget uIWidget = ocrAutoMapper.GetComponent<UIWidget>();
+
+        // 이미 활성화되어 있지 않은 경우라면 위치 조정
+        if (!ocrAutoMapper.activeSelf)
+        {
+            Vector3 position = UIPositionManager.Instance.GetMenuPosition("ocrAutoMapper");
+            ocrAutoMapper.GetComponent<RectTransform>().position = position;
+        }
+
+        uIWidget.Show();
+    }
+
+    // OCRAutoMapper-UIWidget의 Close 작동
+    public void CloseOCRAutoMapper()
+    {
+        UIWidget uIWidget = ocrAutoMapper.GetComponent<UIWidget>();
+        
+        uIWidget.Close();
+    }
+
+    // OCRAutoMapper-UIWidget의 Toggle 작동
+    public void ToggleOCRAutoMapper()
+    {
+        if (ocrAutoMapper.activeSelf)
+        {
+            CloseOCRAutoMapper();
+        }
+        else
+        {
+            ShowOCRAutoMapper();
+        }
+    }
+
+    // choiceInputImage Show
+    public void ShowChoiceInput()
+    {
+        if (!choiceInputImage.activeSelf)
+        {
+            Vector3 position = UIPositionManager.Instance.GetMenuPosition("choiceInput");
+            choiceInputImage.GetComponent<RectTransform>().position = position;
+        }
+        choiceInputImage.SetActive(true);
+    }
+
+    // choiceInputImage Hide
+    public void HideChoiceInput()
+    {
+        choiceInputImage.SetActive(false);
     }
 }
