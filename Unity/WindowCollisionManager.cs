@@ -8,7 +8,7 @@ using UnityEngine.UI;
 
 public class WindowCollisionManager : MonoBehaviour
 {
-    private Canvas canvas;
+    public Canvas canvas;
     private bool isWindowsRectChecking = true;
 
 
@@ -90,11 +90,12 @@ public class WindowCollisionManager : MonoBehaviour
             Destroy(gameObject);
             return;
         }
-
+#if !UNITY_EDITOR && UNITY_STANDALONE_WIN
         if (isWindowsRectChecking)
         {
             StartCoroutine(UpdateWindowsRectsRoutine());
         }
+#endif
     }
 
     public void SetWindowsRectChecking(bool value) {
@@ -297,6 +298,7 @@ public class WindowCollisionManager : MonoBehaviour
         }
 
         // taskbar은 무조건 체크
+#if UNITY_STANDALONE_WIN
         IntPtr taskbarHandle = FindWindow("Shell_TrayWnd", null);
         if (taskbarHandle != IntPtr.Zero && GetWindowRect(taskbarHandle, out RECT taskbarRect))
         {
@@ -314,6 +316,7 @@ public class WindowCollisionManager : MonoBehaviour
                 }    
             }
         }
+#endif
         
         // Debug.Log(testRects.Count);
         // foreach (var rect in testRects)
