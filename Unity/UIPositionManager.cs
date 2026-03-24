@@ -100,6 +100,14 @@ public class UIPositionManager : MonoBehaviour
                 return canvas.transform.TransformPoint(new Vector3(250f, -50f, 0f));
             case "version":
                 return canvas.transform.TransformPoint(new Vector3(0f, -200f, 0f));
+            case "chatBalloonBottom":
+                return canvas.transform.TransformPoint(new Vector3(0f, -canvasRect.rect.height / 2 + 150f, 0f));
+            case "debugBalloon2":
+                return canvas.transform.TransformPoint(new Vector3(canvasRect.rect.width / 2 - 250f, canvasRect.rect.height / 2 - 200f, 0f));
+            case "ocrAutoMapper":
+                return canvas.transform.TransformPoint(new Vector3(-300f, 0f, 0f));
+            case "choiceInput":
+                return GetCanvasPositionCenter(); // 중앙 배치
             default:
                 return GetCanvasPositionCenter(); // 기본값은 중앙
         }
