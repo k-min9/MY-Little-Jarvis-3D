@@ -1,16 +1,18 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 using Newtonsoft.Json;
 using UnityEngine.UI;
 using System.IO;
+using TMPro;
 
 public class ServerManager : MonoBehaviour
 {
     public string baseUrl = "";
-    private string devUrl = "";  // dev 서버 URL 캐시
+    private Dictionary<string, string> serverUrlCache = new Dictionary<string, string>();  // server_id별 URL 캐시
 
     private string ngrokUrl;
     private string ngrokStatus;
@@ -99,13 +101,17 @@ public class ServerManager : MonoBehaviour
 
     public void GetServerUrlFromServerId(string server_id, Action<string> onComplete)
     {
-        // devUrl 캐시가 있는 경우 즉시 반환
-        if (server_id.ToLower().Contains("dev") && !string.IsNullOrEmpty(devUrl))
+        // 캐시가 있는 경우 즉시 반환
+        if (false)  // 캐시 가져오기 설정 없으면 기본적으로 가져오기
         {
-            Debug.Log($"[GetServerUrlFromServerId] devUrl 캐시 사용: {devUrl}");
-            onComplete?.Invoke(devUrl);
-            return;
+            if (serverUrlCache.ContainsKey(server_id))
+            {
+                Debug.Log($"[GetServerUrlFromServerId] 캐시 사용: server_id={server_id}, url={serverUrlCache[server_id]}");
+                onComplete?.Invoke(serverUrlCache[server_id]);
+                return;
+            }
         }
+
 
         StartCoroutine(GetServerUrlCoroutine(server_id, onComplete));
     }
@@ -148,12 +154,9 @@ public class ServerManager : MonoBehaviour
                     yield break;
                 }
 
-                // devUrl 저장 조건
-                if (server_id.ToLower().Contains("dev"))
-                {
-                    devUrl = data.url;
-                    Debug.Log($"[GetServerUrlFromServerId] devUrl 저장됨: {devUrl}");
-                }
+                // 서버 URL 캐시 저장
+                serverUrlCache[server_id] = data.url;
+                Debug.Log($"[GetServerUrlFromServerId] server_id '{server_id}' URL 캐시 저장: {data.url}");
 
                 onComplete?.Invoke(data.url);
             }
@@ -165,6 +168,7 @@ public class ServerManager : MonoBehaviour
         }
     }
 
+    public TextMeshProUGUI baseUrlText;
 
     // Base URL 설정 (FetchNgrokJsonData 이후)
     private IEnumerator SetBaseUrl()
@@ -179,6 +183,7 @@ public class ServerManager : MonoBehaviour
         {
             isConnected = true;
             Debug.Log("Final Base URL: " + baseUrl);
+            baseUrlText.text = baseUrl;
         }
         else
         {
@@ -429,51 +434,121 @@ public class ServerManager : MonoBehaviour
     public Text keyTestResultText;
     public Text keyChoiceInputTestResultText;
     
-    // Test 버튼으로 호출
-    public void CallValidateAPIKey()
+    // Task 기반 Gemini API Key 검증 (비동기 호출용)
+    public async Task<bool> ValidateGeminiAPIKeyAsync(string apiKey)
     {
-        // UI초기화
-        keyTestResultText.text = "Testing...";
+        if (string.IsNullOrEmpty(apiKey)) return false;
+        
+        var tcs = new TaskCompletionSource<bool>();
+        StartCoroutine(ValidateGeminiAPIKeyAsyncCoroutine(apiKey, tcs));
+        return await tcs.Task;
+    }
+
+    private IEnumerator ValidateGeminiAPIKeyAsyncCoroutine(string apiKey, TaskCompletionSource<bool> tcs)
+    {
+        string url = $"https://generativelanguage.googleapis.com/v1beta/models?key={apiKey}";
+        UnityWebRequest request = UnityWebRequest.Get(url);
+        
+        yield return request.SendWebRequest();
+        
+        bool isValid = request.responseCode == 200;
+        tcs.SetResult(isValid);
+    }
+    
+    // // TODO : 오픈라우터 예시... 구현 필요.
+    // // Task 기반 OpenRouter API Key 검증 (비동기 호출용)
+    // public async Task<bool> ValidateOpenRouterAPIKeyAsync(string apiKey)
+    // {
+    //     if (string.IsNullOrEmpty(apiKey)) return false;
+        
+    //     var tcs = new TaskCompletionSource<bool>();
+    //     StartCoroutine(ValidateOpenRouterAPIKeyAsyncCoroutine(apiKey, tcs));
+    //     return await tcs.Task;
+    // }
+
+    // private IEnumerator ValidateOpenRouterAPIKeyAsyncCoroutine(string apiKey, TaskCompletionSource<bool> tcs)
+    // {
+    //     string model = LoadModelFromLocal();
+    //     if (string.IsNullOrEmpty(model))
+    //     {
+    //         bool done = false;
+    //         string result = null;
+    //         yield return GetLatestFreeOpenRouterModel((fetchedModel) =>
+    //         {
+    //             result = string.IsNullOrEmpty(fetchedModel) ? "google/gemma-3-27b-it:free" : fetchedModel;
+    //             done = true;
+    //         });
+    //         while (!done) yield return null;
+    //         model = result;
+    //     }
+
+    //     string url = "https://openrouter.ai/api/v1/chat/completions";
+    //     string json = $"{{\"model\": \"{model}\", \"messages\": [{{\"role\": \"user\", \"content\": \"hello\"}}]}}";
+
+    //     UnityWebRequest request = new UnityWebRequest(url, "POST");
+    //     byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(json);
+    //     request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+    //     request.downloadHandler = new DownloadHandlerBuffer();
+    //     request.SetRequestHeader("Content-Type", "application/json");
+    //     request.SetRequestHeader("Authorization", "Bearer " + apiKey);
+    //     request.SetRequestHeader("HTTP-Referer", "https://yourapp.example.com");
+    //     request.SetRequestHeader("X-Title", "MyLittleJarvis");
+
+    //     yield return request.SendWebRequest();
+        
+    //     bool isValid = request.responseCode == 200;
+    //     tcs.SetResult(isValid);
+    // }
+    
+    // Gemini Test 버튼으로 호출
+    public void CallValidateGeminiAPIKey()
+    {
+        SettingManager.Instance.serverGeminikeyTestResultText.text = "Testing...";
         keyChoiceInputTestResultText.text = "Testing...";
-
-        string serviceType = "gemini";
         string apiKey = SettingManager.Instance.settings.api_key_gemini;
-
-        // 서버타입: 0: Auto, 1: Server, 2: Free(Gemini), 3: Free(OpenRouter), 4: Paid(Gemini)
-        if (SettingManager.Instance.settings.server_type_idx == 2 || SettingManager.Instance.settings.server_type_idx == 4)
-        {
-            serviceType = "gemini";
-        }
-        if (SettingManager.Instance.settings.server_type_idx == 3)
-        {
-            serviceType = "openrouter";
-            apiKey = SettingManager.Instance.settings.api_key_openRouter;
-        }
-
-        StartCoroutine(ValidateAPIKey(serviceType, apiKey));
+        
+        // 검증 후 캐시 무효화하여 재검증 강제
+        ApiKei.InvalidateCache();
+        
+        StartCoroutine(ValidateGeminiAPIKeyWithCache(apiKey));
     }
-
-    public IEnumerator ValidateAPIKey(string serviceType, string apiKey)
+    
+    private IEnumerator ValidateGeminiAPIKeyWithCache(string apiKey)
     {
-        if (string.IsNullOrEmpty(serviceType)) serviceType = "gemini";
-        serviceType = serviceType.ToLower();
-
-        switch (serviceType)
+        yield return StartCoroutine(ValidateGeminiAPIKey(apiKey));
+        
+        // 검증 결과를 캐시에 저장
+        if (SettingManager.Instance.serverGeminikeyTestResultText.text == "Success")
         {
-            case "openrouter":
-                yield return ValidateOpenRouter(apiKey);
-                break;
-            case "chatgpt":
-                yield return ValidateDefaultGET("https://api.openai.com/v1/models", "Bearer " + apiKey);
-                break;
-            case "gemini":
-            default:
-                yield return ValidateDefaultGET($"https://generativelanguage.googleapis.com/v1beta/models?key={apiKey}", null);
-                break;
+            // 수동으로 캐시 업데이트 (public 필드로 접근 불가하므로 재검증 유도)
+            Debug.Log("[ServerManager] API key validated via Test button");
         }
     }
+    
+    // OpenRouter Test 버튼으로 호출
+    public void CallValidateOpenRouterAPIKey()
+    {
+        SettingManager.Instance.serverOpenRouterkeyTestResultText.text = "Testing...";
+        keyChoiceInputTestResultText.text = "Testing...";
+        string apiKey = SettingManager.Instance.settings.api_key_openRouter;
+        StartCoroutine(ValidateOpenRouterAPIKey(apiKey));
+    }
 
-    private IEnumerator ValidateOpenRouter(string apiKey)
+    // Gemini API Key 검증 코루틴
+    private IEnumerator ValidateGeminiAPIKey(string apiKey)
+    {
+        string url = $"https://generativelanguage.googleapis.com/v1beta/models?key={apiKey}";
+        UnityWebRequest request = UnityWebRequest.Get(url);
+        
+        yield return request.SendWebRequest();
+        
+        string result = request.responseCode == 200 ? "Success" : "Fail";
+        SettingManager.Instance.serverGeminikeyTestResultText.text = result;
+        keyChoiceInputTestResultText.text = result;
+    }
+    
+    // OpenRouter API Key 검증 코루틴
+    private IEnumerator ValidateOpenRouterAPIKey(string apiKey)
     {
         string model = LoadModelFromLocal();
 
@@ -508,17 +583,11 @@ public class ServerManager : MonoBehaviour
 
         yield return request.SendWebRequest();
 
+        string testResult = request.responseCode == 200 ? "Success" : "Fail";
+        SettingManager.Instance.serverOpenRouterkeyTestResultText.text = testResult;
+        keyChoiceInputTestResultText.text = testResult;
         if (request.responseCode == 200)
-        {
-            keyTestResultText.text = "Success";
-            keyChoiceInputTestResultText.text = "Success";
             Debug.Log($"[OpenRouter] Model used for test: {model}");
-        }
-        else
-        {
-            keyTestResultText.text = "Fail";
-            keyChoiceInputTestResultText.text = "Fail";
-        }
     }
 
     private string LoadModelFromLocal()
