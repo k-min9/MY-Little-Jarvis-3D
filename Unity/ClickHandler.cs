@@ -83,6 +83,8 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
         {
             StatusManager.Instance.isAnswering = false;
             VoiceManager.Instance.ResetAudio();
+            ChatBalloonManager.Instance.characterTransform = this.transform.parent.GetComponent<RectTransform>();
+            ChatBalloonManager.Instance.clickedCharacter = this.transform.parent.gameObject; // 클릭한 캐릭터 설정
             ChatBalloonManager.Instance.ToggleChatBalloon();
         }       
         else
@@ -114,74 +116,69 @@ public class ClickHandler : MonoBehaviour, IPointerClickHandler
         }
 #endif
 
-        // 환경세팅/튜토리얼 시작 조건 확인 : 우선 baseUrl 값이 ""
+        // server_type_idx: 0=Auto, 1=Local, 2=Google, 3=OpenRouter
+        int serverTypeIdx = SettingManager.Instance.settings.server_type_idx;
+        // Auto(0) / Google(2) / OpenRouter(3) → 정상 실행
+        // 무료 count 소진 시 ApiKei가 I03 시나리오를 자동 트리거
+
+        // // 튜토리얼 미완료 시나리오 (보류)
+        // if (SettingManager.Instance.settings.isShowTutorialOnChat
+        //     && !SettingManager.Instance.settings.isTutorialCompleted)
+        // {
+        //     ScenarioTutorialManager.Instance.StartTutorial();
+        //     return;
+        // }
+
+        // 환경세팅/튜토리얼 시작 조건 확인 : Local이고 baseUrl 값을 아직 반환받지 못함
+        if (serverTypeIdx == 1)
+        {
+            if (string.IsNullOrEmpty(ServerManager.Instance.baseUrl))
+            {
+                // 앱 실행 후 15초가 지나야만 실행 (Server 실행중일 수 있음)
+                if (Time.time <= 15f) return;
+                // 기존 시나리오 실행중일 경우 return
+                if (StatusManager.Instance.isScenario) return;
+
+                // 서버 미설치 → 설치 시나리오
+                if (!InstallerManager.Instance.IsJarvisServerInstalled())
+                {
+                    ScenarioInstallerManager.Instance.StartInstaller();
+                    return;
+                }
+                // 설치됨 + 미기동 → 기동 여부 확인
+                else if (!InstallStatusManager.Instance.IsServerRunning())
+                {
+                    StartCoroutine(ScenarioCommonManager.Instance.Scenario_C02_AskToStartServer());
+                    return;
+                }
+                return; // baseUrl 없음 → 대기
+            }
+        }
+
+        // 정상 대화.
+        StatusManager.Instance.isAnswering = false;
+        VoiceManager.Instance.ResetAudio();
+        ChatBalloonManager.Instance.characterTransform = this.transform.parent.GetComponent<RectTransform>();
+        ChatBalloonManager.Instance.clickedCharacter = this.transform.parent.gameObject; // 클릭한 캐릭터 설정
+        ChatBalloonManager.Instance.ToggleChatBalloon();
+        return;
+
         
-        if (string.IsNullOrEmpty(ServerManager.Instance.baseUrl))
-        {
-            // 앱 실행 후 15초가 지나야만 실행 ((Sample)Server 실행중일 수 있음)
-            if (Time.time <= 15f) return;
-            // 기존 시나리오 실행중일 경우 return 
-            if (StatusManager.Instance.isScenario) return;
-
-            // // 서버 설치 여부 확인 + PC
-            // RuntimePlatform platform = Application.platform;
-            // if ((platform == RuntimePlatform.WindowsPlayer || platform == RuntimePlatform.WindowsEditor)
-            //     && !InstallerManager.Instance.IsJarvisServerInstalled())
-            // {
-            //     ScenarioInstallerManager.Instance.StartInstaller();  //  시나리오 - 설치
-            //     return;
-            // }
-            // else if (SettingManager.Instance.settings.isShowTutorialOnChat
-            //     && !SettingManager.Instance.settings.isTutorialCompleted)  // 시나리오 튜토리얼 실행명령 + 튜토리얼 종료되지 않음
-            // {
-            //     //TODO : 다른 스마트한 방법 찾기
-            //     ScenarioTutorialManager.Instance.StartTutorial();  // 시나리오 - 튜토리얼
-            //     return;
-            // }
-            else if (!InstallStatusManager.Instance.IsServerRunning())  // 설치+환경+튜토리얼종료되어있는상태에서 서버가 켜져있지 않다면 기동
-            {
-                StartCoroutine(ScenarioCommonManager.Instance.Scenario_C02_AskToStartServer());
-                // JarvisServerManager.Instance.RunJarvisServerWithCheck();
-            }
-
-            return; // 일단은 대기
-        }
-        else // 정상대화
-        {
-            StatusManager.Instance.isAnswering = false;
-            VoiceManager.Instance.ResetAudio();
-            ChatBalloonManager.Instance.ToggleChatBalloon();
-            return;
-        }
-        
-        // 세팅/대화 관련 로직에서 return되지 않았을 경우, 일반 동작
-        if (false && SettingManager.Instance.settings.isAskedTurnOnServer)  // TODO : SettingManager쪽은 완전히 없애버리자/ 서버를 켤까요 선생님이 아니라, 그냥 기동시 켜버리기
-        {
-            // 과거의 유산
-            // #if UNITY_EDITOR
-            ChatBalloonManager.Instance.ToggleChatBalloon();
-            // #else
-            //                 ServerManager.AskStartServer();
-            // #endif
-        }
-        else
-        {
-            if (isAnimatorTriggerExists(_animator, "doSpecial"))
-            {
-                _animator.SetTrigger("doSpecial");
-                StatusManager.Instance.SetStatusTrueForSecond(value => StatusManager.Instance.IsOptioning = value, 7.5f);
-            }
-            else if (isAnimatorTriggerExists(_animator, "doSelect"))
-            {
-                Dialogue select = DialogueManager.Instance.GetRandomSelect();
-                DoDialogueBehaviour(select);
-            }
-            else
-            {
-                PlayRandomAnimation();
-            }
-        }
-
+        // // 세팅/대화 관련 로직에서 return되지 않았을 경우 용, 애니메이션 재생 로직
+        // if (isAnimatorTriggerExists(_animator, "doSpecial"))
+        // {
+        //     _animator.SetTrigger("doSpecial");
+        //     StatusManager.Instance.SetStatusTrueForSecond(value => StatusManager.Instance.IsOptioning = value, 7.5f);
+        // }
+        // else if (isAnimatorTriggerExists(_animator, "doSelect"))
+        // {
+        //     Dialogue select = DialogueManager.Instance.GetRandomSelect();
+        //     DoDialogueBehaviour(select);
+        // }
+        // else
+        // {
+        //     PlayRandomAnimation();
+        // }
     }
 
     private void HandleMiddleClick()
