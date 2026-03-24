@@ -239,8 +239,9 @@ public class TTSManager : MonoBehaviour
         // dev_voice 사용 여부 (설치 상태 또는 DevSound 토글)
         else
         {
-            bool shouldUseDevServer = SettingManager.Instance.GetInstallStatus() < 2   // no install, lite
-                                    || SettingManager.Instance.IsDevSoundEnabled();    // DevSound 토글 또는 Android
+            bool shouldUseDevServer = (SettingManager.Instance.GetInstallStatus() < 2   // no install, lite
+                                    || SettingManager.Instance.IsDevSoundEnabled())    // DevSound 토글 또는 Android
+                                    && string.IsNullOrEmpty(baseUrl);                  // 연결된 서버가 없을 때만
             if (shouldUseDevServer)
             {
                 // TaskCompletionSource를 사용하여 콜백을 async/await로 변환
@@ -401,8 +402,9 @@ public class TTSManager : MonoBehaviour
         // dev_voice 사용 여부 (설치 상태 또는 DevSound 토글)
         else
         {
-            bool shouldUseDevServer = SettingManager.Instance.GetInstallStatus() < 2   // no install, lite
-                                    || SettingManager.Instance.IsDevSoundEnabled();    // DevSound 토글 또는 Android
+            bool shouldUseDevServer = (SettingManager.Instance.GetInstallStatus() < 2   // no install, lite
+                                    || SettingManager.Instance.IsDevSoundEnabled())    // DevSound 토글 또는 Android
+                                    && string.IsNullOrEmpty(baseUrl);                  // 연결된 서버가 없을 때만
             if (shouldUseDevServer)
             {
                 // TaskCompletionSource를 사용하여 콜백을 async/await로 변환
