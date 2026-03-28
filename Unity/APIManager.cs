@@ -12,19 +12,33 @@ using UnityEngine.Networking;
 
 public class APIManager : MonoBehaviour
 {
-    // Reply 리스트를 저장할 리스트
-    private List<string> replyListKo = new List<string>();
-    private List<string> replyListJp = new List<string>();
-    private List<string> replyListEn = new List<string>();
+    // 재생성 시 외부(AnswerBalloonManager)에서 접근하는 최근 사용자 발화 이력 저장용
+    private Dictionary<int, string> queryOriginByChatIdx = new Dictionary<int, string>();
+    private Queue<int> queryOriginKeysQueue = new Queue<int>();
+    private const int MAX_QUERY_ORIGIN_HISTORY = 30; // 최대 30개의 말풍선 원문 기록 유지
 
-    public string query_origin = "";
-    private string query_trans = "";
-    private string ai_language_out = "en";  // 메모리에 저장할 언어
+    public void AddQueryOrigin(int chatIdxNum, string origin)
+    {
+        if (!queryOriginByChatIdx.ContainsKey(chatIdxNum))
+        {
+            queryOriginKeysQueue.Enqueue(chatIdxNum);
+        }
+        queryOriginByChatIdx[chatIdxNum] = origin;
 
-    private bool isCompleted = false; // 반환이 완료되었는지 여부를 체크하는 플래그
-    private bool isResponsedStarted = false; // 첫 반환이 돌아왔는지 여부
-    private bool isAnswerStarted = false; // 첫 대답이 시작했는지 여부
-    private bool isFirstBalloonShown = false; // 첫 문장 말풍선 표시 여부 (GeminiDirect용)
+        // 적정 개수를 넘어가면 가장 오래된 기록을 제거하여 메모리 누수 방지
+        while (queryOriginKeysQueue.Count > MAX_QUERY_ORIGIN_HISTORY)
+        {
+            int oldIdx = queryOriginKeysQueue.Dequeue();
+            queryOriginByChatIdx.Remove(oldIdx);
+        }
+    }
+
+    public string GetQueryOrigin(int chatIdxNum)
+    {
+        if (queryOriginByChatIdx.ContainsKey(chatIdxNum))
+            return queryOriginByChatIdx[chatIdxNum];
+        return "";
+    }
     private string logFilePath; // 로그 파일 경로
 
     private DateTime lastSmallTalkCallTime = DateTime.MinValue;
@@ -161,10 +175,11 @@ public class APIManager : MonoBehaviour
 
         try
         {
-            // 요청전 초기화
-            isCompleted = false;
-            isResponsedStarted = false;
-            isAnswerStarted = false;
+            // SmallTalk 전용 지역 replyList (세션 격리)
+            List<string> replyListKo = new List<string>();
+            List<string> replyListJp = new List<string>();
+            List<string> replyListEn = new List<string>();
+            bool isResponsedStarted = false;
 
             string boundary = "----WebKitFormBoundary" + DateTime.Now.Ticks.ToString("x");
             string contentType = "multipart/form-data; boundary=" + boundary;
@@ -287,13 +302,13 @@ public class APIManager : MonoBehaviour
                                     AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();
                                     isResponsedStarted = true;
 
-                                    // query 정보 저장
-                                    try
-                                    {
-                                        query_origin = jsonObject["query"]["origin"].ToString();
-                                        query_trans = jsonObject["query"]["text"].ToString();
-                                    }
-                                    catch { }
+                                    // query 정보 추출 (SmallTalk은 메모리 저장/재생성 없으므로 불필요)
+                                    // try
+                                    // {
+                                    //     string temp_origin = jsonObject["query"]["origin"].ToString();
+                                    //     string temp_trans = jsonObject["query"]["text"].ToString();
+                                    // }
+                                    // catch { }
 
                                     // AI Info 갱신 시도
                                     try
@@ -362,8 +377,8 @@ public class APIManager : MonoBehaviour
                                     }
                                 }
 
-                                // 각 JSON 응답을 기존 로직으로 처리
-                                ProcessReply(jsonObject);
+                                // SmallTalk 응답을 ProcessReply로 처리 (지역 session-like 패턴)
+                                ProcessReplySmallTalk(jsonObject, replyListKo, replyListJp, replyListEn);
                             }
                         }
                         else
@@ -422,7 +437,6 @@ public class APIManager : MonoBehaviour
         {
             // 잡담 최종 종료
             isSmallTalkWaiting = false;
-            isCompleted = true;
             NoticeManager.Instance.DeleteNoticeBalloonInstance();
             AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteNormal();
             
@@ -472,10 +486,8 @@ public class APIManager : MonoBehaviour
 
         try
         {
-            // 요청전 초기화
-            isCompleted = false;
-            isResponsedStarted = false;
-            isAnswerStarted = false;
+            // 세션 객체 생성
+            AIChatSession session = new AIChatSession();
 
             string boundary = "----WebKitFormBoundary" + DateTime.Now.Ticks.ToString("x");
             string contentType = "multipart/form-data; boundary=" + boundary;
@@ -571,7 +583,7 @@ public class APIManager : MonoBehaviour
                             else if (replyType == "reply")
                             {                                
                                 // 첫 응답 처리
-                                if (!isResponsedStarted)
+                                if (!session.isResponsedStarted)
                                 {
                                     // 생각 중 말풍선 숨기기
                                     AnswerBalloonSimpleManager.Instance.HideAnswerBalloonSimple();
@@ -579,7 +591,7 @@ public class APIManager : MonoBehaviour
 
                                     AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
                                     AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();
-                                    isResponsedStarted = true;
+                                    session.isResponsedStarted = true;
 
                                     // AI Info 갱신
                                     try
@@ -598,7 +610,7 @@ public class APIManager : MonoBehaviour
                                 }
 
                                 // 답변 처리
-                                ProcessReply(jsonObject);
+                                ProcessReply(jsonObject, session);
                                 
                                 // 게임 상태 업데이트 (모든 응답에서 공통 처리)
                                 if (MiniGame20QManager.Instance != null && MiniGame20QManager.Instance.Is20QMode())
@@ -679,7 +691,7 @@ public class APIManager : MonoBehaviour
 
                 if (chatIdx == GameManager.Instance.chatIdxSuccess)
                 {
-                    OnFinalResponseReceived();
+                    OnFinalResponseReceived(session);
                 }
             }
         }
@@ -813,32 +825,29 @@ public class APIManager : MonoBehaviour
     }
 
     // FetchStreamingData에서 호출할 함수
-    private void ProcessReply(JObject jsonObject)
+    private void ProcessReply(JObject jsonObject, AIChatSession session)
     {
-
         LogToFile("ProcessReply started."); // ProcessReply 시작 로그
 
         // type 확인
         string type = jsonObject["type"]?.ToString() ?? "reply";
         LogToFile("ProcessReply type : " + type);
 
-        // 초기화
-        replyListKo = new List<string>();
-        replyListJp = new List<string>();
-        replyListEn = new List<string>();
+        // 세션 레플리스트 초기화 (JSON 응답마다 재설정)
+        session.replyListKo = new List<string>();
+        session.replyListJp = new List<string>();
+        session.replyListEn = new List<string>();
 
         // 반환된 JSON 객체에서 "reply_list"를 가져오기
         JToken replyToken = jsonObject["reply_list"];
         string chatIdx = jsonObject["chat_idx"]?.ToString() ?? "-1";
-        ai_language_out = jsonObject["ai_language_out"]?.ToString() ?? "";
-        // Debug.Log("ProcessReply chatIdx chk");
-        // Debug.Log(chatIdx + "/" + GameManager.Instance.chatIdxSuccess.ToString());
+        session.ai_language_out = jsonObject["ai_language_out"]?.ToString() ?? "";
 
-        // 이중 체크 중... 음성체크와 별개로 대화는 뒤에서 저장 되어야하는데 그게 저지 됨?
+        // 이중 체크 - 현재 대화가 아님
         if (chatIdx != GameManager.Instance.chatIdxSuccess.ToString())
         {
             Debug.Log("chatIdx Too Old : " + chatIdx + "/" + GameManager.Instance.chatIdxSuccess.ToString());
-            return;  // 현재 대화가 아님
+            return;
         }
 
         if (replyToken != null && replyToken.Type == JTokenType.Array)
@@ -853,7 +862,7 @@ public class APIManager : MonoBehaviour
                 // 각각의 답변을 리스트에 추가
                 if (!string.IsNullOrEmpty(answerJp))
                 {
-                    replyListJp.Add(answerJp);
+                    session.replyListJp.Add(answerJp);
                     if (SettingManager.Instance.settings.sound_language == "jp")
                     {
                         answerVoice = answerJp;
@@ -862,7 +871,7 @@ public class APIManager : MonoBehaviour
 
                 if (!string.IsNullOrEmpty(answerKo))
                 {
-                    replyListKo.Add(answerKo);
+                    session.replyListKo.Add(answerKo);
                     if (SettingManager.Instance.settings.sound_language == "ko")
                     {
                         answerVoice = answerKo;
@@ -870,45 +879,131 @@ public class APIManager : MonoBehaviour
                 }
                 if (!string.IsNullOrEmpty(answerEn))
                 {
-                    replyListEn.Add(answerEn);
+                    session.replyListEn.Add(answerEn);
                     if (SettingManager.Instance.settings.sound_language == "en")
                     {
                         answerVoice = answerEn;
                     }
                 }
             }
-            // answerballoon 갱신
 
-            string replyKo = string.Join(" ", replyListKo);
-            string replyJp = string.Join(" ", replyListJp);
-            string replyEn = string.Join(" ", replyListEn);
-            LogToFile("replyKo : " + replyKo); // ProcessReply 시작 로그
-            LogToFile("replyJp : " + replyJp); // ProcessReply 시작 로그
-            LogToFile("replyEn : " + replyEn); // ProcessReply 시작 로그
+            string replyKo = string.Join(" ", session.replyListKo);
+            string replyJp = string.Join(" ", session.replyListJp);
+            string replyEn = string.Join(" ", session.replyListEn);
+            LogToFile("replyKo : " + replyKo);
+            LogToFile("replyJp : " + replyJp);
+            LogToFile("replyEn : " + replyEn);
 
-            AnswerBalloonManager.Instance.ModifyAnswerBalloonTextInfo(replyKo, replyJp, replyEn);  // Answerballoon 정보 갱신
-            AnswerBalloonManager.Instance.ModifyAnswerBalloonText();  // 정보토대 답변
+            if (session.targetCharacter != null && session.targetCharacter != CharManager.Instance.GetCurrentCharacter())
+            {
+                SubAnswerBalloonSimpleController subController = SubAnswerBalloonSimpleManager.Instance.GetOrCreateController(session.targetCharacter);
+                if (subController != null)
+                {
+                    // 텍스트가 들어가기 직전에 처음 한 번만 풍선 표출 (빈 풍선 방지)
+                    if (!session.isFirstBalloonShown)
+                    {
+                        subController.ShowAnswerBalloonSimpleInf();
+                        session.isFirstBalloonShown = true;
+                    }
+
+                    subController.ModifyAnswerBalloonSimpleTextInfo(replyKo, replyJp, replyEn);
+                    string displayReply = replyEn;
+                    string currentLang = SettingManager.Instance.settings.ui_language;
+                    if (currentLang == "ko") displayReply = replyKo;
+                    else if (currentLang == "jp") displayReply = replyJp;
+                    subController.ModifyAnswerBalloonSimpleText(displayReply);
+                }
+            }
+            else
+            {
+                AnswerBalloonManager.Instance.ModifyAnswerBalloonTextInfo(replyKo, replyJp, replyEn);
+                AnswerBalloonManager.Instance.ModifyAnswerBalloonText();
+            }
 
             // 음성 API 호출 (TTSManager로 위임)
             if (answerVoice != null)
             {
                 string soundLang = SettingManager.Instance.settings.sound_language;
-                TTSManager.Instance.RequestTTS(answerVoice, chatIdx, soundLang);
+                string nickname = session.targetCharacter != null ? CharManager.Instance.GetNickname(session.targetCharacter) : null;
+                TTSManager.Instance.RequestTTS(answerVoice, chatIdx, soundLang, nickname);
             }
         }
     }
 
+    // SmallTalk 전용 ProcessReply (지역 replyList 버전)
+    private void ProcessReplySmallTalk(JObject jsonObject, List<string> replyListKo, List<string> replyListJp, List<string> replyListEn)
+    {
+        // SmallTalk은 chatIdx 체크 없이 단순 누적
+        JToken replyToken = jsonObject["reply_list"];
+        if (replyToken == null || replyToken.Type != JTokenType.Array)
+        {
+            return;
+        }
+
+        // 이전 명령을 덧쓰고 새 목록치로 대체
+        replyListKo.Clear();
+        replyListJp.Clear();
+        replyListEn.Clear();
+
+        string answerVoice = null;
+        string chatIdx = jsonObject["chat_idx"]?.ToString() ?? "-1";
+        foreach (var reply in replyToken)
+        {
+            string answerJp = reply["answer_jp"]?.ToString() ?? string.Empty;
+            string answerKo = reply["answer_ko"]?.ToString() ?? string.Empty;
+            string answerEn = reply["answer_en"]?.ToString() ?? string.Empty;
+
+            if (!string.IsNullOrEmpty(answerJp))
+            {
+                replyListJp.Add(answerJp);
+                if (SettingManager.Instance.settings.sound_language == "jp")
+                {
+                    answerVoice = answerJp;
+                }
+            }
+            if (!string.IsNullOrEmpty(answerKo))
+            {
+                replyListKo.Add(answerKo);
+                if (SettingManager.Instance.settings.sound_language == "ko")
+                {
+                    answerVoice = answerKo;
+                }
+            }
+            if (!string.IsNullOrEmpty(answerEn))
+            {
+                replyListEn.Add(answerEn);
+                if (SettingManager.Instance.settings.sound_language == "en")
+                {
+                    answerVoice = answerEn;
+                }
+            }
+        }
+
+        string replyKoStr = string.Join(" ", replyListKo);
+        string replyJpStr = string.Join(" ", replyListJp);
+        string replyEnStr = string.Join(" ", replyListEn);
+
+        AnswerBalloonManager.Instance.ModifyAnswerBalloonTextInfo(replyKoStr, replyJpStr, replyEnStr);
+        AnswerBalloonManager.Instance.ModifyAnswerBalloonText();
+
+        if (answerVoice != null)
+        {
+            string soundLang = SettingManager.Instance.settings.sound_language;
+            TTSManager.Instance.RequestTTS(answerVoice, chatIdx, soundLang, null);
+        }
+    }
+
     // GeminiDirect 전용 ProcessReply (문장 단위로 호출됨)
-    private async void ProcessReplyGeminiDirect(JObject jsonObject)
+    private async void ProcessReplyGeminiDirect(JObject jsonObject, AIChatSession session)
     {
         // 최초 수신 시 리스트 초기화 (말풍선 표시는 첫 문장 번역 후로 지연)
-        if (!isResponsedStarted)
+        if (!session.isResponsedStarted)
         {
             // 리스트 초기화 (최초 1회만)
-            replyListKo = new List<string>();
-            replyListJp = new List<string>();
-            replyListEn = new List<string>();
-            isFirstBalloonShown = false;
+            session.replyListKo = new List<string>();
+            session.replyListJp = new List<string>();
+            session.replyListEn = new List<string>();
+            session.isFirstBalloonShown = false;
 
             // AI Info 내용 갱신
             try
@@ -932,14 +1027,14 @@ public class APIManager : MonoBehaviour
 
             // Web/Image 의도는 비활성화
             AnswerBalloonManager.Instance.HideWebImage();
-            
-            isResponsedStarted = true;
+
+            session.isResponsedStarted = true;
         }
 
         // chatIdx 체크
         string chatIdx = jsonObject["chat_idx"]?.ToString() ?? "-1";
-        ai_language_out = jsonObject["ai_language_out"]?.ToString() ?? "";
-        
+        session.ai_language_out = jsonObject["ai_language_out"]?.ToString() ?? "";
+
         if (chatIdx != GameManager.Instance.chatIdxSuccess.ToString())
         {
             Debug.Log("chatIdx Too Old : " + chatIdx + "/" + GameManager.Instance.chatIdxSuccess.ToString());
@@ -954,40 +1049,40 @@ public class APIManager : MonoBehaviour
             string uiLang = SettingManager.Instance.settings.ui_language ?? "ko";
             string aiLang = SettingManager.Instance.settings.ai_language ?? "ko";
             string soundLang = SettingManager.Instance.settings.sound_language ?? "ko";
-            
+
             // UI 번역 필요 여부 (ai_lang != ui_lang이면 UI 번역 필요)
             bool needUiTranslation = (aiLang != uiLang);
             
             // TTS 번역 필요 여부 (ai_lang != sound_lang이면 TTS 번역 필요)
             bool needTtsTranslation = (aiLang != soundLang);
-            
+
             foreach (var reply in replyToken)
             {
                 // AI 원본 응답 (GeminiDirect는 단일 언어로 응답)
                 string answerOriginal = reply["answer_origin"]?.ToString() ?? string.Empty;
-                
+
                 if (string.IsNullOrEmpty(answerOriginal))
                     continue;
-                
+
                 // Stop strings 제거 (잔여 태그 정리)
                 answerOriginal = answerOriginal
                     .Replace("<end_of_turn>", "")
                     .Replace("<|im_end|>", "")
                     .Replace("<|eot_id|>", "")
                     .Trim();
-                
+
                 if (string.IsNullOrEmpty(answerOriginal))
                     continue;
-                
+
                 // --- 0. seq 선할당 (번역 전에 순서 확정) ---
                 int seq = TTSManager.Instance.RegisterTtsRequest(answerOriginal);
                 int capturedSessionId = TTSManager.Instance.GetSessionId();
-                
+
                 Debug.Log($"[TTS_Flow] 1.문장성립 seq={seq} text='{answerOriginal.Substring(0, Math.Min(30, answerOriginal.Length))}...'");
-                
+
                 // --- 1. UI 표시 (번역 필요 시 번역) ---
                 string answerUi = answerOriginal;
-                
+
                 if (needUiTranslation)
                 {
                     // UI 언어로 번역
@@ -1007,38 +1102,64 @@ public class APIManager : MonoBehaviour
                         answerUi = resultUi?.Text ?? answerOriginal;
                     }
                 }
-                
-                replyListJp.Add(answerUi);
-                replyListKo.Add(answerUi);
-                replyListEn.Add(answerUi);
-                
-                string replyKo = string.Join(" ", replyListKo);
-                string replyJp = string.Join(" ", replyListJp);
-                string replyEn = string.Join(" ", replyListEn);
-                
+
+                session.replyListJp.Add(answerUi);
+                session.replyListKo.Add(answerUi);
+                session.replyListEn.Add(answerUi);
+
+                string replyKo = string.Join(" ", session.replyListKo);
+                string replyJp = string.Join(" ", session.replyListJp);
+                string replyEn = string.Join(" ", session.replyListEn);
+
                 // --- 2. TTS 번역 (필요 시) ---
                 // 첫 문장(seq=0) TTS 번역 시작 전: 말풍선 표시 (로딩 시간 분산)
-                if (!isFirstBalloonShown)
+                if (!session.isFirstBalloonShown)
                 {
                     // 생각 중 말풍선 숨기기
                     AnswerBalloonSimpleManager.Instance.HideAnswerBalloonSimple();
 
                     // 안내 말풍선 숨기기
                     NoticeManager.Instance.DeleteNoticeBalloonInstance();
-                    
-                    // AnswerBalloon 표시
-                    AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
-                    AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();
-                    
-                    isFirstBalloonShown = true;
+
+                    if (session.targetCharacter != null && session.targetCharacter != CharManager.Instance.GetCurrentCharacter())
+                    {
+                        SubAnswerBalloonSimpleController subController = SubAnswerBalloonSimpleManager.Instance.GetOrCreateController(session.targetCharacter);
+                        if (subController != null)
+                        {
+                            subController.ShowAnswerBalloonSimpleInf();
+                        }
+                    }
+                    else
+                    {
+                        AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
+                        AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();
+                    }
+
+                    session.isFirstBalloonShown = true;
                 }
-                
-                // AnswerBalloon 내용 누적 (TTS 번역 전에 즉시 표시)
-                AnswerBalloonManager.Instance.ModifyAnswerBalloonTextInfo(replyKo, replyJp, replyEn);
-                AnswerBalloonManager.Instance.ModifyAnswerBalloonText();
-                
+
+                // AnswerBalloon 내용 누적
+                if (session.targetCharacter != null && session.targetCharacter != CharManager.Instance.GetCurrentCharacter())
+                {
+                    SubAnswerBalloonSimpleController subController = SubAnswerBalloonSimpleManager.Instance.GetOrCreateController(session.targetCharacter);
+                    if (subController != null)
+                    {
+                        subController.ModifyAnswerBalloonSimpleTextInfo(replyKo, replyJp, replyEn);
+                        string displayReply = replyEn;
+                        string currentLang = SettingManager.Instance.settings.ui_language;
+                        if (currentLang == "ko") displayReply = replyKo;
+                        else if (currentLang == "jp") displayReply = replyJp;
+                        subController.ModifyAnswerBalloonSimpleText(displayReply);
+                    }
+                }
+                else
+                {
+                    AnswerBalloonManager.Instance.ModifyAnswerBalloonTextInfo(replyKo, replyJp, replyEn);
+                    AnswerBalloonManager.Instance.ModifyAnswerBalloonText();
+                }
+
                 string answerVoice = answerOriginal;
-                
+
                 // UI 번역과 TTS 번역의 목표 언어가 같으면 중복 번역 방지
                 if (needUiTranslation && needTtsTranslation && uiLang == soundLang)
                 {
@@ -1064,59 +1185,67 @@ public class APIManager : MonoBehaviour
                         answerVoice = result?.Text ?? answerOriginal;
                     }
                 }
-                
+
                 Debug.Log($"[TTS_Flow] 2.번역종료 seq={seq} voice='{answerVoice.Substring(0, Math.Min(20, answerVoice.Length))}...'");
-                
+
                 // --- 3. TTS 요청 (선할당된 seq 사용) ---
                 TTSManager.Instance.MarkTtsInFlight(seq, answerVoice);
-                
+                string nickname = session.targetCharacter != null ? CharManager.Instance.GetNickname(session.targetCharacter) : null;
+                bool isSubCharacter = session.targetCharacter != null && session.targetCharacter != CharManager.Instance.GetCurrentCharacter();
+
                 if (soundLang == "ko" || soundLang == "en")
                 {
-                    TTSManager.Instance.GetKoWavFromAPI(answerVoice, chatIdx, seq, capturedSessionId);
+                    TTSManager.Instance.GetKoWavFromAPI(answerVoice, chatIdx, seq, capturedSessionId, nickname, isSubCharacter);
                 }
                 else // jp, ja
                 {
-                    TTSManager.Instance.GetJpWavFromAPI(answerVoice, chatIdx, seq, capturedSessionId);
+                    TTSManager.Instance.GetJpWavFromAPI(answerVoice, chatIdx, seq, capturedSessionId, nickname, isSubCharacter);
                 }
             }
         }
     }
 
     // 최종 반환 완료 시 호출될 함수
-    private void OnFinalResponseReceived()
+    private void OnFinalResponseReceived(AIChatSession session)
     {
         // 최종 응답이 비어있는지 체크
-        if (replyListKo.Count == 0)
+        if (session.replyListKo.Count == 0)
         {
             // 말풍선 숨기기 (표시된 경우)
             AnswerBalloonManager.Instance.HideAnswerBalloon();
             AnswerBalloonSimpleManager.Instance.HideAnswerBalloonSimple();
-            
+
             // EmotionBalloon 표시
-            EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), "No", 2f);
-            
+            GameObject fallbackTarget;
+            if (session.targetCharacter != null)
+            {
+                fallbackTarget = session.targetCharacter;
+            }
+            else
+            {
+                fallbackTarget = CharManager.Instance.GetActiveCharacter();
+            }
+            EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(fallbackTarget, "No", 2f);
+
             Debug.LogWarning("[APIManager] No valid response received from API - all sentences were filtered out");
             LogToFile("ProcessReply completed with no valid response.");
             NoticeManager.Instance.DeleteNoticeBalloonInstance();
-            
-            isCompleted = true;
-            return; // 이후 처리 스킵
+            return;
         }
-        
-        isCompleted = true;
-        AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteNormal();  // 대답완료 sprite
+
+        AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteNormal();
 
         Debug.Log("All replies have been received.");
         LogToFile("ProcessReply completed."); // ProcessReply 완료 로그
         NoticeManager.Instance.DeleteNoticeBalloonInstance();
 
         // 다국어 답변 조립
-        string replyKo = string.Join(" ", replyListKo);
-        string replyJp = string.Join(" ", replyListJp);
-        string replyEn = string.Join(" ", replyListEn);
+        string replyKo = string.Join(" ", session.replyListKo);
+        string replyJp = string.Join(" ", session.replyListJp);
+        string replyEn = string.Join(" ", session.replyListEn);
 
         // 표시언어에 따른 대표 메시지 선택
-        string reply = replyEn; // 기본값
+        string reply = replyEn;
         if (SettingManager.Instance.settings.ui_language == "ja" || SettingManager.Instance.settings.ui_language == "jp")
         {
             reply = replyJp;
@@ -1127,29 +1256,31 @@ public class APIManager : MonoBehaviour
         }
 
         Debug.Log("Answer Finished : " + reply);
-        
-        // 일반 대화로 저장
-        if (query_trans != "")  // 영어 번역이 필요한 LLM 사용시 번역기 답변
+
+        // 저장할 파일 이름 결정 (서브캐릭터면 닉네임, 아니면 null(기본값))
+        string nickname = null;
+        if (session.targetCharacter != null && session.targetCharacter != CharManager.Instance.GetCurrentCharacter())
         {
-            // 사용자 메시지 저장 (번역된 영어 버전)
-            MemoryManager.Instance.SaveConversationMemory("player", "user", query_trans, query_trans, query_trans, query_trans);
-            
-            // 캐릭터 응답 저장 (다국어 포함)
-            MemoryManager.Instance.SaveConversationMemory("character", "assistant", reply, replyKo, replyJp, replyEn);
+            nickname = CharManager.Instance.GetNickname(session.targetCharacter);
+            Debug.Log("[SubChat] memory target nickname : " + nickname);
+        }
+
+        // 메모리 저장
+        if (session.query_trans != "")  // 영어 번역이 필요한 LLM 사용시
+        {
+            MemoryManager.Instance.SaveConversationMemory("player", "user", session.query_trans, session.query_trans, session.query_trans, session.query_trans, nickname);
+            MemoryManager.Instance.SaveConversationMemory("character", "assistant", reply, replyKo, replyJp, replyEn, nickname);
         }
         else
         {
-            // 사용자 메시지 저장 (원본)
-            MemoryManager.Instance.SaveConversationMemory("player", "user", query_origin, query_origin, query_origin, query_origin);
-            
-            // 캐릭터 응답 저장 (다국어 포함)
-            MemoryManager.Instance.SaveConversationMemory("character", "assistant", reply, replyKo, replyJp, replyEn);
+            MemoryManager.Instance.SaveConversationMemory("player", "user", session.query_origin, session.query_origin, session.query_origin, session.query_origin, nickname);
+            MemoryManager.Instance.SaveConversationMemory("character", "assistant", reply, replyKo, replyJp, replyEn, nickname);
         }
     }
 
 
     // 스트리밍 데이터를 가져오는 메서드
-    public async Task FetchStreamingData(string url, Dictionary<string, string> data, byte[] screenshotBytes = null)
+    public async Task FetchStreamingData(string url, Dictionary<string, string> data, byte[] screenshotBytes = null, GameObject targetCharacter = null)
     {
         Debug.Log("FetchStreamingData START");
         string jsonData = JsonConvert.SerializeObject(data);
@@ -1161,10 +1292,8 @@ public class APIManager : MonoBehaviour
 
         try
         {
-            // 요청전 초기화
-            isCompleted = false;
-            isResponsedStarted = false;
-            isAnswerStarted = false;
+            // 세션 객체 생성
+            AIChatSession session = new AIChatSession(targetCharacter, curChatIdxNum);
 
             // HttpWebRequest 객체를 사용하여 요청 생성
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
@@ -1289,7 +1418,7 @@ public class APIManager : MonoBehaviour
                                     else  // replyType == "reply"
                                     {
                                         // 최초 수신
-                                        if (!isResponsedStarted)
+                                        if (!session.isResponsedStarted)
                                         {
                                             // 생각 중 말풍선 숨기기
                                             AnswerBalloonSimpleManager.Instance.HideAnswerBalloonSimple();
@@ -1297,14 +1426,21 @@ public class APIManager : MonoBehaviour
                                             // 안내 말풍선 숨기기
                                             NoticeManager.Instance.DeleteNoticeBalloonInstance();
 
-                                            AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
-                                            AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();  // 대답중 sprite
-                                            isResponsedStarted = true;
+                                            if (session.targetCharacter == null || session.targetCharacter == CharManager.Instance.GetCurrentCharacter())
+                                            {
+                                                AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
+                                                AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();  // 대답중 sprite
+                                            }
+                                            // 서브 캐릭터의 말풍선 표출은 ProcessReply 내부에서 텍스트가 들어올 때까지 지연 (빈 말풍선 노출 방지)
+                                            session.isResponsedStarted = true;
 
                                             // Debug.Log(jsonObject["query"]);
                                             // Debug.Log(jsonObject["query"]["text"]);
-                                            query_origin = jsonObject["query"]["origin"].ToString();
-                                            query_trans = jsonObject["query"]["text"].ToString();
+                                            session.query_origin = jsonObject["query"]["origin"].ToString();
+                                            session.query_trans = jsonObject["query"]["text"].ToString();
+
+                                            // 세션의 원문을 딕셔너리에 저장 (메모리 누수 방지 적용)
+                                            AddQueryOrigin(session.chatIdxNum, session.query_origin);
 
                                             // Setting - AI Info 내용 갱신
                                             try
@@ -1384,7 +1520,7 @@ public class APIManager : MonoBehaviour
                                             }
 
                                         }
-                                        ProcessReply(jsonObject); // 각 JSON 응답을 처리
+                                        ProcessReply(jsonObject, session); // 각 JSON 응답을 처리
                                     }
                                 }
                                 else
@@ -1407,17 +1543,19 @@ public class APIManager : MonoBehaviour
                             if (latestIntentSmallTalkAnswer == "on" && !string.IsNullOrEmpty(latestSmallTalkQuery))
                             {
                                 Debug.Log("[SmallTalk] Related conversation detected. Saving smalltalk first.");
+                                string memoryFilename = targetCharacter != null && targetCharacter != CharManager.Instance.GetCurrentCharacter() ? CharManager.Instance.GetNickname(targetCharacter) : null;
                                 MemoryManager.Instance.SaveConversationMemory(
                                     "character",
                                     "assistant",
                                     latestSmallTalkQuery,
                                     latestSmallTalkQuery,
                                     latestSmallTalkQuery,
-                                    latestSmallTalkQuery
+                                    latestSmallTalkQuery,
+                                    memoryFilename
                                 );
                             }
 
-                            OnFinalResponseReceived(); // 최종 반환 완료 시 함수 호출
+                            OnFinalResponseReceived(session); // 최종 반환 완료 시 함수 호출 (세션 전달)
                         }
                         else
                         {
@@ -1441,7 +1579,16 @@ public class APIManager : MonoBehaviour
             }
 
             Debug.Log("API error");
-            EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), "No", 2f);
+            GameObject fallbackTarget;
+            if (targetCharacter != null)
+            {
+                fallbackTarget = targetCharacter;
+            }
+            else
+            {
+                fallbackTarget = CharManager.Instance.GetActiveCharacter();
+            }
+            EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(fallbackTarget, "No", 2f);
             return;
         }
         catch (Exception ex)
@@ -1449,7 +1596,16 @@ public class APIManager : MonoBehaviour
             Debug.LogError($"Exception: {ex.Message}");
 
             Debug.Log("API error");
-            EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(CharManager.Instance.GetCurrentCharacter(), "No", 2f);
+            GameObject fallbackTarget;
+            if (targetCharacter != null)
+            {
+                fallbackTarget = targetCharacter;
+            }
+            else
+            {
+                fallbackTarget = CharManager.Instance.GetActiveCharacter();
+            }
+            EmotionBalloonManager.Instance.ShowEmotionBalloonForSec(fallbackTarget, "No", 2f);
             return;
         }
     }
@@ -1610,8 +1766,9 @@ public class APIManager : MonoBehaviour
         string streamUrl = baseUrl + "/conversation_stream";
         Debug.Log("streamUrl : " + streamUrl);
 
-        // 닉네임 가져오기
-        string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
+        // 닉네임 가져오기 (활성화된 서브 캐릭터 우선)
+        GameObject targetCharacter = CharManager.Instance.GetActiveCharacter();
+        string nickname = CharManager.Instance.GetNickname(targetCharacter);
         string player_name = SettingManager.Instance.settings.player_name;
         // string ui_language = SettingManager.Instance.settings.ui_language ?? "";  // 설정 ui에서 쓰는 언어에 따라가는 경향이 있음
         string ai_language = SettingManager.Instance.settings.ai_language ?? "";
@@ -1740,8 +1897,8 @@ public class APIManager : MonoBehaviour
                 // screenshot는 파일로 이미 저장되어 있음 (panel_capture.png)
             }
         }
-
-        var memory = MemoryManager.Instance.GetAllConversationMemory();
+        string targetNickname = targetCharacter != null ? CharManager.Instance.GetNickname(targetCharacter) : null;
+        var memory = MemoryManager.Instance.GetAllConversationMemory(targetNickname);
         string memoryJson = JsonConvert.SerializeObject(memory);
         string guidelineJson = UIUserCardManager.Instance.GetGuidelineListJson();
         string situationJson = UIChatSituationManager.Instance.GetCurUIChatSituationInfoJson();
@@ -1824,7 +1981,7 @@ public class APIManager : MonoBehaviour
             { "query_smalltalk", query_smalltalk}
         };
 
-        await FetchStreamingData(streamUrl, requestData, screenshotBytes);
+        await FetchStreamingData(streamUrl, requestData, screenshotBytes, targetCharacter);
     }
 
     // // Gemini 전용 대화 스트림 호출 함수(For Sample/Deprecated)
@@ -1846,8 +2003,9 @@ public class APIManager : MonoBehaviour
         string streamUrl = baseUrl + "/conversation_stream_gemini";
         Debug.Log("Gemini streamUrl : " + streamUrl);
 
-        // 닉네임 가져오기
-        string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
+        // 닉네임 가져오기 (활성화된 서브 캐릭터 우선)
+        GameObject targetCharacter = CharManager.Instance.GetActiveCharacter();
+        string nickname = CharManager.Instance.GetNickname(targetCharacter);
         string player_name = SettingManager.Instance.settings.player_name;
         string ai_language = SettingManager.Instance.settings.ai_language ?? "";
         string ai_language_in = ai_lang_in;  // stt 에서 가져온 언어 있으면 사용
@@ -1928,28 +2086,31 @@ public class APIManager : MonoBehaviour
         // 애니메이션 재생 초기화
         AnimationManager.Instance.Idle();
         
-        // 요청 전 초기화 (FetchStreamingData와 동일)
-        isCompleted = false;
-        isResponsedStarted = false;
-        query_origin = query;
-        query_trans = "";
+        // 닉네임 가져오기 (활성화된 서브 캐릭터 우선)
+        GameObject targetCharacter = CharManager.Instance.GetActiveCharacter();
+        int chatIdxNum = int.TryParse(chatIdx, out var idx) ? idx : 0;
+
+        // 세션 생성 및 초기화
+        AIChatSession session = new AIChatSession(targetCharacter, chatIdxNum);
+        session.query_origin = query;
+        session.query_trans = "";
+        AddQueryOrigin(session.chatIdxNum, session.query_origin);
         
         // TTS 세션 시작 (GeminiDirect는 FetchStreamingData를 거치지 않으므로 여기서 수행)
-        int chatIdxNum = int.TryParse(chatIdx, out var idx) ? idx : 0;
         TTSManager.Instance.BeginTtsSession(chatIdxNum);
         
         // 전송시작 말풍선
         NoticeManager.Instance.ShowNoticeEmotionBalloon("Time");
 
-        // 닉네임 가져오기
-        string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
+        // 변수 할당 시 targetCharacter는 위에서 이미 가져옴
+        string nickname = CharManager.Instance.GetNickname(targetCharacter);
         string player_name = SettingManager.Instance.settings.player_name;
         string ai_language = SettingManager.Instance.settings.ai_language ?? "";
         string ai_language_in = ai_lang_in;  // stt 에서 가져온 언어 있으면 사용
         string ai_language_out = SettingManager.Instance.settings.ai_language_out ?? "";
 
         // 메모리, 가이드라인, 상황 정보 가져오기
-        var memory = MemoryManager.Instance.GetAllConversationMemory();
+        var memory = MemoryManager.Instance.GetAllConversationMemory(nickname);
         
         // JSON을 List로 변환
         List<Dictionary<string, string>> memoryList = new List<Dictionary<string, string>>();
@@ -2007,8 +2168,8 @@ public class APIManager : MonoBehaviour
             guidelineList: guidelineList,
             situationDict: situationDict,
             chatIdx: chatIdx,
-            onChunkReceived: ProcessReplyGeminiDirect,
-            onComplete: () => OnFinalResponseReceived()
+            onChunkReceived: (chunk) => ProcessReplyGeminiDirect(chunk, session),
+            onComplete: () => OnFinalResponseReceived(session)
         );
     }
 
