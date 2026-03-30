@@ -49,13 +49,6 @@ public class APIAroPlaManager : MonoBehaviour
     }
 
 
-    public string GetFileName()
-    {
-        string filename = "aropla_conversation_memory.json";
-
-        return Path.Combine(Application.persistentDataPath, filename);
-    }
-    
     // 아로프라 채널 상태
     private bool isAroplaMode = false;
     private bool isProcessing = false;
@@ -112,7 +105,7 @@ public class APIAroPlaManager : MonoBehaviour
         try
         {
             // MemoryManager의 새로운 오버로드 메서드 사용
-            MemoryManager.Instance.SaveConversationMemory(speaker, role, message, messageKo, messageJp, messageEn, filename: GetFileName());
+            MemoryManager.Instance.SaveConversationMemory(speaker, role, message, messageKo, messageJp, messageEn, "aropla");
             
             LogToFile($"Saved to memory: {role} - {speaker} - {message}");
             AroplaLog($"Memory saved: {role}/{speaker} - {message.Substring(0, Math.Min(50, message.Length))}...");
@@ -290,7 +283,7 @@ public class APIAroPlaManager : MonoBehaviour
         try
         {
             // 아로프라 방식: 확장된 메모리 사용
-            var memory = MemoryManager.Instance.GetAllConversationMemory(filename: GetFileName());
+            var memory = MemoryManager.Instance.GetAllConversationMemory("aropla");
             string memoryJson = JsonConvert.SerializeObject(memory);
             
             // APIManager와 동일한 Dictionary<string, string> 방식으로 데이터 구성
@@ -509,7 +502,7 @@ public class APIAroPlaManager : MonoBehaviour
         }
 
         // 6. 다음 발화자 결정
-        var updatedMemories = MemoryManager.Instance.GetAllConversationMemory(filename: GetFileName());
+        var updatedMemories = MemoryManager.Instance.GetAllConversationMemory("");
         string updatedMemoryJson = JsonConvert.SerializeObject(updatedMemories);
         var updatedMemoryList = ParseMemoryJsonToList(updatedMemoryJson);
 
@@ -587,7 +580,7 @@ public class APIAroPlaManager : MonoBehaviour
         {
             // 마지막 메시지를 가져와서 전달 (MemoryManager 기반)
             string lastMessage = "";
-            var memories = MemoryManager.Instance.GetAllConversationMemory(filename: GetFileName());
+            var memories = MemoryManager.Instance.GetAllConversationMemory("aropla");
             if (memories.Count > 0)
             {
                 var lastMemory = memories[memories.Count - 1];
@@ -793,7 +786,7 @@ public class APIAroPlaManager : MonoBehaviour
         nextSpeakerBalloon = EmotionBalloonManager.Instance.SetEmotionBalloonForTarget(
             targetCharacter, 
             nextSpeaker, 
-            300f  // 충분히 긴 시간 (다음 답변이 오면 제거됨)
+            3f  // 3초정도만 유지
         );
         
         AroplaLog($"🎯 Next speaker balloon shown: {speaker} -> {nextSpeaker}");
@@ -1256,6 +1249,12 @@ public class APIAroPlaManager : MonoBehaviour
 
         // 프라나 핸들러 설정
         SetPlanaHandlers();
+        
+        // 회전 관리를 위한 PhysicsHandler 추가
+        if (planaInstance.GetComponent<PhysicsHandler>() == null)
+        {
+            planaInstance.AddComponent<PhysicsHandler>();
+        }
 
         LogToFile($"Plana instance created at position: {planaPosition}");
     }
@@ -1504,13 +1503,13 @@ public class APIAroPlaManager : MonoBehaviour
     // 아로프라 전용 메모리 관리 메서드들
     public int GetAroplaConversationCount()
     {
-        return MemoryManager.Instance.GetAllConversationMemory(filename: GetFileName()).Count;
+        return MemoryManager.Instance.GetAllConversationMemory("aropla").Count;
     }
 
     // 마지막 대화 삭제 (MemoryManager 기반)
     public void DeleteLastAroplaConversation()
     {
-        MemoryManager.Instance.DeleteRecentDialogue(filename: GetFileName());
+        MemoryManager.Instance.DeleteRecentDialogue("aropla");
         LogToFile("Deleted last conversation via MemoryManager");
     }
     
@@ -1520,7 +1519,7 @@ public class APIAroPlaManager : MonoBehaviour
         var messages = new List<string>();
         try
         {
-            var memories = MemoryManager.Instance.GetMessagesInLanguage(language, filename: GetFileName());
+            var memories = MemoryManager.Instance.GetMessagesInLanguage(language, "aropla");
             foreach (var memory in memories)
             {
                 string messageText = language switch
@@ -1548,7 +1547,7 @@ public class APIAroPlaManager : MonoBehaviour
     public List<Conversation> GetConversationHistory()
     {
         // 아로프라 방식: MemoryManager를 통해 대화 히스토리 반환
-        return MemoryManager.Instance.GetAllConversationMemory(GetFileName());
+        return MemoryManager.Instance.GetAllConversationMemory("aropla");
     }
     
     // 아로나 위치 업데이트 (캐릭터 변경시 등에 사용) - 메인 캐릭터이므로 불필요

@@ -56,7 +56,7 @@ public class MemoryManager : MonoBehaviour
         }
     }
 
-    private string GetFileName()
+    public string GetFileName(string targetNickname = null)
     {
         // Operator 모드일 경우
         if (ChatModeManager.Instance.IsAroplaMode())
@@ -64,7 +64,7 @@ public class MemoryManager : MonoBehaviour
             return Path.Combine(Application.persistentDataPath, "aropla_conversation_memory.json");
         }
 
-        string nickname = CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter());
+        string nickname = string.IsNullOrEmpty(targetNickname) ? CharManager.Instance.GetNickname(CharManager.Instance.GetCurrentCharacter()) : targetNickname;
         string filename = "conversation_memory_" + nickname + ".json";
 
         return Path.Combine(Application.persistentDataPath, filename);
@@ -96,10 +96,10 @@ public class MemoryManager : MonoBehaviour
     }
     
     // 확장된 대화 저장 (새로운 구조)
-    public void SaveConversationMemory(string speaker, string role, string message, string messageKo, string messageJp, string messageEn, string filename = null)
+    public void SaveConversationMemory(string speaker, string role, string message, string messageKo, string messageJp, string messageEn, string targetNickname = null)
     {
-        string targetFile = string.IsNullOrEmpty(filename) ? GetFileName() : filename;
-        List<Conversation> data = GetAllMemory(filename);
+        string targetFile = GetFileName(targetNickname);
+        List<Conversation> data = GetAllMemory(targetNickname);
 
         data.Add(new Conversation
         {
@@ -121,10 +121,10 @@ public class MemoryManager : MonoBehaviour
     }
 
     // 시스템 메시지 저장 (트리거, intent ask 등)
-    public void SaveSystemMemory(string speaker, string role, string message, string messageKo, string messageJp, string messageEn, string filename = null)
+    public void SaveSystemMemory(string speaker, string role, string message, string messageKo, string messageJp, string messageEn, string targetNickname = null)
     {
-        string targetFile = string.IsNullOrEmpty(filename) ? GetFileName() : filename;
-        List<Conversation> data = GetAllMemory(filename);
+        string targetFile = GetFileName(targetNickname);
+        List<Conversation> data = GetAllMemory(targetNickname);
 
         data.Add(new Conversation
         {
@@ -156,51 +156,51 @@ public class MemoryManager : MonoBehaviour
     }
 
     // 모든 메모리 불러오기 (필터링 없음 - 시스템 메시지 포함)
-    public List<Conversation> GetAllMemory(string filename = null)
+    public List<Conversation> GetAllMemory(string targetNickname = null)
     {
-        string fileName = string.IsNullOrEmpty(filename) ? GetFileName() : filename;
+        string fileName = GetFileName(targetNickname);
         if (!File.Exists(fileName))
         {
             return new List<Conversation>();
         }
 
-        string json = File.ReadAllText(fileName);
-        return JsonConvert.DeserializeObject<List<Conversation>>(json) ?? new List<Conversation>();
+            string json = File.ReadAllText(fileName);
+            return JsonConvert.DeserializeObject<List<Conversation>>(json) ?? new List<Conversation>();
     }
 
     // 모든 대화 불러오기 (type="conversation"만 반환)
-    public List<Conversation> GetAllConversationMemory(string filename = null)
+    public List<Conversation> GetAllConversationMemory(string targetNickname = null)
     {
-        var allData = GetAllMemory(filename);
+        var allData = GetAllMemory(targetNickname);
         
         // type이 null이거나 "conversation"인 것만 반환 (기존 호환성)
         return allData.Where(c => string.IsNullOrEmpty(c.type) || c.type == "conversation").ToList();
     }
 
     // 최신 대화 가져오기
-    public List<Conversation> GetLatestConversationMemory(int conversationMemoryNumber, string filename = null)
+    public List<Conversation> GetLatestConversationMemory(int conversationMemoryNumber, string targetNickname = null)
     {
-        List<Conversation> data = GetAllConversationMemory(filename);
+        List<Conversation> data = GetAllConversationMemory(targetNickname);
         return data.Skip(Mathf.Max(0, data.Count - conversationMemoryNumber)).ToList();
     }
 
     // 대화 초기화
-    public void ResetConversationMemory(string filename = null)
+    public void ResetConversationMemory(string targetNickname = null)
     {
-        string targetFile = string.IsNullOrEmpty(filename) ? GetFileName() : filename;
+        string targetFile = GetFileName(targetNickname);
         File.WriteAllText(targetFile, JsonConvert.SerializeObject(new List<Conversation>(), Formatting.Indented));
     }
 
     // 대화 내용 초기화 및 안내
-    public void ResetConversationMemoryAndGuide(string filename = null)
+    public void ResetConversationMemoryAndGuide(string targetNickname = null)
     {
-        // Operator 모드일 경우
+        // Operator 모드일 경우 (targetNickname이 들어가도 상관없도록 기본 GetFileName이 핸들링함)
         if (ChatModeManager.Instance.IsAroplaMode())
         {
-            filename = APIAroPlaManager.Instance.GetFileName();
+            targetNickname = "aropla";
         }
 
-        ResetConversationMemory(filename);
+        ResetConversationMemory(targetNickname);
         AnswerBalloonSimpleManager.Instance.ShowAnswerBalloonSimpleInf();
         AnswerBalloonSimpleManager.Instance.ModifyAnswerBalloonSimpleText("Memory Erased");
         UIChatHistoryManager.Instance.ClearChatHistory();
@@ -208,12 +208,12 @@ public class MemoryManager : MonoBehaviour
     }
 
     // 최대 길이만큼의 대화 가져오기
-    public (List<Conversation>, int, int) GetTruncatedConversationMemory(int maxLen = 2048, string filename = null)
+    public (List<Conversation>, int, int) GetTruncatedConversationMemory(int maxLen = 2048, string targetNickname = null)
     {
         var (greetingList, greetingLen) = GetGreetingDialogue();
         maxLen -= greetingLen;
 
-        List<Conversation> conversationMemory = GetAllConversationMemory(filename);
+        List<Conversation> conversationMemory = GetAllConversationMemory(targetNickname);
         List<Conversation> truncatedMemory = new List<Conversation>();
 
         int memoryLen = 0;
@@ -259,10 +259,10 @@ public class MemoryManager : MonoBehaviour
     }
 
     // 마지막 대화 삭제
-    public void DeleteRecentDialogue(string filename = null)
+    public void DeleteRecentDialogue(string targetNickname = null)
     {
-        string targetFile = string.IsNullOrEmpty(filename) ? GetFileName() : filename;
-        List<Conversation> data = GetAllConversationMemory(filename);
+        string targetFile = GetFileName(targetNickname);
+        List<Conversation> data = GetAllConversationMemory(targetNickname);
         if (data.Count > 0)
         {
             data.RemoveAt(data.Count - 1);
@@ -273,9 +273,9 @@ public class MemoryManager : MonoBehaviour
     }
     
     // 특정 언어로 메시지 가져오기
-    public List<Conversation> GetMessagesInLanguage(string language, string filename = null)
+    public List<Conversation> GetMessagesInLanguage(string language, string targetNickname = null)
     {
-        var memories = GetAllConversationMemory(filename);
+        var memories = GetAllConversationMemory(targetNickname);
         return memories.Where(m => 
         {
             return language switch
