@@ -5,6 +5,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 
 [Serializable]
 public class CharacterDatabaseData
@@ -25,6 +27,33 @@ public class ChangeCharClothesInfo
     public string text;           // UI에 표시될 의상 텍스트 (예: "< 교복 >")
     public string spriteAddress;  // 해당 의상을 입었을 때의 캐릭터 아이콘의 Address
     public string prefabAddress;  // 인게임에서 교체될 실제 3D 모델(프리팹)의 Address
+                                  // "2d_general" 이면 공용 2D 프리팹 특수 로직 사용
+
+    // 2d_general 전용 - Addressable AnimatorController 주소
+    public string animatorControllerAddress;
+
+    // 2d_general 전용 - CharAttributes 주입값 (JSON에서 직접 관리)
+    public string charAttr_nickname;
+    public string charAttr_charcode;
+    public string charAttr_voicePath = "default";
+    public string charAttr_type = "2D";
+    public bool   charAttr_is2DWalkDirectionRight = true;  // 일반 캐릭터도 JSON에서 관리
+    public bool   charAttr_isMain = true;
+
+    // 2d_general 전용 - 각 상태별 Blend Tree 클립 갯수 (AnimationBlendController에 주입)
+    public int blendCount_idle   = 1;
+    public int blendCount_talk   = 1;
+    public int blendCount_listen = 1;
+    public int blendCount_pat    = 1;
+    public int blendCount_walk   = 1;
+    public int blendCount_pick   = 1;
+
+    // 2d_general 전용 - Clothes 매핑 (빈값이면 매핑 없음)
+    public string toggleClothesAddress;   // CharAttributes.toggleClothes 에 주입할 GameObject Address
+    public string changeClothesAddress;   // CharAttributes.changeClothes 에 주입할 GameObject Address
+
+    // Collider/DragHandler 주입값 (0이면 프리팹 기본값 유지)
+    public float  headPatThreshold;       // DragHandler.headPatThreshold
 }
 
 [Serializable]
@@ -60,6 +89,9 @@ public class ChangeCharManager : MonoBehaviour
     [SerializeField] private Image GridToggleBtnImage;
     [SerializeField] private Sprite gridListSprite;
     [SerializeField] private Sprite gridGridSprite;
+    
+    // 중앙 관리용 Fallback Sprite
+    [HideInInspector] public Sprite fallbackSprite;
 
     [Header("UI Rect Components")]
     [SerializeField] private RectTransform uIParentRect; // 변경할 UI 패널
@@ -100,6 +132,108 @@ public class ChangeCharManager : MonoBehaviour
 
         // UI 생성 전에 미리 즐겨찾기 데이터를 디스크에서 로드하여 DB에 덮어씌움
         LoadFavorites();
+        
+        // 중앙 관리용 Fallback Sprite 동기 로딩
+        LoadFallbackSprite();
+
+        // Remote 카탈로그 업데이트 체크 (백그라운드)
+        StartCoroutine(CheckCatalogUpdates());
+        
+        // 원격 카탈로그 초기화 후 DLC 로딩 진단 정보 출력 (개발/테스트용)
+        TestDLC();
+    }
+
+    private void LoadFallbackSprite()
+    {
+        try
+        {
+            var handle = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<Sprite>("sensei_sprite");
+            fallbackSprite = handle.WaitForCompletion();
+            
+            if (fallbackSprite == null)
+            {
+                Debug.LogWarning("Fallback sprite 'sensei_sprite' could not be loaded. Please check Addressables.");
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError("Exception loading fallback sprite: " + e.Message);
+        }
+    }
+
+    // Remote 카탈로그 업데이트 체크 (GitHub Releases에서 최신 카탈로그 동기화)
+    private IEnumerator CheckCatalogUpdates()
+    {
+        Debug.Log("[DLC] 카탈로그 업데이트 체크 시작...");
+
+        // Addressables 카탈로그 업데이트 체크
+        var checkHandle = Addressables.CheckForCatalogUpdates(false);
+        yield return checkHandle;
+
+        if (checkHandle.Status == AsyncOperationStatus.Succeeded)
+        {
+            if (checkHandle.Result != null && checkHandle.Result.Count > 0)
+            {
+                Debug.Log($"[DLC] 카탈로그 업데이트 발견: {checkHandle.Result.Count}개");
+                foreach (string catalogId in checkHandle.Result)
+                {
+                    Debug.Log($"[DLC]   - 카탈로그: {catalogId}");
+                }
+
+                var updateHandle = Addressables.UpdateCatalogs(checkHandle.Result, false);
+                yield return updateHandle;
+
+                if (updateHandle.Status == AsyncOperationStatus.Succeeded)
+                {
+                    Debug.Log("[DLC] 카탈로그 업데이트 완료 (성공)");
+                }
+                else
+                {
+                    Debug.LogError($"[DLC] 카탈로그 업데이트 실패: {updateHandle.OperationException?.Message}");
+                }
+                Addressables.Release(updateHandle);
+            }
+            else
+            {
+                Debug.Log("[DLC] 카탈로그 최신 상태 (업데이트 없음)");
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"[DLC] 카탈로그 체크 실패: {checkHandle.OperationException?.Message}");
+        }
+
+        Addressables.Release(checkHandle);
+    }
+
+    private async void TestDLC()
+    {
+        Debug.Log("--- [DLC] plana_ball 진단 시작 ---");
+        var locs = UnityEngine.AddressableAssets.Addressables.LoadResourceLocationsAsync("plana_ball");
+        await locs.Task;
+        if (locs.Result != null && locs.Result.Count > 0)
+        {
+            Debug.Log($"[DLC] 'plana_ball' 등록 위치 ({locs.Result.Count}개):");
+            foreach (var loc in locs.Result)
+            {
+                string bundleId = (loc.Dependencies != null && loc.Dependencies.Count > 0) ? loc.Dependencies[0].InternalId : "no_deps";
+                Debug.Log($"[DLC]   - Asset InternalId: {loc.InternalId}");
+                Debug.Log($"[DLC]   - Asset Provider: {loc.ProviderId}");
+                Debug.Log($"[DLC]   - Bundle 경로: {bundleId}");
+                Debug.Log($"[DLC]   - 그룹 위치: {(bundleId.StartsWith("http") ? "REMOTE ☁" : "LOCAL 📦")}");
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[DLC] 카탈로그에서 'plana_ball'을 찾을 수 없습니다.");
+        }
+        UnityEngine.AddressableAssets.Addressables.Release(locs);
+
+        var sizeHandle = UnityEngine.AddressableAssets.Addressables.GetDownloadSizeAsync("plana_ball");
+        await sizeHandle.Task;
+        Debug.Log($"[DLC] 'plana_ball' 다운로드 필요 용량: {sizeHandle.Result} bytes");
+        UnityEngine.AddressableAssets.Addressables.Release(sizeHandle);
+        Debug.Log("--- [DLC] 진단 종료 ---");
     }
 
     void Start()

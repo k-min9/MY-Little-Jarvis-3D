@@ -37,18 +37,45 @@ public class ChangeCharListSlotController : MonoBehaviour
 
     private async void LoadSpriteFromAddressable(string address)
     {
-        if (string.IsNullOrEmpty(address)) return;
-
-        AsyncOperationHandle<Sprite> handle = Addressables.LoadAssetAsync<Sprite>(address);
-        await handle.Task;
-
-        if (handle.Status == AsyncOperationStatus.Succeeded)
+        // 1. 주소가 비어있으면 바로 Fallback 시도
+        if (string.IsNullOrEmpty(address))
         {
-            characterIcon.sprite = handle.Result;
+            ApplyFallbackSprite();
+            return;
+        }
+
+        try
+        {
+            AsyncOperationHandle<Sprite> handle = Addressables.LoadAssetAsync<Sprite>(address);
+            await handle.Task;
+
+            if (handle.Status == AsyncOperationStatus.Succeeded)
+            {
+                characterIcon.sprite = handle.Result;
+            }
+            else
+            {
+                Debug.LogWarning($"Failed to load sprite: {address}. Trying fallback...");
+                ApplyFallbackSprite();
+            }
+        }
+        catch
+        {
+            // 예외 발생 시(잘못된 주소 등)에도 Fallback 시도
+            Debug.LogWarning($"Exception loading sprite: {address}. Trying fallback...");
+            ApplyFallbackSprite();
+        }
+    }
+
+    private void ApplyFallbackSprite()
+    {
+        if (ChangeCharManager.Instance.fallbackSprite != null)
+        {
+            characterIcon.sprite = ChangeCharManager.Instance.fallbackSprite;
         }
         else
         {
-            Debug.LogError($"Failed to load sprite from addressable: {address}");
+            Debug.LogError("CRITICAL: Fallback sprite is missing in ChangeCharManager!");
         }
     }
 
@@ -92,27 +119,65 @@ public class ChangeCharListSlotController : MonoBehaviour
         // 리스트 슬롯에서는 의상 변경 기능 없이 기본(첫 번째) 의상만 사용하므로 Index 0으로 고정
         if (charData != null && charData.clothesList.Count > 0)
         {
-            ChangeCharClothesInfo currentClothes = charData.clothesList[0];
-            LoadAndChangeCharacter(currentClothes.prefabAddress);
+            LoadAndChangeCharacter(charData.clothesList[0]);
         }
     }
 
-    private async void LoadAndChangeCharacter(string address)
+    private async void LoadAndChangeCharacter(ChangeCharClothesInfo clothes)
     {
-        if (string.IsNullOrEmpty(address)) return;
+        if (string.IsNullOrEmpty(clothes.prefabAddress)) return;
 
-        AsyncOperationHandle<GameObject> handle = Addressables.LoadAssetAsync<GameObject>(address);
+        // 공용 2d_general
+        if (clothes.prefabAddress == "2d_general")
+        {
+            await CharManager.Instance.ChangeCharacter2DGeneral(clothes);
+            return;
+        }
+
+        // DLC 다운로드 필요 여부 체크
+        try
+        {
+            var sizeHandle = Addressables.GetDownloadSizeAsync(clothes.prefabAddress);
+            await sizeHandle.Task;
+            long downloadSize = (sizeHandle.Status == AsyncOperationStatus.Succeeded) ? sizeHandle.Result : 0;
+            Addressables.Release(sizeHandle);
+
+            if (downloadSize > 0)
+            {
+                Debug.Log($"[DLC] 중앙 DownloadManager를 통해 다운로드 시도: {clothes.prefabAddress} ({downloadSize} bytes)");
+
+                DownloadManager.Instance.RequestAddressableDownload(clothes.prefabAddress, downloadSize, (success) =>
+                {
+                    if (success)
+                    {
+                        Debug.Log($"[DLC] 다운로드 완료: {clothes.prefabAddress}");
+                        // 스프라이트 갱신
+                        LoadSpriteFromAddressable(clothes.spriteAddress);
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[DLC] 다운로드 취소 또는 실패: {clothes.prefabAddress}");
+                    }
+                });
+                return; // 이번 클릭에서는 다운로드 창 띄우고 종료, 다음 클릭에서 실제로 변경됨
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[DLC] 다운로드 체크 스킵: {clothes.prefabAddress} - {e.Message}");
+        }
+
+        // 일반 프리팹 교체 로직 (로컬 또는 이미 다운로드된 에셋)
+        AsyncOperationHandle<GameObject> handle = Addressables.LoadAssetAsync<GameObject>(clothes.prefabAddress);
         await handle.Task;
 
         if (handle.Status == AsyncOperationStatus.Succeeded)
         {
-            // 의존성이 있거나 복잡한 구동방식 때문에, 인스턴스화 하지 않고 CharManager로 원본 프리팹만 전달하도록 가정
-            // (만약 기존에도 Asset 참조를 넘겼다면 결과값을 그대로 전달)
-            CharManager.Instance.ChangeCharacterFromGameObject(handle.Result);
+            CharManager.Instance.ChangeCharacterFromDLC(handle.Result);
         }
         else
         {
-             Debug.LogError($"Failed to load character prefab from addressable: {address}");
+            Debug.LogError($"Failed to load character prefab from addressable: {clothes.prefabAddress}");
         }
     }
 }

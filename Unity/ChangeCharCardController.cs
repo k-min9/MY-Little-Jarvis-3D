@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -121,18 +122,83 @@ public class ChangeCharCardController : MonoBehaviour
         // 점(Dot) 색상 업데이트 호출
         UpdatePaginationDotsUI();
 
-        if (string.IsNullOrEmpty(currentClothes.spriteAddress)) return;
-
-        AsyncOperationHandle<Sprite> handle = Addressables.LoadAssetAsync<Sprite>(currentClothes.spriteAddress);
-        await handle.Task;
-
-        if (handle.Status == AsyncOperationStatus.Succeeded)
+        if (string.IsNullOrEmpty(currentClothes.spriteAddress))
         {
-            characterIcon.sprite = handle.Result;
+            ApplyFallbackSprite();
+            return;
+        }
+
+        // 프리팹 다운로드 여부 먼저 확인: 미다운로드면 fallback
+        if (!string.IsNullOrEmpty(currentClothes.prefabAddress) && currentClothes.prefabAddress != "2d_general")
+        {
+            try
+            {
+                var sizeHandle = Addressables.GetDownloadSizeAsync(currentClothes.prefabAddress);
+                await sizeHandle.Task;
+                long pendingSize = (sizeHandle.Status == AsyncOperationStatus.Succeeded) ? sizeHandle.Result : 0;
+                Addressables.Release(sizeHandle);
+
+                if (pendingSize > 0)
+                {
+                    Debug.Log($"[DLC] 프리팹 미다운로드 ({pendingSize} bytes) → fallback 표시: {currentClothes.prefabAddress}");
+                    ApplyFallbackSprite();
+                    return;
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[DLC] 다운로드 사이즈 체크 실패, 스프라이트 로드 시도: {e.Message}");
+            }
+        }
+
+        // 프리팹이 다운로드된 경우에만 실제 스프라이트 로드
+        try
+        {
+            AsyncOperationHandle<Sprite> handle = Addressables.LoadAssetAsync<Sprite>(currentClothes.spriteAddress);
+            await handle.Task;
+
+            if (handle.Status == AsyncOperationStatus.Succeeded)
+            {
+                characterIcon.sprite = handle.Result;
+                // 실제 로드 출처 확인 (번들 파일 경로 = 로컬/리모트 판별)
+                var locs = Addressables.LoadResourceLocationsAsync(currentClothes.spriteAddress);
+                await locs.Task;
+                if (locs.Result != null && locs.Result.Count > 0)
+                {
+                    var loc = locs.Result[0];
+                    string assetId  = loc.InternalId;
+                    string bundleId = (loc.Dependencies != null && loc.Dependencies.Count > 0)
+                                       ? loc.Dependencies[0].InternalId : "no_deps";
+                    bool isRemote   = bundleId.StartsWith("http");
+                    Debug.Log($"[DLC] 스프라이트 로드 성공: {currentClothes.spriteAddress}\n" +
+                              $"  그룹: {(isRemote ? "REMOTE(DLC) ☁" : "LOCAL 📦")}\n" +
+                              $"  에셋ID: {assetId}\n" +
+                              $"  번들: {bundleId}");
+                }
+                Addressables.Release(locs);
+            }
+            else
+            {
+                Debug.LogWarning($"Failed to load sprite from addressable: {currentClothes.spriteAddress}. Trying fallback...");
+                ApplyFallbackSprite();
+            }
+        }
+        catch
+        {
+            Debug.LogWarning($"Exception loading sprite: {currentClothes.spriteAddress}. Trying fallback...");
+            ApplyFallbackSprite();
+        }
+    }
+
+    private void ApplyFallbackSprite()
+    {
+        if (ChangeCharManager.Instance.fallbackSprite != null)
+        {
+            characterIcon.sprite = ChangeCharManager.Instance.fallbackSprite;
         }
         else
         {
-            Debug.LogError($"Failed to load sprite from addressable: {currentClothes.spriteAddress}");
+            Debug.LogError("CRITICAL: Fallback sprite is missing in ChangeCharManager!");
         }
     }
 
@@ -180,16 +246,57 @@ public class ChangeCharCardController : MonoBehaviour
         
         if (string.IsNullOrEmpty(currentClothes.prefabAddress)) return;
 
+        // 공용 2d_general
+        if (currentClothes.prefabAddress == "2d_general")
+        {
+            await CharManager.Instance.ChangeCharacter2DGeneral(currentClothes);
+            return;
+        }
+
+        // DLC 다운로드 필요 여부 체크
+        try
+        {
+            var sizeHandle = Addressables.GetDownloadSizeAsync(currentClothes.prefabAddress);
+            await sizeHandle.Task;
+            long downloadSize = (sizeHandle.Status == AsyncOperationStatus.Succeeded) ? sizeHandle.Result : 0;
+            Addressables.Release(sizeHandle);
+
+            if (downloadSize > 0)
+            {
+                Debug.Log($"[DLC] 중앙 DownloadManager를 통해 다운로드 시도: {currentClothes.prefabAddress} ({downloadSize} bytes)");
+
+                DownloadManager.Instance.RequestAddressableDownload(currentClothes.prefabAddress, downloadSize, (success) =>
+                {
+                    if (success)
+                    {
+                        Debug.Log($"[DLC] 다운로드 완료: {currentClothes.prefabAddress}");
+                        // UI 갱신 (스프라이트 표시)
+                        UpdateClothesUI();
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[DLC] 다운로드 취소 또는 실패: {currentClothes.prefabAddress}");
+                    }
+                });
+                return; // 이번 클릭에서는 다운로드 창 띄우고 종료, 다음 클릭에서 실제로 변경됨
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[DLC] 다운로드 체크 스킵: {currentClothes.prefabAddress} - {e.Message}");
+        }
+
+        // 일반 프리팹 교체 로직 (로컬 또는 이미 다운로드된 에셋)
         AsyncOperationHandle<GameObject> handle = Addressables.LoadAssetAsync<GameObject>(currentClothes.prefabAddress);
         await handle.Task;
 
         if (handle.Status == AsyncOperationStatus.Succeeded)
         {
-             CharManager.Instance.ChangeCharacterFromGameObject(handle.Result);
+            CharManager.Instance.ChangeCharacterFromDLC(handle.Result);
         }
         else
         {
-             Debug.LogError($"Failed to load character prefab from addressable: {currentClothes.prefabAddress}");
+            Debug.LogError($"Failed to load character prefab from addressable: {currentClothes.prefabAddress}");
         }
     }
 }
