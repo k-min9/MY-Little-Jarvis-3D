@@ -200,7 +200,7 @@ public class AnswerBalloonManager : MonoBehaviour
         // 기존 음성 중지 및 초기화
         VoiceManager.Instance.ResetAudio();
 
-        string input = APIManager.Instance.query_origin;
+        string input = APIManager.Instance.GetQueryOrigin(GameManager.Instance.chatIdx);
         GameManager.Instance.chatIdx += 1;
         GameManager.Instance.chatIdxRegenerateCount += 1;
         Debug.Log("Regenerate 텍스트 (" + GameManager.Instance.chatIdx.ToString() + ") : " + input);
