@@ -122,8 +122,6 @@ public class AnswerBalloonSimpleManager : MonoBehaviour
         // 높이 조정
         float textHeight = answerBalloonSimpleText.preferredHeight;
         answerBalloonSimpleTransform.sizeDelta = new Vector2(answerBalloonSimpleTransform.sizeDelta.x, textHeight + 60);
-
-        
     }
 
     // 언어전환을 고려한 string setting
@@ -155,6 +153,18 @@ public class AnswerBalloonSimpleManager : MonoBehaviour
     // AnswerBalloonSimple을 숨기는 함수
     public void HideAnswerBalloonSimple()
     {
+        // 서브 캐릭터 라우팅
+        GameObject activeChar = CharManager.Instance?.GetActiveCharacter();
+        if (activeChar != null && CharManager.Instance != null && CharManager.Instance.activeCharacter != null)
+        {
+            SubAnswerBalloonSimpleController subController = SubAnswerBalloonSimpleManager.Instance?.GetOrCreateController(CharManager.Instance.activeCharacter);
+            if (subController != null)
+            {
+                subController.HideAnswerBalloonSimple();
+                return;
+            }
+        }
+
         // Operator 모드일 경우 PortraitBalloonSimpleManager로 라우팅
         if (ChatModeManager.Instance.IsOperatorMode())
         {
