@@ -23,6 +23,7 @@ public class ChatBalloonManager : MonoBehaviour
 
     [SerializeField] private Canvas _canvas; // chatBalloon 이미지
     [SerializeField] private GameObject chatBalloon; // chatBalloon 이미지
+    public bool IsChatBalloonActive() { return chatBalloon != null && chatBalloon.activeSelf; }
     [SerializeField] public RectTransform characterTransform; // chatBalloon이 표시될 캐릭터의 Transform
     public GameObject clickedCharacter; // Aropla 모드에서 클릭한 캐릭터 (arona 또는 plana 인스턴스)
     [SerializeField] private RectTransform chatBalloonTransform; // chatBalloon의 Transform
@@ -124,8 +125,14 @@ public class ChatBalloonManager : MonoBehaviour
     // 상태 갱신 로직
     private void Update()
     {
+        // 비활성화 일 경우 별도 작업 없음
+        if (!chatBalloon.activeSelf)
+        {
+            return;
+        }
+
         // ESC로 말풍선 닫기
-        if (chatBalloon.activeSelf && Input.GetKeyDown(KeyCode.Escape))
+        if (Input.GetKeyDown(KeyCode.Escape))
         {
             HideChatBalloon();
             return;
@@ -138,7 +145,7 @@ public class ChatBalloonManager : MonoBehaviour
             return;
         }
 
-        if (StatusManager.Instance.IsChatting && chatBalloon.activeSelf && chatBalloonMode == "char")  // activeSelf : 활성화 여부
+        if (chatBalloonMode == "char")
         {
             UpdateChatBalloonPosition();
         }
@@ -168,6 +175,7 @@ public class ChatBalloonManager : MonoBehaviour
                 AnimationManager.Instance.ListenDisable();
             }
             clickedCharacter = null; // 초기화
+            CharManager.Instance.SetActiveCharacter(null); // 서브 캐릭터 타겟 초기화 (메인 원복)
         }
         chatBalloonMode = "off";
 //         // 안드로이드 테스트용
@@ -225,8 +233,8 @@ public class ChatBalloonManager : MonoBehaviour
     // chatBalloon의 위치를 캐릭터 바로 위로 조정하는 함수
     private void UpdateChatBalloonPosition()
     {
-        // Aropla 모드일 때는 clickedCharacter의 RectTransform 사용
         RectTransform targetTransform = characterTransform;
+        // Aropla 모드일 때는 clickedCharacter의 RectTransform 사용
         if (ChatModeManager.Instance.IsAroplaMode() && clickedCharacter != null)
         {
             RectTransform clickedRect = clickedCharacter.GetComponent<RectTransform>();
@@ -243,7 +251,7 @@ public class ChatBalloonManager : MonoBehaviour
         float leftBound = -canvasRect.rect.width / 2; // 캔버스 왼쪽 끝
         float rightBound = canvasRect.rect.width / 2; // 캔버스 오른쪽 끝
         float charPositionX = Mathf.Clamp(charPosition.x, leftBound + 250, rightBound - 250);
-
+        
         // chatBalloonTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 270 * SettingManager.Instance.settings.char_size / 100f); // Y축 창크기 270만큼
         chatBalloonTransform.anchoredPosition = new Vector2(charPositionX, charPosition.y + 200 * SettingManager.Instance.settings.char_size / 100f + 100);
     }
