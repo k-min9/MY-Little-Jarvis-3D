@@ -653,4 +653,84 @@ public class DownloadManager : MonoBehaviour
             Debug.Log("[DownloadManager] Download cancelled by user");
         }
     }
+
+    // ============================================
+    // Addressables DLC 다운로드 지원 (통합 관리형)
+    // ============================================
+
+    public void RequestAddressableDownload(string address, long expectedSize, System.Action<bool> onComplete)
+    {
+        if (isDownloading)
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorUtility.DisplayDialog(
+                GetLocalizedText("download_in_progress"), 
+                GetLocalizedText("download_in_progress_msg"), 
+                GetLocalizedText("confirm"));
+#endif
+            onComplete?.Invoke(false);
+            return;
+        }
+
+        string sizeText = (expectedSize / (1024f * 1024f)).ToString("0.00") + " MB";
+
+#if UNITY_EDITOR
+        bool proceed = UnityEditor.EditorUtility.DisplayDialog(
+            "DLC 다운로드 (Addressables)",
+            $"추가 캐릭터/의상 에셋 다운로드가 필요합니다.\n\n대상: {address}\n필요 용량: {sizeText}\n\n다운로드를 진행하시겠습니까?",
+            "다운로드", "나중에");
+
+        if (!proceed)
+        {
+            onComplete?.Invoke(false);
+            return;
+        }
+#endif
+
+        StartCoroutine(AddressableDownloadCoroutine(address, expectedSize, onComplete));
+    }
+
+    private IEnumerator AddressableDownloadCoroutine(string address, long expectedSize, System.Action<bool> onComplete)
+    {
+        isDownloading = true;
+        modelDownloadGameObject.SetActive(true);
+        modelDownloadText.text = $"준비 중...";
+        modelDownloadImage.fillAmount = 0f;
+
+        var downloadHandle = UnityEngine.AddressableAssets.Addressables.DownloadDependenciesAsync(address, false);
+
+        while (!downloadHandle.IsDone)
+        {
+            var status = downloadHandle.GetDownloadStatus();
+            if (status.TotalBytes > 0)
+            {
+                float progress = status.Percent;
+                modelDownloadImage.fillAmount = progress;
+                
+                string downloadedMB = (status.DownloadedBytes / (1024f * 1024f)).ToString("0.00");
+                string totalMB = (status.TotalBytes / (1024f * 1024f)).ToString("0.00");
+                
+                modelDownloadText.text = $"DLC 다운로드 중... {progress * 100:0.0}%\n({downloadedMB} MB / {totalMB} MB)";
+            }
+            yield return null;
+        }
+
+        bool success = downloadHandle.Status == UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationStatus.Succeeded;
+        
+        if (success)
+        {
+            Debug.Log($"[DLC] '{address}' 다운로드 완료!");
+        }
+        else
+        {
+            Debug.LogError($"[DLC] '{address}' 다운로드 실패: {downloadHandle.OperationException?.Message}");
+        }
+
+        UnityEngine.AddressableAssets.Addressables.Release(downloadHandle);
+
+        modelDownloadGameObject.SetActive(false);
+        isDownloading = false;
+
+        onComplete?.Invoke(success);
+    }
 }
