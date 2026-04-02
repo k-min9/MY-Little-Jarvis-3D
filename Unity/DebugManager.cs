@@ -23,7 +23,7 @@ public class DebugManager : MonoBehaviour
     {
         // Unity 에디터 또는 DevMode에서만 실행
 #if !UNITY_EDITOR
-        if (DevManager.Instance == null || !DevManager.Instance.IsDevModeEnabled())
+        if (!DevManager.Instance.IsDevModeEnabled())
         {
             return;
         }
@@ -151,5 +151,31 @@ public class DebugManager : MonoBehaviour
         {
             Debug.LogError($"[DebugManager] Failed to open folder: {ex.Message}");
         }
+    }
+
+    // 텍스트 파일을 메모장으로 열기
+    // 사용 가능 플랫폼: Windows
+    public void OpenTextFile(string filePath)
+    {
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+        try
+        {
+            if (File.Exists(filePath))
+            {
+                System.Diagnostics.Process.Start("notepad.exe", filePath);
+                Debug.Log($"[DebugManager] Opening file in notepad: {filePath}");
+            }
+            else
+            {
+                Debug.LogWarning($"[DebugManager] File does not exist: {filePath}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[DebugManager] Failed to open file: {ex.Message}");
+        }
+#else
+        Debug.LogWarning("[DebugManager] OpenTextFile is only supported on Windows platform");
+#endif
     }
 }
