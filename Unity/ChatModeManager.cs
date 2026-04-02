@@ -81,8 +81,9 @@ public class ChatModeManager : MonoBehaviour
                 // Chat 모드는 종료 시 특별한 처리 없음
                 break;
             case ChatMode.Aropla:
-                // APIAroPlaManager에 위임
+                // ApiMultiConversationManager에 위임
                 APIAroPlaManager.Instance.StopAroplaChannel();
+                // ApiMultiConversationManager.Instance.StopMultiConversation();
                 break;
             case ChatMode.Operator:
                 // OperatorModeManager에 위임
@@ -100,8 +101,9 @@ public class ChatModeManager : MonoBehaviour
                 // Chat 모드는 진입 시 특별한 처리 없음 (각 Exit에서 복원 처리)
                 break;
             case ChatMode.Aropla:
-                // APIAroPlaManager에 위임
+                // ApiMultiConversationManager에 위임
                 APIAroPlaManager.Instance.StartAroplaChannel();
+                // ApiMultiConversationManager.Instance.StartMultiConversation();
                 break;
             case ChatMode.Operator:
                 // OperatorModeManager에 위임

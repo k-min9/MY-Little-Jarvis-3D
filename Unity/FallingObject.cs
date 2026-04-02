@@ -14,7 +14,7 @@ public class FallingObject : MonoBehaviour
         animator = GetComponent<Animator>();
 
         Canvas canvas = FindObjectOfType<Canvas>();
-        // animator.SetBool("IsFalling", isFalling);
+        // animator.SetBool("isFalling", isFalling);
 
         // bottomBoundary = -(canvas.GetComponent<RectTransform>().rect.height / 2) + rectTransform.rect.height * 0.5f; // + taskbarHeight; 
         bottomBoundary = -(canvas.GetComponent<RectTransform>().rect.height / 2);  //  + 50f;
@@ -68,12 +68,12 @@ public class FallingObject : MonoBehaviour
     public void StartFalling()
     {
         StatusManager.Instance.IsFalling = true;
-        // animator.SetBool("IsFalling", true);
+        animator.SetBool("isFalling", true);
     }
 
     public void StopFalling()
     {
         StatusManager.Instance.IsFalling = false;
-        // animator.SetBool("IsFalling", false);
+        animator.SetBool("isFalling", false);
     }
 }

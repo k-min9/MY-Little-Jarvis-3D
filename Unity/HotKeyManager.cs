@@ -325,7 +325,7 @@ public class HotkeyManager : MonoBehaviour
         bindings.Add(new HotkeyBinding { catalogKey = HotKeyCatalog.Ctrl_4, actionName = HotKeyActionType.ActionStartTikitaka.ToString() });
         bindings.Add(new HotkeyBinding { catalogKey = HotKeyCatalog.Ctrl_5, actionName = HotKeyActionType.ActionSmallTalk.ToString() });
         bindings.Add(new HotkeyBinding { catalogKey = HotKeyCatalog.Ctrl_6, actionName = HotKeyActionType.ActionSetArea.ToString() });
-        bindings.Add(new HotkeyBinding { catalogKey = HotKeyCatalog.Ctrl_7, actionName = HotKeyActionType.ActionExecuteAreaOCR.ToString() });
+        bindings.Add(new HotkeyBinding { catalogKey = HotKeyCatalog.Ctrl_7, actionName = HotKeyActionType.ActionNone.ToString() });
         bindings.Add(new HotkeyBinding { catalogKey = HotKeyCatalog.Ctrl_8, actionName = HotKeyActionType.ActionNone.ToString() });
         bindings.Add(new HotkeyBinding { catalogKey = HotKeyCatalog.Ctrl_9, actionName = HotKeyActionType.ActionNone.ToString() });
         bindings.Add(new HotkeyBinding { catalogKey = HotKeyCatalog.Ctrl_0, actionName = HotKeyActionType.ActionNone.ToString() });
