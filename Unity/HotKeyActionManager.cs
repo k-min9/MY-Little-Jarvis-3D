@@ -90,6 +90,9 @@ public enum HotKeyActionType
     [DisplayText("Stop Meme")]
     ActionStopMeme,
 
+    [DisplayText("Clear Cache")]
+    ActionClearCache,
+
     // 동작 없음 (항상 맨 뒤)
     [DisplayText("None")]
     ActionNone,
@@ -390,6 +393,16 @@ public class HotKeyActionManager : MonoBehaviour
             {
                 AnimationPlayerManager.Instance.StopAtRandomMoment();
             }
+        };
+
+        // Addressables 캐시 클리어 (DLC 테스트용)
+        actions["ActionClearCache"] = () =>
+        {
+            // 빈 문자열("")로는 캐시가 지워지지 않습니다. 확실하게 키를 지정해줘야 지워집니다.
+            UnityEngine.AddressableAssets.Addressables.ClearDependencyCacheAsync("plana_ball");
+            UnityEngine.AddressableAssets.Addressables.ClearDependencyCacheAsync("plana_ball_sprite");
+            UnityEngine.Caching.ClearCache();
+            Debug.Log("[DLC] 캐시 클리어 완료 (plana_ball, Addressables + Unity Caching)");
         };
 
         // 동작 없음

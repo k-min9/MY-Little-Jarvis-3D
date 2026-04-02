@@ -20,28 +20,28 @@ public class FaceTextureChanger : MonoBehaviour
         SetMouth(32);
     }
 
-    // void Update()
-    // {
-    // #if UNITY_EDITOR
-    //     // Test 용 : 키보드 숫자 1, 2, 3 입력을 감지하여 SetMouth 호출, 0은 입 없애기
-    //     if (Input.GetKeyDown(KeyCode.Alpha0))
-    //     {
-    //         SetMouth(0);
-    //     }
-    //     if (Input.GetKeyDown(KeyCode.Alpha1))
-    //     {
-    //         SetMouth(1);
-    //     }
-    //     else if (Input.GetKeyDown(KeyCode.Alpha2))
-    //     {
-    //         SetMouth(2);
-    //     }
-    //     else if (Input.GetKeyDown(KeyCode.Alpha3))
-    //     {
-    //         SetMouth(3);
-    //     }
-    // #endif
-    // }
+    void Update()
+    {
+    #if UNITY_EDITOR
+        // Test 용 : 키보드 숫자 1, 2, 3 입력을 감지하여 SetMouth 호출, 0은 입 없애기
+        if (Input.GetKeyDown(KeyCode.Alpha0))
+        {
+            SetMouth(0);
+        }
+        if (Input.GetKeyDown(KeyCode.Alpha1))
+        {
+            SetMouth(1);
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha2))
+        {
+            SetMouth(2);
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha3))
+        {
+            SetMouth(3);
+        }
+    #endif
+    }
 
 
     private void InitMouthTextures(Texture2D texture, int columns, int rows, int maxTextures)
