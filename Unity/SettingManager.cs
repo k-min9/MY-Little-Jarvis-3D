@@ -121,9 +121,12 @@ public class SettingManager : MonoBehaviour
     [SerializeField] private Toggle devModeToggle;
     [SerializeField] private Toggle devHowlingToggle;
     [SerializeField] private Toggle devSoundToggle;
+    [SerializeField] private Toggle localSoundToggle;
+    [SerializeField] private Toggle devOCRToggle;
+    [SerializeField] private Toggle localOCRToggle;
 
     [Header("OCR")]
-    [SerializeField] private Button ocrOption1Button;
+    [SerializeField] private Button ocrOption1Button;  // 색상변경 넣고 싶을때 전용 버튼관리
     [SerializeField] private Button ocrOption2Button;
     [SerializeField] private Button ocrOption3Button;
     [SerializeField] private Image ocrOption1Image;
@@ -131,6 +134,12 @@ public class SettingManager : MonoBehaviour
     [SerializeField] private Image ocrOption3Image;
     [SerializeField] private Sprite ocrOptionActiveSprite;
     [SerializeField] private Sprite ocrOptionInactiveSprite;
+    
+    [Header("OCR Range (비영속)")]
+    [SerializeField] private Button ocrDefaultRangeButton;
+    [SerializeField] private Button ocrCustomRangeButton;
+    [SerializeField] private Image ocrDefaultRangeImage;
+    [SerializeField] private Image ocrCustomRangeImage;
 
     // 기타 표시용 UI
     [Header("Extra UI")]
@@ -211,6 +220,9 @@ public class SettingManager : MonoBehaviour
         public bool isDevMode;
         public bool isDevHowling;
         public bool isDevSound;  // dev_voice 서버 사용 여부 (저장 안함)
+        public bool isLocalSound;  // local_voice 서버 사용 여부 (저장 안함, isDevSound 보다 우선됨)
+        public bool isDevOCR;  // dev_ocr_translate 서버 사용 여부 (저장 안함)
+        public bool isLocalOCR;  // local_ocr 서버 사용 여부 (저장 안함, isDevOCR 보다 우선됨)
 
         // Hotkey
         public bool hotKeyGlobalInputEnabled;
@@ -420,7 +432,11 @@ public class SettingManager : MonoBehaviour
     public void SetIsDevModeToggle(bool value) { settings.isDevMode = value; DevManager.Instance.SetInteractableDev(value);}
     public void SetIsDevHowlingToggle(bool value) { settings.isDevHowling = value; SaveSettings(); }
     public void SetIsDevSoundToggle(bool value) { settings.isDevSound = value; }  // dev_voice 서버 사용 여부 (저장 안함)
-    
+    public void SetIsLocalSoundToggle(bool value) { settings.isLocalSound = value; devSoundToggle.interactable = !value; if(value) { settings.isDevSound = false; devSoundToggle.isOn = false; } }  // local_voice 서버 사용 여부 (저장 안함)
+    public void SetIsDevOCRToggle(bool value) { settings.isDevOCR = value; }  // dev_ocr_translate 서버 사용 여부 (저장 안함)
+    public void SetIsLocalOCRToggle(bool value) { settings.isLocalOCR = value; devOCRToggle.interactable = !value; if(value) { settings.isDevOCR = false; devOCRToggle.isOn = false; } }  // local_ocr 서버 사용 여부 (저장 안함)
+
+
     // Auto Small Talk UI 업데이트
     private void UpdateAutoSmallTalkUI() { charAutoSmallTalkSliderObject.SetActive(settings.isCharAutoSmallTalk); UpdateAutoSmallTalkIntervalText(); }
     private void UpdateAutoSmallTalkIntervalText()
@@ -477,6 +493,53 @@ public class SettingManager : MonoBehaviour
         ocrOption1Image.sprite = settings.ocrOptionType == "Options1" ? ocrOptionActiveSprite : ocrOptionInactiveSprite;
         ocrOption2Image.sprite = settings.ocrOptionType == "Options2" ? ocrOptionActiveSprite : ocrOptionInactiveSprite;
         ocrOption3Image.sprite = settings.ocrOptionType == "Options3" ? ocrOptionActiveSprite : ocrOptionInactiveSprite;
+        
+        // Range 버튼 상태도 갱신
+        UpdateOCRRangeButtons();
+    }
+    
+    // OCR Range 관련 (비영속 - 저장 안함)
+    
+    // "Default Range" 버튼 클릭
+    public void SetOCRDefaultRange()
+    {
+        int slot = GetCurrentOCRSlot();
+        ScreenshotOCRRectManager.Instance.ClearCustomRectMode(slot);
+        UpdateOCRRangeButtons();
+        Debug.Log($"[SettingManager] OCR Range set to Default for slot {slot}");
+    }
+    
+    // "Custom Range" 버튼 클릭
+    public void SetOCRCustomRange()
+    {
+        int slot = GetCurrentOCRSlot();
+        ScreenshotOCRRectManager.Instance.OnAreaSelectComplete = (completedSlot) =>
+        {
+            UpdateOCRRangeButtons();
+            // 선택된 영역 프리뷰 표시 (3초)
+            ScreenshotOCRRectManager.Instance.ShowScreenshotOCRRectImage(completedSlot);
+        };
+        ScreenshotOCRRectManager.Instance.SetCustomRectMode(slot);
+        Debug.Log($"[SettingManager] Starting custom range selection for slot {slot}");
+    }
+    
+    // 현재 OCR 슬롯 번호 반환
+    private int GetCurrentOCRSlot()
+    {
+        if (settings.ocrOptionType == "Options2") return 2;
+        if (settings.ocrOptionType == "Options3") return 3;
+        return 1;
+    }
+    
+    // Range 버튼 UI 갱신
+    private void UpdateOCRRangeButtons()
+    {
+        int slot = GetCurrentOCRSlot();
+        bool hasCustomRect = ScreenshotOCRRectManager.Instance.HasCustomRect(slot);
+        
+        // 스프라이트 업데이트 (비영속이므로 Default가 기본 활성화)
+        ocrDefaultRangeImage.sprite = hasCustomRect ? ocrOptionInactiveSprite : ocrOptionActiveSprite;
+        ocrCustomRangeImage.sprite = hasCustomRect ? ocrOptionActiveSprite : ocrOptionInactiveSprite;
     }
     
     // dev_voice 서버 사용 여부 반환 (Android 또는 DevSound 토글 활성화시 true)
@@ -488,6 +551,17 @@ public class SettingManager : MonoBehaviour
         return settings.isDevSound;  // PC에서는 토글 설정값 사용
 #endif
     }
+    
+    // dev_ocr_translate 서버 사용 여부 반환 (Android 또는 DevOCR 토글 활성화시 true)
+    public bool IsDevOCREnabled()
+    {
+#if UNITY_ANDROID
+        return true;  // Android에서는 항상 dev_ocr_translate 사용
+#else
+        return settings.isDevOCR;  // PC에서는 토글 설정값 사용
+#endif
+    }
+
     
     // 표시용
     // public void SetServerInfoText(string text) { serverInfoText.text = text; }
@@ -508,6 +582,10 @@ public class SettingManager : MonoBehaviour
         // Devmode 초기화
         devModeToggle.isOn = false;
         devSoundToggle.isOn = false;
+        devOCRToggle.isOn = false;
+        localSoundToggle.isOn = false;
+        localOCRToggle.isOn = false;
+
         
         // 저장 경로를 Application.persistentDataPath로 설정
         string directoryPath = Path.Combine(Application.persistentDataPath, "config");
@@ -1199,6 +1277,9 @@ public class SettingManager : MonoBehaviour
         // 로딩 후 Dev 값 초기화
         settings.isDevMode = false;
         settings.isDevSound = false;
+        settings.isLocalSound = false;
+        settings.isDevOCR = false;
+        settings.isLocalOCR = false;
     }
 
     // UI 세팅 적용
@@ -1207,24 +1288,25 @@ public class SettingManager : MonoBehaviour
         playerNameInputField.text = settings.player_name;
         uiLangDropdown.value = settings.ui_language_idx;
         operatorTypeDropdown.value = settings.operator_type_idx;
-        isAlwaysOnTopToggle.isOn = settings.isAlwaysOnTop;
-        isShowChatBoxOnClickToggle.isOn = settings.isShowChatBoxOnClick;
-        isShowTutorialOnChatToggle.isOn = settings.isShowTutorialOnChat;
-        isStartServerOnInitToggle.isOn = settings.isStartServerOnInit;
-        isSTTServerToggle.isOn = settings.isSTTServer;
-        editSttInChatInputToggle.isOn = settings.editSttinChatInput;
-        enableEditionUpdateSuggestionToggle.isOn = settings.enableEditionUpdateSuggestion;
-        hotKeyGlobalInputToggle.isOn = settings.hotKeyGlobalInputEnabled;
+        // SetIsOnWithoutNotify: 초기 로딩 시 OnValueChanged 발동 방지 (타 Manager 미초기화 시 NullRef 방어)
+        isAlwaysOnTopToggle.SetIsOnWithoutNotify(settings.isAlwaysOnTop);
+        isShowChatBoxOnClickToggle.SetIsOnWithoutNotify(settings.isShowChatBoxOnClick);
+        isShowTutorialOnChatToggle.SetIsOnWithoutNotify(settings.isShowTutorialOnChat);
+        isStartServerOnInitToggle.SetIsOnWithoutNotify(settings.isStartServerOnInit);
+        isSTTServerToggle.SetIsOnWithoutNotify(settings.isSTTServer);
+        editSttInChatInputToggle.SetIsOnWithoutNotify(settings.editSttinChatInput);
+        enableEditionUpdateSuggestionToggle.SetIsOnWithoutNotify(settings.enableEditionUpdateSuggestion);
+        hotKeyGlobalInputToggle.SetIsOnWithoutNotify(settings.hotKeyGlobalInputEnabled);
 
         charSizeSlider.value = settings.char_size;
         charSpeedSlider.value = settings.char_speed;
         charMobilitySlider.value = settings.char_mobility;
-        isCharAutoSmallTalk.isOn = settings.isCharAutoSmallTalk;
+        isCharAutoSmallTalk.SetIsOnWithoutNotify(settings.isCharAutoSmallTalk);
         charAutoSmallTalkSlider.value = settings.charAutoSmallTalkInterval;
-        isGravityToggle.isOn = settings.isGravity;
-        isWindowsCollisionToggle.isOn = settings.isWindowsCollision;
-        isStartWithLastCharToggle.isOn = settings.isStartWithLastChar;
-        isRememberCharOutfitsToggle.isOn = settings.isRememberCharOutfits;
+        isGravityToggle.SetIsOnWithoutNotify(settings.isGravity);
+        isWindowsCollisionToggle.SetIsOnWithoutNotify(settings.isWindowsCollision);
+        isStartWithLastCharToggle.SetIsOnWithoutNotify(settings.isStartWithLastChar);
+        isRememberCharOutfitsToggle.SetIsOnWithoutNotify(settings.isRememberCharOutfits);
         
         soundLanguageDropdown.value = settings.sound_language_idx;
         soundVolumeMasterSlider.value = settings.sound_volumeMaster;
@@ -1248,19 +1330,19 @@ public class SettingManager : MonoBehaviour
         aiWebSearchDropdown.value = settings.ai_web_search_idx;
         aiUseImageDropdown.value = settings.ai_use_image_idx;
         aiAskIntentDropdown.value = settings.ai_ask_intent_idx;
-        isAskedTurnOnServerToggle.isOn = settings.isAskedTurnOnServer;
-        isAPITestToggle.isOn = settings.isAPITest;
-        confirmUserIntentToggle.isOn = settings.confirmUserIntent;
-        includeCharInScreenshotToggle.isOn = settings.includeCharInScreenshot;
-        includeUIInScreenshotToggle.isOn = settings.includeUIInScreenshot;
-        isAskChangeToMultimodalToggle.isOn = settings.isAskChangeToMultimodal;
+        isAskedTurnOnServerToggle.SetIsOnWithoutNotify(settings.isAskedTurnOnServer);
+        isAPITestToggle.SetIsOnWithoutNotify(settings.isAPITest);
+        confirmUserIntentToggle.SetIsOnWithoutNotify(settings.confirmUserIntent);
+        includeCharInScreenshotToggle.SetIsOnWithoutNotify(settings.includeCharInScreenshot);
+        includeUIInScreenshotToggle.SetIsOnWithoutNotify(settings.includeUIInScreenshot);
+        isAskChangeToMultimodalToggle.SetIsOnWithoutNotify(settings.isAskChangeToMultimodal);
         aiLangDropdown.value = settings.ai_language_idx;
         aiEmotionDropdown.value = settings.ai_emotion_idx;
         aiVoiceFilterDropdown.value = settings.ai_voice_filter_idx;
 
-        devHowlingToggle.isOn = settings.isDevHowling;
-        devModeToggle.isOn = false; // DevMode는 저장과 무관하게 항상 false
-        devSoundToggle.isOn = false; // DevSound는 저장과 무관하게 항상 false
+        devHowlingToggle.SetIsOnWithoutNotify(settings.isDevHowling);
+        devModeToggle.SetIsOnWithoutNotify(false); // DevMode는 저장과 무관하게 항상 false
+        devSoundToggle.SetIsOnWithoutNotify(false); // DevSound는 저장과 무관하게 항상 false
 
         UpdateOCROptionToggles();
 
@@ -1382,6 +1464,14 @@ public class SettingManager : MonoBehaviour
         
         if (serverLocalLoadButton != null)
             serverLocalLoadButton.interactable = modelExists;
+
+        // Devmode면 상관없이 True
+        if (DevManager.Instance.IsDevModeEnabled())
+        {
+            serverLocalReleaseButton.interactable = true;
+            serverLocalLoadButton.interactable = true;
+        }
+
     }
 
     // 기본값 설정
