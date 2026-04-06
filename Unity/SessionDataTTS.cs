@@ -17,6 +17,7 @@ public struct SessionDataTTS
     public Dictionary<int, byte[]> wavBySeq;           // TTS 성공 결과
     public Dictionary<int, string> stateBySeq;         // "pending","in_flight","ready","failed","skipped","played"
     public Dictionary<int, float> waitStartTimeBySeq;  // 내 차례에서 대기 시작 시간
+    public Dictionary<int, bool> isSubBySeq;           // 서브캐릭터 여부 플래그
 
     // 세션 초기화
     public void Reset(int newSessionId, int newChatIdxNum)
@@ -31,5 +32,6 @@ public struct SessionDataTTS
         wavBySeq = new Dictionary<int, byte[]>();
         stateBySeq = new Dictionary<int, string>();
         waitStartTimeBySeq = new Dictionary<int, float>();
+        isSubBySeq = new Dictionary<int, bool>();
     }
 }

@@ -201,6 +201,19 @@ public class SubCharManager : MonoBehaviour
                 previousPosition = prevRectTransform.anchoredPosition3D;
                 previousRotation = chara.transform.rotation; // 기존 회전 값 저장(프리팹초기값 사용도 고려)
             }
+
+            // AnimationPlayerManager에서 기존 캐릭터 해제
+            if (AnimationPlayerManager.Instance != null)
+            {
+                AnimationPlayerManager.Instance.UnregisterPlayer(chara);
+            }
+
+            // SubAnswerBalloonSimpleController 해제
+            if (SubAnswerBalloonSimpleManager.Instance != null)
+            {
+                SubAnswerBalloonSimpleManager.Instance.RemoveController(chara);
+            }
+
             Destroy(chara);
             character = Instantiate(obj, previousPosition, previousRotation, canvas.transform);
             character.transform.SetParent(subCharsContainer.transform, false);  // parent 정리
@@ -376,6 +389,12 @@ public class SubCharManager : MonoBehaviour
         // {
         //     Debug.Log("Character has no nickname.");
         // }
+
+        // AnimationPlayerManager에 서브 캐릭터 등록
+        if (AnimationPlayerManager.Instance != null)
+        {
+            AnimationPlayerManager.Instance.RegisterPlayer(character);
+        }
     }
 
 
@@ -545,9 +564,28 @@ public class SubCharManager : MonoBehaviour
     // subCharsContainer 이하 subChars 전부 erase
     public void ClearAllSummonChar()
     {
-        foreach (Transform child in subCharsContainer.transform)
+        // AnimationPlayerManager에서 서브 캐릭터들 해제
+        if (AnimationPlayerManager.Instance != null && subCharsContainer != null)
         {
-            Destroy(child.gameObject);
+            foreach (Transform child in subCharsContainer.transform)
+            {
+                AnimationPlayerManager.Instance.UnregisterPlayer(child.gameObject);
+            }
+        }
+
+        // 서브 캐릭터들 파괴
+        if (subCharsContainer != null)
+        {
+            foreach (Transform child in subCharsContainer.transform)
+            {
+                Destroy(child.gameObject);
+            }
+        }
+
+        // SubAnswerBalloonSimpleManager 내용 전체 지우기
+        if (SubAnswerBalloonSimpleManager.Instance != null)
+        {
+            SubAnswerBalloonSimpleManager.Instance.ClearAll();
         }
     }
 }
