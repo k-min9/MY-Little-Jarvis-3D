@@ -3,7 +3,7 @@ using System.Collections;
 using System;
 
 /**
-싱글톤으로 현재 메인 캐릭터의 상태를 관리
+싱글톤으로 현재 서브 캐릭터의 상태를 관리
 
 isDragging = 드래그중인지 여부
 isFalling = 낙하중인지 여부
@@ -28,11 +28,11 @@ public class SubStatusManager : MonoBehaviour
     public bool isFalling;
     public bool isPicking;
     public bool isWalking;
-    // public bool isListening;  // 차후 음성인식 용 구별
+    public bool isListening;  // 차후 음성인식 용 구별
     // public bool isAsking;
-    // public bool isChatting;
-    // public bool isAnswering;
-    // public bool isAnsweringSimple;  // AnswerBalloonSimple 용
+    public bool isChatting;
+    public bool isAnswering;
+    public bool isAnsweringSimple;  // AnswerBalloonSimple 용
     // public bool isThinking;
     public bool isOptioning;
     // public bool isOnTop;
@@ -71,11 +71,11 @@ public class SubStatusManager : MonoBehaviour
     //     set { isWalking = value; }
     // }
 
-    // public bool IsListening
-    // {
-    //     get { return isListening; }
-    //     set { isListening = value; }
-    // }
+    public bool IsListening
+    {
+        get { return isListening; }
+        set { isListening = value; }
+    }
 
     // public bool IsAsking
     // {
@@ -83,22 +83,22 @@ public class SubStatusManager : MonoBehaviour
     //     set { isAsking = value; }
     // }
 
-    // public bool IsChatting
-    // {
-    //     get { return isChatting; }
-    //     set { isChatting = value; }
-    // }
+    public bool IsChatting
+    {
+        get { return isChatting; }
+        set { isChatting = value; }
+    }
 
-    // public bool IsAnswering
-    // {
-    //     get { return isAnswering; }
-    //     set { isAnswering = value; }
-    // }
-    // public bool IsAnsweringSimple
-    // {
-    //     get { return isAnsweringSimple; }
-    //     set { isAnsweringSimple = value; }
-    // }
+    public bool IsAnswering
+    {
+        get { return isAnswering; }
+        set { isAnswering = value; }
+    }
+    public bool IsAnsweringSimple
+    {
+        get { return isAnsweringSimple; }
+        set { isAnsweringSimple = value; }
+    }
 
     // public bool IsThinking
     // {
@@ -127,57 +127,59 @@ public class SubStatusManager : MonoBehaviour
     //     set { isAiUsing = value; }
     // }
 
-    // public bool IsConversationing
-    // {
-    //     get { return isAsking|| isChatting|| isListening || isThinking || isAnswering || isAnsweringSimple; }
-    // }
+    public bool IsConversationing
+    {
+        get { return isChatting || isListening || isAnswering || isAnsweringSimple; }
+    }
 
-    // void Update()
-    // {
-    //     // 대화중이면 입 움직이기
-    //     if (VoiceManager.Instance.isQueuePlaying)
-    //     {   
-    //         updateMouthStatus();
-    //     } else {
-    //     #if !UNITY_EDITOR
-    //         initMouthStatus();
-    //     #endif
-    //     }
-    // }
+    void Update()
+    {
+        // 대화중이면 입 움직이기
+        bool isSpeaking = (isAnswering || isAnsweringSimple);
+        // 서브캐릭터 대답 중이고, SubVoiceManager에서 오디오가 하나라도 재생 중일 때
+        bool isSubAudioPlaying = SubVoiceManager.Instance.GetAudioClip() != null;
+        
+        if (isSpeaking && isSubAudioPlaying)
+        {   
+            updateMouthStatus();
+        } 
+        else 
+        {
+        #if !UNITY_EDITOR
+            initMouthStatus();
+        #endif
+        }
+    }
 
-    // // 입 움직이게 : 13,14 왔다갔다 > 오디오클립 연계로 입후 반응 없어도 멈추게 변경
-    // void updateMouthStatus() {
-    //     // 변수 그때 그때 세팅 (TODO : CharChange, InitChange에서 최적화 가능)
-    //     FaceTextureChanger faceTextureChanger;
-    //     // TODO : 쓰게 되면 이 부분 변경임
-    //     faceTextureChanger = CharManager.Instance.GetCurrentCharacter().GetComponentInChildren<FaceTextureChanger>();
-    //     if (faceTextureChanger==null) return;     
+    void updateMouthStatus() 
+    {
+        FaceTextureChanger faceTextureChanger = GetComponentInChildren<FaceTextureChanger>();
+        if (faceTextureChanger == null) return;     
 
-    //     // 2초에 한번 입모양 변경
-    //     faceTextureChanger.mouthIndex += 1;
-    //     if (faceTextureChanger.mouthIndex < 120) return;
-    //     faceTextureChanger.mouthIndex = 0;
+        faceTextureChanger.mouthIndex += 1;
+        if (faceTextureChanger.mouthIndex >= 50) 
+        {
+            faceTextureChanger.mouthIndex = 0;
+            if (faceTextureChanger.mouthStatus == 5)
+            {
+                faceTextureChanger.SetMouth(6);
+            }
+            else
+            {
+                faceTextureChanger.SetMouth(5);
+            }
+        }
+    }
 
-    //     if (faceTextureChanger.mouthStatus == 5) {
-    //         faceTextureChanger.SetMouth(6);
-    //     } else {
-    //         faceTextureChanger.SetMouth(5);
-    //     }
-    // }
+    void initMouthStatus() 
+    {
+        FaceTextureChanger faceTextureChanger = GetComponentInChildren<FaceTextureChanger>();
+        if (faceTextureChanger == null) return;        
 
-    // // CharManager 쓰고 있음
-    // // 입 상태 초기화
-    // void initMouthStatus() {
-    //     // 변수 그때 그때 세팅 (TODO : CharChange, InitChange에서 최적화 가능)
-    //     FaceTextureChanger faceTextureChanger;
-    //     faceTextureChanger = CharManager.Instance.GetCurrentCharacter().GetComponentInChildren<FaceTextureChanger>();
-    //     if (faceTextureChanger==null) return;        
-
-    //     // 입이 열린상태면 닫기
-    //     if (faceTextureChanger.mouthStatus == 32 || faceTextureChanger.mouthStatus == 0) return;
-    //     faceTextureChanger.SetMouth(32);
-    //     faceTextureChanger.mouthIndex = 9999;  // 순서주의
-    // }
+        if (faceTextureChanger.mouthStatus == 32 || faceTextureChanger.mouthStatus == 0) return;
+        faceTextureChanger.SetMouth(32);
+        faceTextureChanger.mouthIndex = 9999;
+    }
 
     // X초간 status를 True로
     // 예시 : SubStatusManager.Instance.SetStatusTrueForSecond(value => SubStatusManager.Instance.IsOptioning = value, 3f); // 3초간 isOptioning을 true로

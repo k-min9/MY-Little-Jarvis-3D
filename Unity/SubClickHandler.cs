@@ -47,16 +47,19 @@ public class SubClickHandler : MonoBehaviour, IPointerClickHandler
 
     private void HandleClickMobile()
     {
-        // if (SettingManager.Instance.settings.isShowChatBoxOnClick)
-        // {
-        //     // Sub 캐릭터는 대화 없음 
-
-        //     // StatusManager.Instance.isAnswering = false;
-        //     // VoiceManager.Instance.ResetAudio();
-        //     // ChatBalloonManager.Instance.ToggleChatBalloon();
-        // }       
-        // else
-        // {
+        if (SettingManager.Instance.settings.isShowChatBoxOnClick)
+        {
+            // Sub 캐릭터 채팅창 활성화
+            CharManager.Instance.SetActiveCharacter(this.transform.parent.gameObject);
+            Debug.Log($"[SubChat] Sub character mobile click: {this.transform.parent.gameObject.name}");
+            
+            // StatusManager.Instance.isAnswering = false; // 서브 캐릭터는 서브 Status를 써야함 (추후 고려)
+            // VoiceManager.Instance.ResetAudio();
+            
+            SubChatBalloonManager.Instance.GetOrCreateController(this.transform.parent.gameObject).ToggleChatBalloon();
+        }       
+        else
+        {
             if (isAnimatorTriggerExists(_animator, "doSpecial"))
             {
                 _animator.SetTrigger("doSpecial");
@@ -72,49 +75,42 @@ public class SubClickHandler : MonoBehaviour, IPointerClickHandler
             {
                 PlayRandomAnimation();
             }
-        // }
+        }
     }
 
     private void HandleLeftClick()
     {
-        // // 기존 좌클릭 처리 로직
-        // if (SettingManager.Instance.settings.isShowChatBoxOnClick)
-        // {
-        //     StatusManager.Instance.isAnswering = false;
-        //     VoiceManager.Instance.ResetAudio();
-        //     ChatBalloonManager.Instance.ToggleChatBalloon();
-        // }
-        // else
-        // {
-//             if (false && SettingManager.Instance.settings.isAskedTurnOnServer)  // TODO : SettingManager쪽은 완전히 없애버리자.
-//             {
-//                 // 과거의 유산
-// // #if UNITY_EDITOR
-//                 ChatBalloonManager.Instance.ToggleChatBalloon();
-// // #else
-// //                 ServerManager.AskStartServer();
-// // #endif
-//             }
-//             else
-//             {
-                if (isAnimatorTriggerExists(_animator, "doSpecial"))
-                {
-                    _animator.SetTrigger("doSpecial");
-                    // StatusManager.Instance.SetStatusTrueForSecond(value => StatusManager.Instance.IsOptioning = value, 7.5f);
-                    subStatusManager.SetStatusTrueForSecond(value => subStatusManager.isOptioning = value, 7.5f);
-                }
-                else if (isAnimatorTriggerExists(_animator, "doSelect"))
-                {
-                    // Dialogue select = DialogueManager.Instance.GetRandomSelect();
-                    Dialogue select = DialogueCacheManager.instance.GetRandomSelect(charAttributes.charcode);
-                    DoDialogueBehaviour(select);
-                }
-                else
-                {
-                    PlayRandomAnimation();
-                }
-            // }
-        // }
+        // 기존 좌클릭 처리 로직
+        if (SettingManager.Instance.settings.isShowChatBoxOnClick)
+        {
+            // Sub 캐릭터 채팅창 활성화
+            CharManager.Instance.SetActiveCharacter(this.transform.parent.gameObject);
+            Debug.Log($"[SubChat] Sub character left click: {this.transform.parent.gameObject.name}");
+            
+            // StatusManager.Instance.isAnswering = false;
+            // VoiceManager.Instance.ResetAudio();
+            
+            SubChatBalloonManager.Instance.GetOrCreateController(this.transform.parent.gameObject).ToggleChatBalloon();
+        }
+        else
+        {
+            if (isAnimatorTriggerExists(_animator, "doSpecial"))
+            {
+                _animator.SetTrigger("doSpecial");
+                // StatusManager.Instance.SetStatusTrueForSecond(value => StatusManager.Instance.IsOptioning = value, 7.5f);
+                subStatusManager.SetStatusTrueForSecond(value => subStatusManager.isOptioning = value, 7.5f);
+            }
+            else if (isAnimatorTriggerExists(_animator, "doSelect"))
+            {
+                // Dialogue select = DialogueManager.Instance.GetRandomSelect();
+                Dialogue select = DialogueCacheManager.instance.GetRandomSelect(charAttributes.charcode);
+                DoDialogueBehaviour(select);
+            }
+            else
+            {
+                PlayRandomAnimation();
+            }
+        }
     }
 
     private void HandleMiddleClick()
