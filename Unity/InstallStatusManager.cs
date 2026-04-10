@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using UnityEngine;
 
 // InstallStatusManager (GameObject)
@@ -34,9 +35,15 @@ public class InstallStatusManager : MonoBehaviour
         }
     }
 
-    void Start()
+    private TaskCompletionSource<bool> loadCompleteTcs = new TaskCompletionSource<bool>();
+    private bool isLoadComplete = false;
+
+    void Awake()
     {
         LoadInstallStatus();
+        isLoadComplete = true;
+        loadCompleteTcs.SetResult(true);
+        
         ApplyInstallStatusToUI();
 
         // 시작시 서버 기동 옵션 확인 및 시동
@@ -244,6 +251,12 @@ public class InstallStatusManager : MonoBehaviour
     // 현재 버전 확인 후 Lite 요구
     public bool CheckAndOperateLite(bool showOperator = true)
     {
+        // Devmode 일 경우 그냥 true 반환
+        if (DevManager.Instance.IsDevModeEnabled())
+        {
+            return true;
+        }
+
         int installStatusIndex = GetInstallStatusIndex();
         Debug.Log("CheckAndOperateLite : " + installStatusIndex);
 
@@ -259,9 +272,79 @@ public class InstallStatusManager : MonoBehaviour
         return true;
     }
     
+    // 비동기로 InstallStatus 로드 완료 대기
+    public async Task WaitForLoadComplete()
+    {
+        if (isLoadComplete) return;
+        await loadCompleteTcs.Task;
+    }
+
+    // CheckAndOperateLite를 비동기로 변환
+    public async Task<bool> CheckAndOperateLiteAsync(bool showOperator = true)
+    {
+        // Devmode 일 경우 그냥 true 반환
+        if (DevManager.Instance.IsDevModeEnabled())
+        {
+            return true;
+        }
+
+        await WaitForLoadComplete();
+        
+        int installStatusIndex = GetInstallStatusIndex();
+        Debug.Log("CheckAndOperateLiteAsync : " + installStatusIndex);
+
+        // 현재 Sample 버전일 경우 버전업 요구
+        if (installStatusIndex <= 0)
+        {
+            if (showOperator)
+            {
+                StartCoroutine(ScenarioCommonManager.Instance.Run_C90_unavailable_edition_recommend_lite());
+            }
+            return false;
+        }
+        return true;
+    }
+
+    // CheckAndOperateFull를 비동기로 변환
+    public async Task<bool> CheckAndOperateFullAsync(bool showOperator = true)
+    {
+        // Devmode 일 경우 그냥 true 반환
+        if (DevManager.Instance.IsDevModeEnabled())
+        {
+            return true;
+        }
+
+        await WaitForLoadComplete();
+        
+        int installStatusIndex = GetInstallStatusIndex();
+
+        // 현재 Sample, Lite 버전일 경우 버전업 요구
+        if (installStatusIndex <= 1)
+        {
+            if (showOperator)
+            {
+                StartCoroutine(ScenarioCommonManager.Instance.Run_C90_unavailable_edition_recommend_full());
+            }
+            return false;
+        }
+        return true;
+    }
+    
     // 현재 버전 확인 후 Full 요구
     public bool CheckAndOperateFull(bool showOperator = true)
     {
+        // Devmode 일 경우 그냥 true 반환
+        if (DevManager.Instance.IsDevModeEnabled())
+        {
+            return true;
+        }
+
+        if (!isLoadComplete)
+        {
+            Debug.LogWarning("InstallStatus가 아직 로드되지 않았습니다.");
+            return false;
+        }
+
         int installStatusIndex = GetInstallStatusIndex();
 
         // 현재 Sample, Lite 버전일 경우 버전업 요구
