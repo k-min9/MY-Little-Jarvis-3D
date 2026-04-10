@@ -177,6 +177,10 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
             EmotionManager.Instance.ShowEmotion("idle");
         }
         StatusManager.Instance.IsPicking = false;
+
+        // 2D 애니메이션 강제 정지(Freeze) 풀기 로직
+        _animator.speed = 1f;
+        _animator.Update(0f);
     }
 
     // 머리 쓰다듬기
