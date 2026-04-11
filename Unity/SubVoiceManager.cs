@@ -147,8 +147,21 @@ public class SubVoiceManager : MonoBehaviour
         }
     }
 
+    // 현재 재생 중인 AudioSource의 AudioClip을 반환
+    public AudioClip GetAudioClip()
+    {
+        foreach (var audioSource in audioSources)
+        {
+            if (audioSource.isPlaying)
+            {
+                return audioSource.clip;
+            }
+        }
+        return null;
+    }
+
     // 사용 가능한 AudioSource를 찾거나 새로운 AudioSource를 생성하는 함수
-    private AudioSource GetAvailableAudioSource()
+    public AudioSource GetAvailableAudioSource()
     {
         // 사용 가능한 AudioSource를 먼저 찾기
         foreach (var audioSource in audioSources)
