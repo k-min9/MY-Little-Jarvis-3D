@@ -97,7 +97,7 @@ public class TTSManager : MonoBehaviour
         if (state == "ready")
         {
             // 재생 큐에 삽입
-            EnqueueWavData(ttsSession.wavBySeq[seq]);
+            EnqueueWavData(ttsSession.wavBySeq[seq], seq);
             ttsSession.stateBySeq[seq] = "played";
             Debug.Log($"[TTS_Flow] 4.TTS수락 seq={seq} → 재생큐 추가");
             ttsSession.nextSeqToPlay++;
@@ -164,13 +164,32 @@ public class TTSManager : MonoBehaviour
     }
 
     // WAV 데이터를 파일로 저장하고 VoiceManager 큐에 추가
-    private void EnqueueWavData(byte[] wavData)
+    private void EnqueueWavData(byte[] wavData, int seq)
     {
         string filePath = Path.Combine(Application.persistentDataPath, "response.wav");
+        bool isSubCharacter = ttsSession.isSubBySeq.ContainsKey(seq) && ttsSession.isSubBySeq[seq];
+        
+        if (isSubCharacter)
+        {
+            filePath = Path.Combine(Application.persistentDataPath, "response_sub.wav");
+        }
+
         try
         {
             File.WriteAllBytes(filePath, wavData);
-            VoiceManager.Instance.LoadAudioWavToQueue();
+            if (isSubCharacter)
+            {
+#if UNITY_ANDROID && !UNITY_EDITOR
+                string playPath = "file://" + filePath;
+#else
+                string playPath = filePath;
+#endif
+                SubVoiceManager.Instance.PlayWavAudioFromPath(playPath);
+            }
+            else
+            {
+                VoiceManager.Instance.LoadAudioWavToQueue();
+            }
         }
         catch (IOException e)
         {
@@ -221,8 +240,13 @@ public class TTSManager : MonoBehaviour
 
     #region TTS API 호출
 
-    public async void GetKoWavFromAPI(string text, string chatIdx, int seq, int capturedSessionId, string nickname = null)
+    public async void GetKoWavFromAPI(string text, string chatIdx, int seq, int capturedSessionId, string nickname = null, bool isSubCharacter = false)
     {
+        if (ttsSession.stateBySeq != null)
+        {
+            ttsSession.isSubBySeq[seq] = isSubCharacter;
+        }
+        
         Debug.Log($"[TTS] TTS start seq={seq} lang=ko");
         
         // baseUrl을 비동기로 가져오기
@@ -384,8 +408,13 @@ public class TTSManager : MonoBehaviour
         }
     }
 
-    public async void GetJpWavFromAPI(string text, string chatIdx, int seq, int capturedSessionId, string nickname = null)
+    public async void GetJpWavFromAPI(string text, string chatIdx, int seq, int capturedSessionId, string nickname = null, bool isSubCharacter = false)
     {
+        if (ttsSession.stateBySeq != null)
+        {
+            ttsSession.isSubBySeq[seq] = isSubCharacter;
+        }
+
         Debug.Log($"[TTS] TTS start seq={seq} lang=jp");
         
         // baseUrl을 비동기로 가져오기
