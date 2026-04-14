@@ -42,20 +42,20 @@ public class CharManager : MonoBehaviour
     // 오류시 보낼 기본 값
     public Sprite sampleSprite;
 
-    void Awake()
+    private async void Awake()
     {
         // 선행작업 로딩
         SettingManager.Instance.LoadSettings();
 
-        // JSON에서 캐릭터 프리팹 리스트 로드
-        LoadCharacterListFromJSON();
+        // JSON에서 캐릭터 프리팹 리스트 로드 (다운로드된 에셋만)
+        await LoadCharacterListFromJSON();
 
         // InitCharacter 호출해서 첫 번째 캐릭터를 생성
         InitCharacter();
     }
 
 
-    private void LoadCharacterListFromJSON()
+    private async Task LoadCharacterListFromJSON()
     {
         string databaseFilePath = System.IO.Path.Combine(Application.streamingAssetsPath, "config", "character_database.json");
         if (System.IO.File.Exists(databaseFilePath))
@@ -69,43 +69,64 @@ public class CharManager : MonoBehaviour
                 if (data != null && data.characters != null)
                 {
                     _characterDatabaseData = data;   // InitCharacterFromCharCode에서 재사용
-                    charList.Clear();
+
+                    // 1. Remote 에셋 주소만 수집 → GetPendingSize 캐시 갱신 대상
+                    //    isLocal 에셋은 항상 번들에 내장되어 있으므로 size 조회 불필요 + Remote 의존성 체인 회피
+                    System.Collections.Generic.HashSet<string> remoteAddresses = new System.Collections.Generic.HashSet<string>();
                     foreach (var charInfo in data.characters)
                     {
                         foreach (var clothes in charInfo.clothesList)
                         {
-                            if (!string.IsNullOrEmpty(clothes.prefabAddress))
-                            {
-                                try
-                                {
-                                    var sizeHandle = UnityEngine.AddressableAssets.Addressables.GetDownloadSizeAsync(clothes.prefabAddress);
-                                    sizeHandle.WaitForCompletion();
-                                    long downloadSize = sizeHandle.Result;
-                                    UnityEngine.AddressableAssets.Addressables.Release(sizeHandle);
+                            if (clothes.isLocal) continue;  // Local 에셋은 skip
+                            if (!string.IsNullOrEmpty(clothes.prefabAddress)) remoteAddresses.Add(clothes.prefabAddress);
+                            if (!string.IsNullOrEmpty(clothes.spriteAddress)) remoteAddresses.Add(clothes.spriteAddress);
+                            if (!string.IsNullOrEmpty(clothes.animatorControllerAddress)) remoteAddresses.Add(clothes.animatorControllerAddress);
+                        }
+                    }
 
-                                    if (downloadSize == 0)
-                                    {
-                                        var handle = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<GameObject>(clothes.prefabAddress);
-                                        GameObject prefab = handle.WaitForCompletion();
-                                        if (prefab != null && !charList.Contains(prefab))
-                                        {
-                                            charList.Add(prefab);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        Debug.Log($"[DLC] 앱 기동 시 자동 다운로드 차단됨 (대기 중): {clothes.prefabAddress} ({downloadSize} bytes)");
-                                    }
-                                }
-                                catch (System.Exception e)
-                                {
-                                    // Remote DLC 에셋이 아직 캐시되지 않은 경우 조용히 스킵
-                                    Debug.LogWarning($"[DLC] 초기 로드 스킵: {clothes.prefabAddress} - {e.Message}");
-                                }
+                    // 2. Remote 에셋만 사이즈 병렬 조회 (GetPendingSize 내부 캐시 갱신 목적)
+                    System.Collections.Generic.List<Task> cacheTasks = new System.Collections.Generic.List<Task>();
+                    foreach (var addr in remoteAddresses)
+                    {
+                        cacheTasks.Add(AddressableManager.Instance.GetPendingSize(addr));
+                    }
+                    await Task.WhenAll(cacheTasks);
+
+                    // 3. 프리팹 병렬 로드
+                    //    isLocal == true  → 리스트 초기화 없이 기존 에셋(Inspector 할당 등) 유지
+                    //    isLocal == false → LoadIfExist (size 체크 후 미다운로드면 skip)
+                    System.Collections.Generic.List<Task<GameObject>> prefabLoadTasks = new System.Collections.Generic.List<Task<GameObject>>();
+                    System.Collections.Generic.List<string> requestedPrefabs = new System.Collections.Generic.List<string>();
+
+                    foreach (var charInfo in data.characters)
+                    {
+                        foreach (var clothes in charInfo.clothesList)
+                        {
+                            if (string.IsNullOrEmpty(clothes.prefabAddress)) continue;
+                            if (requestedPrefabs.Contains(clothes.prefabAddress)) continue;
+
+                            requestedPrefabs.Add(clothes.prefabAddress);
+
+                            if (!clothes.isLocal)
+                            {
+                                prefabLoadTasks.Add(AddressableManager.Instance.LoadIfExist<GameObject>(clothes.prefabAddress));
                             }
                         }
                     }
-                    Debug.Log($"Loaded {charList.Count} character prefabs from JSON via Addressables.");
+
+                    // 모든 프리팹 병렬 대기
+                    GameObject[] loadedPrefabs = await Task.WhenAll(prefabLoadTasks);
+
+                    // 인벤토리 등록
+                    foreach (GameObject prefab in loadedPrefabs)
+                    {
+                        if (prefab != null && !charList.Contains(prefab))
+                        {
+                            charList.Add(prefab);
+                        }
+                    }
+
+                    Debug.Log($"Loaded {charList.Count} character prefabs from JSON via Addressables (Parallel).");
                 }
             }
             catch (System.Exception e)
@@ -216,7 +237,7 @@ public class CharManager : MonoBehaviour
         InitCharacterFromCharCode("arona");
     }
 
-    private void InitCharacterFromCharCode(string charCode)
+    private async void InitCharacterFromCharCode(string charCode)
     {
         Debug.Log("InitCharacterFromCharCode Start : " + charCode);
 
@@ -243,6 +264,23 @@ public class CharManager : MonoBehaviour
                     StatusManager.Instance.IsDragging = false;
                     currentCharacter = Instantiate(gen2DPrefab, Vector3.zero, gen2DPrefab.transform.rotation, canvas.transform);
                     currentCharacterInitLocalScale = currentCharacter.transform.localScale.x;
+                    setCharSize();
+
+                    RectTransform gen2DRect = currentCharacter.GetComponent<RectTransform>();
+                    if (gen2DRect != null) gen2DRect.anchoredPosition3D = new Vector3(0, 0, -70);
+
+                    charIndex = charList.IndexOf(gen2DPrefab);
+
+                    // 2d_general 컴포넌트 주입 (헬퍼 사용)
+                    bool injected = await Inject2DGeneralComponentsAsync(clothes, currentCharacter);
+                    if (!injected)
+                    {
+                        // AnimatorController 미다운로드 → 인스턴스 제거 후 arona fallback
+                        Destroy(currentCharacter);
+                        currentCharacter = null;
+                        InitCharacterFromCharCode("arona");
+                        return;
+                    }
 
                     setDragHandlerVar(currentCharacter);
                     setClickHandlerVar(currentCharacter);
@@ -255,14 +293,6 @@ public class CharManager : MonoBehaviour
                     setStatusManagerVar(currentCharacter);
                     setEmotionFaceController(currentCharacter);
                     AnimationPlayerManager.Instance.RegisterPlayer(currentCharacter);
-
-                    RectTransform gen2DRect = currentCharacter.GetComponent<RectTransform>();
-                    if (gen2DRect != null) gen2DRect.anchoredPosition3D = new Vector3(0, 0, -70);
-
-                    charIndex = charList.IndexOf(gen2DPrefab);
-
-                    // 2d_general 컴포넌트 주입 (헬퍼 사용)
-                    Inject2DGeneralComponents(clothes, currentCharacter);
 
 #if UNITY_ANDROID && !UNITY_EDITOR
                     StartCoroutine(LoadAndPlayGreeting());
@@ -301,7 +331,11 @@ public class CharManager : MonoBehaviour
         // 캐릭터 인스턴스 생성 및 초기화
         StatusManager.Instance.IsDragging = false;
         currentCharacter = Instantiate(selectedChar, Vector3.zero, selectedChar.transform.rotation, canvas.transform);
+        
+        // 크기 즉시 적용 (Start() 타이밍 지연 보완)
         currentCharacterInitLocalScale = currentCharacter.transform.localScale.x;
+        setCharSize();
+        
         Debug.Log("currentCharacterInitLocalScale : "+ currentCharacterInitLocalScale);
 
         setDragHandlerVar(currentCharacter);
@@ -366,7 +400,7 @@ public class CharManager : MonoBehaviour
 
     // 캐릭터 교체 함수 (해당 인덱스의 캐릭터로 변경)
     // clothesInfo2d 마녀 : 2d_general 프리팩일 때 주입할 ChangeCharClothesInfo (해당 없으면 null)
-    public async void ChangeCharacter(int index, ChangeCharClothesInfo clothesInfo2d = null)
+    public async Task ChangeCharacter(int index, ChangeCharClothesInfo clothesInfo2d = null)
     {
         // 인덱스 유효성 체크
         if (index < 0 || index >= charList.Count)
@@ -444,13 +478,29 @@ public class CharManager : MonoBehaviour
         StatusManager.Instance.IsDragging = false;
         currentCharacter = Instantiate(charList[index], previousPosition, previousRotation, canvas.transform);
 
-        // 2d_general: Instantiate 직후 즉시 주입 (이후 Handler/Dialogue/Save가 올바른 값 사용)
-        if (clothesInfo2d != null)
-            Inject2DGeneralComponents(clothesInfo2d, currentCharacter);
-
-        // 기본 size 변경
+        // 시각적 튐 방지: 크기 및 위치 즉시 동기화
         currentCharacterInitLocalScale = currentCharacter.transform.localScale.x;
         setCharSize();
+
+        RectTransform newRectTransform = currentCharacter.GetComponent<RectTransform>();
+        if (newRectTransform != null)
+        {
+            newRectTransform.anchoredPosition3D = previousPosition;
+        }
+
+        // 2d_general: Instantiate 직후 즉시 주입 (이후 Handler/Dialogue/Save가 올바른 값 사용)
+        if (clothesInfo2d != null)
+        {
+            bool injected = await Inject2DGeneralComponentsAsync(clothesInfo2d, currentCharacter);
+            if (!injected)
+            {
+                // AnimatorController 미다운로드 → 인스턴스 제거 후 arona fallback
+                Destroy(currentCharacter);
+                currentCharacter = null;
+                InitCharacterFromCharCode("arona");
+                return;
+            }
+        }
 
         // Handler에 값 setting
         setDragHandlerVar(currentCharacter);
@@ -464,13 +514,6 @@ public class CharManager : MonoBehaviour
         setStatusManagerVar(currentCharacter);
         setEmotionFaceController(currentCharacter);
         AnimationPlayerManager.Instance.RegisterPlayer(currentCharacter);
-
-        // RectTransform 위치를 (0, 0, -70)으로 설정 (또는 이전 위치로 유지)
-        RectTransform newRectTransform = currentCharacter.GetComponent<RectTransform>();
-        if (newRectTransform != null)
-        {
-            newRectTransform.anchoredPosition3D = previousPosition;
-        }
 
         // 현재 인덱스 업데이트
         charIndex = index;
@@ -551,9 +594,9 @@ public class CharManager : MonoBehaviour
         ChangeCharacter(index);
     }
 
-    // 2d_general 전용 컴포넌트 주입 공통 헬퍼 (동기, WaitForCompletion)
-    // 두 경로(InitCharacterFromCharCode / ChangeCharacter2DGeneral)에서 공통 사용
-    private void Inject2DGeneralComponents(ChangeCharClothesInfo clothes, GameObject instance)
+    // 2d_general 전용 컴포넌트 주입 공통 헬퍼 (async)
+    // 반환값: true = 주입 성공, false = AnimatorController 미다운로드 → 호출자가 arona fallback 처리
+    private async Task<bool> Inject2DGeneralComponentsAsync(ChangeCharClothesInfo clothes, GameObject instance)
     {
         // CharAttributes 주입
         CharAttributes attrs = instance.GetComponent<CharAttributes>();
@@ -566,38 +609,36 @@ public class CharManager : MonoBehaviour
             attrs.is2DWalkDirectionRight = clothes.charAttr_is2DWalkDirectionRight;
             attrs.isMain                 = clothes.charAttr_isMain;
 
-            // charSprite — spriteAddress 있으면 로드 후 주입
+            // charSprite — LoadIfExist: 없으면 sampleSprite(fallback), 다운로드 시도 없음
             if (!string.IsNullOrEmpty(clothes.spriteAddress))
             {
-                var h = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<Sprite>(clothes.spriteAddress);
-                Sprite sp = h.WaitForCompletion();
-                if (sp != null) attrs.charSprite = sp;
+                Sprite sp = await AddressableManager.Instance.LoadIfExist<Sprite>(clothes.spriteAddress);
+                attrs.charSprite = sp != null ? sp : sampleSprite;
             }
 
             if (!string.IsNullOrEmpty(clothes.toggleClothesAddress))
             {
-                var h = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<GameObject>(clothes.toggleClothesAddress);
-                GameObject p = h.WaitForCompletion();
+                GameObject p = await AddressableManager.Instance.LoadWithDownloadableAsync<GameObject>(clothes.toggleClothesAddress);
                 if (p != null) attrs.toggleClothes = Instantiate(p, instance.transform);
             }
             if (!string.IsNullOrEmpty(clothes.changeClothesAddress))
             {
-                var h = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<GameObject>(clothes.changeClothesAddress);
-                GameObject p = h.WaitForCompletion();
+                GameObject p = await AddressableManager.Instance.LoadWithDownloadableAsync<GameObject>(clothes.changeClothesAddress);
                 if (p != null) attrs.changeClothes = Instantiate(p, instance.transform);
             }
         }
 
-        // AnimatorController 교체
+        // AnimatorController — LoadIfExist: 없으면 false 반환 → 호출자가 arona fallback
         if (!string.IsNullOrEmpty(clothes.animatorControllerAddress))
         {
-            var h = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<RuntimeAnimatorController>(clothes.animatorControllerAddress);
-            RuntimeAnimatorController ac = h.WaitForCompletion();
-            if (ac != null)
+            RuntimeAnimatorController ac = await AddressableManager.Instance.LoadIfExist<RuntimeAnimatorController>(clothes.animatorControllerAddress);
+            if (ac == null)
             {
-                Animator anim = instance.GetComponent<Animator>();
-                if (anim != null) anim.runtimeAnimatorController = ac;
+                Debug.LogWarning($"[2DGeneral] AnimatorController 미다운로드 → arona fallback: {clothes.animatorControllerAddress}");
+                return false;
             }
+            Animator anim = instance.GetComponent<Animator>();
+            if (anim != null) anim.runtimeAnimatorController = ac;
         }
 
         // AnimationBlendController 없으면 자동 추가
@@ -619,6 +660,8 @@ public class CharManager : MonoBehaviour
                     dragHandler.headPatThreshold = clothes.headPatThreshold;
             }
         }
+
+        return true;
     }
 
     // ChangeChar 경로용 (async) — ChangeCharCardController에서 await로 호출
@@ -639,7 +682,7 @@ public class CharManager : MonoBehaviour
         {
             if (System.Object.ReferenceEquals(charList[i], prefabHandle.Result))
             {
-                ChangeCharacter(i, clothesInfo);
+                await ChangeCharacter(i, clothesInfo);
                 return;
             }
         }
@@ -713,8 +756,71 @@ public class CharManager : MonoBehaviour
         }
         else
         {
-            // 옷 갈아입기
             ChangeCharacterFromGameObject(charAttributes.changeClothes);
+        }
+    }
+
+    // 캐릭터 코스튬 변경 (리스트를 통한 로테이션 활성화)
+    public void ChangeCostume()
+    {
+        if (currentCharacter == null) return;
+        
+        CharAttributes charAttributes = currentCharacter.GetComponent<CharAttributes>();
+        if (charAttributes == null) return;
+
+        // costumeSets가 존재하고 아이템이 있을 때 로테이션 처리
+        if (charAttributes.costumeSets != null && charAttributes.costumeSets.Count > 0)
+        {
+            // 아직 초기화가 안된 상태(-1)이거나, 활성화된 리스트 인덱스를 처음 찾음
+            if (charAttributes.currentCostumeIndex == -1)
+            {
+                for (int i = 0; i < charAttributes.costumeSets.Count; i++)
+                {
+                    bool isActiveSet = false;
+                    CharAttributes.CostumeSet set = charAttributes.costumeSets[i];
+                    if (set != null && set.costumePieces.Count > 0)
+                    {
+                        // 세트 내의 첫 번째 아이템이 활성화되어 있다면 이 세트가 활성화된 것으로 간주
+                        foreach (GameObject piece in set.costumePieces)
+                        {
+                            if (piece != null && piece.activeSelf)
+                            {
+                                isActiveSet = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (isActiveSet)
+                    {
+                        charAttributes.currentCostumeIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            charAttributes.currentCostumeIndex = (charAttributes.currentCostumeIndex + 1) % charAttributes.costumeSets.Count;
+            
+            for (int i = 0; i < charAttributes.costumeSets.Count; i++)
+            {
+                CharAttributes.CostumeSet set = charAttributes.costumeSets[i];
+                if (set != null)
+                {
+                    bool shouldBeActive = (i == charAttributes.currentCostumeIndex);
+                    foreach (GameObject piece in set.costumePieces)
+                    {
+                        if (piece != null)
+                        {
+                            piece.SetActive(shouldBeActive);
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            // costumeSets가 세팅되어 있지 않거나 비어있으면, 기존 ChangeClothes 로직으로 fallback
+            ChangeClothes(); 
         }
     }
 
@@ -831,6 +937,7 @@ public class CharManager : MonoBehaviour
         physicsManager.animator = charObj.GetComponent<Animator>();
         physicsManager.rectTransform = charObj.GetComponent<RectTransform>();
         physicsManager.charAttributes = charObj.GetComponent<CharAttributes>();
+        physicsManager.InitializeRotation(); // 지연 초기화에도 올바른 회전값 캐싱을 위해 호출
     }
     public void setAnswerBalloonVar(GameObject charObj)
     {
