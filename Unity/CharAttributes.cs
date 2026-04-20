@@ -15,6 +15,17 @@ public class CharAttributes : MonoBehaviour
     public GameObject toggleClothes = null;  // 안경, 외투 등의 변환
     public GameObject changeClothes = null;  // 옷 자체를 변경
 
+    [System.Serializable]
+    public class CostumeSet
+    {
+        public string setName = "Costume Name"; 
+        public System.Collections.Generic.List<GameObject> costumePieces = new System.Collections.Generic.List<GameObject>();
+    }
+
+    public System.Collections.Generic.List<CostumeSet> costumeSets = new System.Collections.Generic.List<CostumeSet>();
+    [HideInInspector]
+    public int currentCostumeIndex = -1;
+
     private void Start()
     {
         initLocalScale = transform.localScale.x;
