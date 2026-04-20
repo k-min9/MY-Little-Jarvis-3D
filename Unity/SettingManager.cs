@@ -102,6 +102,7 @@ public class SettingManager : MonoBehaviour
     [SerializeField] private Dropdown aiUseImageDropdown;
     [SerializeField] private Dropdown aiAskIntentDropdown;
     [SerializeField] private Dropdown aiEmotionDropdown;
+    [SerializeField] private Dropdown aiThinkModeDropdown;
     [SerializeField] private Dropdown aiVoiceFilterDropdown;
     [SerializeField] private Toggle confirmUserIntentToggle;
     [SerializeField] private Toggle includeCharInScreenshotToggle;
@@ -208,6 +209,8 @@ public class SettingManager : MonoBehaviour
         public string ai_ask_intent;
         public int ai_emotion_idx;  // 0 : off, 1 : on
         public string ai_emotion;
+        public int ai_think_mode_idx;  // 0 : off, 1 : on
+        public string ai_think_mode;
         public string ai_language;
         public bool isAskedTurnOnServer;
         public bool isAPITest;
@@ -411,6 +414,7 @@ public class SettingManager : MonoBehaviour
     public void SetIsAskChangeToMultimodalToggle(bool value) { settings.isAskChangeToMultimodal = value; SaveSettings(); }
     public void SetAiLanguage() { int value=aiLangDropdown.value; settings.ai_language_idx = value; settings.ai_language=getAiLangFromIdx(value); SaveSettings(); }
     public async void SetAIEmotion() { int value=aiEmotionDropdown.value; value = await getAiEmotionFilterScenarioAsync(value); aiEmotionDropdown.value = value; settings.ai_emotion_idx = value; settings.ai_emotion = getONOFFTypeFromIdx(value); SaveSettings(); }
+    public void SetAIThinkMode() { if (aiThinkModeDropdown != null) { int value=aiThinkModeDropdown.value; settings.ai_think_mode_idx = value; settings.ai_think_mode = getONOFFTypeFromIdx(value); SaveSettings(); } }
     public void SetAiVoiceFilter() { int value=aiVoiceFilterDropdown.value; value = getAiVoiceFilterScenario(value); aiVoiceFilterDropdown.value = value; settings.ai_voice_filter_idx = value; SaveSettings(); }
     public void SetHotKeyGlobalInput(bool value) 
     { 
@@ -1338,6 +1342,7 @@ public class SettingManager : MonoBehaviour
         isAskChangeToMultimodalToggle.SetIsOnWithoutNotify(settings.isAskChangeToMultimodal);
         aiLangDropdown.value = settings.ai_language_idx;
         aiEmotionDropdown.value = settings.ai_emotion_idx;
+        if (aiThinkModeDropdown != null) { aiThinkModeDropdown.value = settings.ai_think_mode_idx; }
         aiVoiceFilterDropdown.value = settings.ai_voice_filter_idx;
 
         devHowlingToggle.SetIsOnWithoutNotify(settings.isDevHowling);
@@ -1557,6 +1562,8 @@ public class SettingManager : MonoBehaviour
         settings.ai_ask_intent = "off";
         settings.ai_emotion_idx = 0;  // 0 : off, 1 : on
         settings.ai_emotion = "off";
+        settings.ai_think_mode_idx = 1;  // 0 : off, 1 : on
+        settings.ai_think_mode = "on";
         settings.isAskedTurnOnServer = true;
         settings.isAPITest = false;
         settings.confirmUserIntent = false;

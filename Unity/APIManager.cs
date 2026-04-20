@@ -1776,6 +1776,7 @@ public class APIManager : MonoBehaviour
         string ai_language_out = SettingManager.Instance.settings.ai_language_out ?? "";
         string ai_web_search = SettingManager.Instance.settings.ai_web_search ?? "off";  // 0 : off, 1 : on, 2: force
         string ai_emotion = SettingManager.Instance.settings.ai_emotion ?? "off";  // 0 : off, 1 : on
+        string ai_think_mode = SettingManager.Instance.settings.ai_think_mode ?? "off";  // 0 : off, 1 : on
         if (GameManager.Instance.isWebSearchForced)  // 강제 검색 메뉴
         {
             GameManager.Instance.isWebSearchForced = false;
@@ -1957,6 +1958,7 @@ public class APIManager : MonoBehaviour
             { "ai_language_in", ai_language_in }, // 추론언어로 한입, 영입영출 등 조절(ko, en, jp)
             { "ai_language_out", ai_language_out }, // 추론언어로 한출, 영입영출 등 조절(ko, en, jp)
             { "ai_emotion", ai_emotion},
+            { "ai_think_mode", ai_think_mode},
             { "api_key_Gemini", ""},
             { "api_key_OpenRouter", ""},
             { "api_key_ChatGPT", ""},
