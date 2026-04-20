@@ -51,7 +51,15 @@ public class PhysicsManager : MonoBehaviour
     private void Start()
     {
         walkProbability = 100f - idleProbability;
-        initialRotationY = rectTransform.localEulerAngles.y;
+        InitializeRotation();
+    }
+
+    public void InitializeRotation()
+    {
+        if (rectTransform != null)
+        {
+            initialRotationY = rectTransform.localEulerAngles.y;
+        }
     }
 
     private void Update()
