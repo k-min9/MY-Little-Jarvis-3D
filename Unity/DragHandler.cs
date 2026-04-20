@@ -22,9 +22,14 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
     public float headPatThreshold = 18f;  // 머리쓰다듬기 반응 비율
     public float emotionFxMultiRate = 0.0002f;  // 이펙트 비율
 
+
     private void Start()
     {
-        charAttributes = FindObjectOfType<CharAttributes>();
+        charAttributes = transform.parent?.GetComponent<CharAttributes>();
+        if (charAttributes == null)
+        {
+            charAttributes = FindObjectOfType<CharAttributes>();
+        }
         
         // 안전망: 필요한 컴포넌트들이 설정되지 않은 경우 자동으로 찾아서 설정
         InitDragHandler();
@@ -205,12 +210,28 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
             Destroy(emotionFxInstance);
         }
         emotionFxInstance = EffectManager.Instance.CreateEffectToGameObject(this.transform.parent.gameObject);
-        // 현재 스케일에 0.0002를 곱하여 설정
+        
+        // char_size 값 명시적 활용
+        float charSize = SettingManager.Instance.settings.char_size;
+        float emotionFxBaseMultiplier = 20000.0f; // 기본적으로 곱해주는 이펙트 크기 상수
+        
+        // 현재 이펙트 기본 스케일
         Vector3 currentScale = emotionFxInstance.transform.localScale;
+        
+        // 화면에 최종적으로 출력될 이펙트의 절대 목표 크기 결정 (상수 multiplier 적용)
+        float finalSizeRate = emotionFxMultiRate * emotionFxBaseMultiplier * (charSize / 100f);
+        Vector3 targetWorldScale = new Vector3(
+            currentScale.x * finalSizeRate,
+            currentScale.y * finalSizeRate,
+            currentScale.z * finalSizeRate
+        );
+
+        // 부모(캐릭터)의 현재 스케일 영향을 완벽히 상쇄하여, 목표 크기(targetWorldScale)로 일관되게 출력
+        Vector3 parentScale = this.transform.parent.localScale;
         emotionFxInstance.transform.localScale = new Vector3(
-            currentScale.x * emotionFxMultiRate,
-            currentScale.y * emotionFxMultiRate,
-            currentScale.z * emotionFxMultiRate
+            targetWorldScale.x / parentScale.x,
+            targetWorldScale.y / parentScale.y,
+            targetWorldScale.z / parentScale.z
         );
 
         // 아로나일 경우 얼굴 표정 정도 변경
