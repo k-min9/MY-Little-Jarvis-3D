@@ -33,7 +33,15 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         this.m_ContextMenu = WidgetUtility.Find<ContextMenu>("ContextMenu");
         this.m_ContextMenuSub = WidgetUtility.Find<ContextMenu>("ContextMenuSub"); // SubMenu 인스턴스 직접 참조
         this._transparentWindow = FindObjectOfType<TransparentWindow>();  // GameObject에 있음
-        this._charAttributes = FindObjectOfType<CharAttributes>();
+        this._charAttributes = GetComponent<CharAttributes>();
+        if (this._charAttributes == null)
+        {
+            this._charAttributes = GetComponentInParent<CharAttributes>();
+        }
+        if (this._charAttributes == null)
+        {
+            this._charAttributes = FindObjectOfType<CharAttributes>();
+        }
         this.m_RadialMenuAction = WidgetUtility.Find<RadialMenu>("RadialMenuAction");
 
     }
@@ -124,7 +132,8 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     │   ├ Action (원형 메뉴: 이동/행동 등)
     │   ├ Change Char (캐릭터 변경)
     │   ├ Summon Char (서브 캐릭터 소환)
-    │   └ Change Clothes (의상 변경)
+    │   ├ Change Clothes (의상 변경)
+    │   └ Change Costume (의상 변경) 
     ├ Chat
     │   ├ Guideline (주의사항)
     │   ├ Situation (퍼스트메시지)
@@ -189,6 +198,13 @@ public class MenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
                 (_charAttributes.toggleClothes != null || _charAttributes.changeClothes != null)
                 ? (UnityAction)(() => {
                     CharManager.Instance.ChangeClothes();
+                })
+                : null  // 회색 글씨
+            ),
+            (LanguageData.Translate("Change Costume", targetLang),
+                (_charAttributes.costumeSets != null && _charAttributes.costumeSets.Count > 0)
+                ? (UnityAction)(() => {
+                    CharManager.Instance.ChangeCostume();
                 })
                 : null  // 회색 글씨
             ),
