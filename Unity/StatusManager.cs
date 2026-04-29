@@ -15,6 +15,7 @@ isListening = 현재 유저의 질문을 듣고 있는지 여부 (음성인식)
 isAnswering = 현재 유저에게 답하고 있는지 여부
 isAnsweringSimple = 현재 유저에게 답하고 있는지 여부 (AnswerBalloonSimple update 병렬용)`1
 IsAnsweringPortrait = 현재 오퍼레이터 사용 여부(PortraitBalloonSimpleManager update 병렬용)
+IsAnsweringOperator = 현재 오퍼레이터 모드에서 답변 중인지 여부 (PortraitBalloonSimpleManager Operator 모드용)
 isThinking = 현재 유저의 질문에 대한 답을 연산하고 있는지 여부
 isConversationing = set은 없고, isAsking, isChatting, isListening, isThinking, isAnswering이 하나라도 True이면 True를 반환
 isOptioning = 우클릭, 메뉴등의 대기 상태
@@ -58,6 +59,7 @@ public class StatusManager : MonoBehaviour
     public bool isAnswering;
     public bool isAnsweringSimple;  // AnswerBalloonSimple 용
     public bool isAnsweringPortrait;  // PortraitBalloonSimple 용
+    public bool isAnsweringOperator;  // PortraitBalloonSimple Operator 모드용
     public bool isThinking;
     public bool isOptioning;
     public bool isOnTop;
@@ -66,6 +68,39 @@ public class StatusManager : MonoBehaviour
     public bool isMouthActive = false; // 입이 현재 움직이는 중인지 여부
     public bool isScenario = false;  // 튜토리얼 등의 시나리오는 여러가지가 동시에 진행될 수 없음
     public bool isServerConnected = false; // 현재 서버가 연결되어 있는지 여부
+    
+    // Aropla 모드 등에서 현재 말하고 있는 캐릭터들의 GameObject (HashSet으로 O(1) 성능)
+    private System.Collections.Generic.HashSet<GameObject> speakingGameObjects = new System.Collections.Generic.HashSet<GameObject>();
+    
+    // 말하는 캐릭터 추가
+    public void AddSpeakingCharacter(GameObject character)
+    {
+        if (character != null)
+        {
+            speakingGameObjects.Add(character); // HashSet은 중복 자동 무시
+        }
+    }
+    
+    // 말하는 캐릭터 제거
+    public void RemoveSpeakingCharacter(GameObject character)
+    {
+        if (character != null)
+        {
+            speakingGameObjects.Remove(character);
+        }
+    }
+    
+    // 해당 캐릭터가 현재 말하고 있는지 확인
+    public bool IsSpeaking(GameObject character)
+    {
+        return character != null && speakingGameObjects.Contains(character);
+    }
+    
+    // 모든 말하는 캐릭터 초기화
+    public void ClearSpeakingCharacters()
+    {
+        speakingGameObjects.Clear();
+    }
 
     // 그 외
     public RectTransform characterTransform;
@@ -135,6 +170,11 @@ public class StatusManager : MonoBehaviour
         get { return isAnsweringPortrait; }
         set { isAnsweringPortrait = value; }
     }
+    public bool IsAnsweringOperator
+    {
+        get { return isAnsweringOperator; }
+        set { isAnsweringOperator = value; }
+    }
 
     public bool IsThinking
     {
@@ -171,7 +211,7 @@ public class StatusManager : MonoBehaviour
 
     public bool IsConversationing
     {
-        get { return isAsking|| isChatting|| isListening || isThinking || isAnswering || isAnsweringSimple; }
+        get { return isAsking|| isChatting|| isListening || isThinking || isAnswering || isAnsweringSimple || isAnsweringOperator; }
     }
 
     private void Awake()
@@ -194,6 +234,7 @@ public class StatusManager : MonoBehaviour
             if (!isMouthActive)
             {
                 isMouthActive = true;  // EmotionFaceController에서도 사용
+                AnimationManager.Instance.TalkStart();
             }
             updateMouthStatus();
         }
@@ -204,46 +245,45 @@ public class StatusManager : MonoBehaviour
                 isMouthActive = false;
                 initMouthStatus();
                 EmotionManager.Instance.ShowEmotionFromEmotion("default"); // 입 다문 직후에만 호출
+                AnimationManager.Instance.TalkEnd();
             }
         }
     }
 
     // 입 움직이게 : 13,14 왔다갔다 > 오디오클립 연계로 입후 반응 없어도 멈추게 변경
     void updateMouthStatus() {
-        // 변수 그때 그때 세팅 (TODO : CharChange, InitChange에서 최적화 가능)
         FaceTextureChanger faceTextureChanger;
         faceTextureChanger = CharManager.Instance.GetCurrentCharacter().GetComponentInChildren<FaceTextureChanger>();
-        if (faceTextureChanger==null) return;
-
-        // 120프레임(약 2초)에 도달했을 때만 입모양 변경
-        faceTextureChanger.mouthIndex += 1;
-        if (faceTextureChanger.mouthIndex >= 120)
-        {
-            faceTextureChanger.mouthIndex = 0;  // 카운터 리셋
-
-            // 입모양 토글 (5 ↔ 6)
-            if (faceTextureChanger.mouthStatus == 5)
+        if (faceTextureChanger!=null) {
+            // 50프레임(약 0.5초)에 도달했을 때만 입모양 변경
+            faceTextureChanger.mouthIndex += 1;
+            if (faceTextureChanger.mouthIndex >= 50)
             {
-                faceTextureChanger.SetMouth(6);
-            }
-            else
-            {
-                faceTextureChanger.SetMouth(5);
+                faceTextureChanger.mouthIndex = 0;  // 카운터 리셋
+
+                // 입모양 토글 (5 ↔ 6)
+                if (faceTextureChanger.mouthStatus == 5)
+                {
+                    faceTextureChanger.SetMouth(6);
+                }
+                else
+                {
+                    faceTextureChanger.SetMouth(5);
+                }
             }
         }
     }
 
     // 입 상태 초기화
     void initMouthStatus() {
-        // 변수 그때 그때 세팅 (TODO : CharChange, InitChange에서 최적화 가능)
         FaceTextureChanger faceTextureChanger;
         faceTextureChanger = CharManager.Instance.GetCurrentCharacter().GetComponentInChildren<FaceTextureChanger>();
-        if (faceTextureChanger==null) return;        
-
-        // 입이 열린상태면 닫기
-        if (faceTextureChanger.mouthStatus == 32 || faceTextureChanger.mouthStatus == 0) return;
-        faceTextureChanger.SetMouth(32);
-        faceTextureChanger.mouthIndex = 9999;  // 순서주의
+        if (faceTextureChanger!=null) {
+            // 입이 열린상태면 닫기
+            if (faceTextureChanger.mouthStatus == 32 || faceTextureChanger.mouthStatus == 0) return;
+            faceTextureChanger.SetMouth(32);
+            faceTextureChanger.mouthIndex = 9999;  // 순서주의
+        }        
     }
 
     // X초간 status를 True로

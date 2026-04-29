@@ -28,6 +28,7 @@ public class ChangeCharClothesInfo
     public string spriteAddress;  // 해당 의상을 입었을 때의 캐릭터 아이콘의 Address
     public string prefabAddress;  // 인게임에서 교체될 실제 3D 모델(프리팹)의 Address
                                   // "2d_general" 이면 공용 2D 프리팹 특수 로직 사용
+    public bool   isLocal = false; // true = Local default Group (직접 로드), false = Remote DLC (size 체크 후 로드)
 
     // 2d_general 전용 - Addressable AnimatorController 주소
     public string animatorControllerAddress;
@@ -65,6 +66,13 @@ public class ChangeCharInfo
     public List<ChangeCharClothesInfo> clothesList = new List<ChangeCharClothesInfo>(); 
 }
 
+public enum CharacterFilterType
+{
+    All,
+    Favorite
+    // 향후 추가 가능 (예: School, Club 등)
+}
+
 public class ChangeCharManager : MonoBehaviour
 {
     // 싱글톤 인스턴스
@@ -91,7 +99,7 @@ public class ChangeCharManager : MonoBehaviour
     [SerializeField] private Sprite gridGridSprite;
     
     // 중앙 관리용 Fallback Sprite
-    [HideInInspector] public Sprite fallbackSprite;
+    [SerializeField] public Sprite fallbackSprite;
 
     [Header("UI Rect Components")]
     [SerializeField] private RectTransform uIParentRect; // 변경할 UI 패널
@@ -111,6 +119,9 @@ public class ChangeCharManager : MonoBehaviour
     [Header("Grid Mode Setting")]
     public string currentMode = "Grid"; // "Grid" 또는 "List"
     private readonly string[] availableModes = { "Grid", "List" }; // 확장 가능한 모드 배열
+
+    [Header("Filter Setting")]
+    public CharacterFilterType currentFilter = CharacterFilterType.All;
 
     private Canvas _canvas;
     private string favoritesFilePath;
@@ -134,7 +145,7 @@ public class ChangeCharManager : MonoBehaviour
         LoadFavorites();
         
         // 중앙 관리용 Fallback Sprite 동기 로딩
-        LoadFallbackSprite();
+        // LoadFallbackSprite();  // 내부 리소스 연동으로 변경
 
         // Remote 카탈로그 업데이트 체크 (백그라운드)
         StartCoroutine(CheckCatalogUpdates());
@@ -143,23 +154,23 @@ public class ChangeCharManager : MonoBehaviour
         TestDLC();
     }
 
-    private void LoadFallbackSprite()
-    {
-        try
-        {
-            var handle = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<Sprite>("sensei_sprite");
-            fallbackSprite = handle.WaitForCompletion();
+    // private void LoadFallbackSprite()
+    // {
+    //     try
+    //     {
+    //         var handle = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<Sprite>("sensei_sprite");
+    //         fallbackSprite = handle.WaitForCompletion();
             
-            if (fallbackSprite == null)
-            {
-                Debug.LogWarning("Fallback sprite 'sensei_sprite' could not be loaded. Please check Addressables.");
-            }
-        }
-        catch (Exception e)
-        {
-            Debug.LogError("Exception loading fallback sprite: " + e.Message);
-        }
-    }
+    //         if (fallbackSprite == null)
+    //         {
+    //             Debug.LogWarning("Fallback sprite 'sensei_sprite' could not be loaded. Please check Addressables.");
+    //         }
+    //     }
+    //     catch (Exception e)
+    //     {
+    //         Debug.LogError("Exception loading fallback sprite: " + e.Message);
+    //     }
+    // }
 
     // Remote 카탈로그 업데이트 체크 (GitHub Releases에서 최신 카탈로그 동기화)
     private IEnumerator CheckCatalogUpdates()
@@ -286,6 +297,9 @@ public class ChangeCharManager : MonoBehaviour
                 slot.UpdateFavoriteUI();
             }
         }
+
+        // 즐겨찾기 상태 변경 후, 현재 필터 상태에 맞춰 즉시 활성화/비활성화 처리
+        UpdateSlotsVisibility();
     }
 
     // UI 버튼의 OnClick 이벤트에 연결 (Inspector에서 설정)
@@ -307,13 +321,13 @@ public class ChangeCharManager : MonoBehaviour
             case "Grid":
                 GridToggleBtnImage.sprite = gridGridSprite;
                 uIParentRect.sizeDelta = new Vector2(800f, uIParentRect.sizeDelta.y);
-                uIHandleRect.sizeDelta = new Vector2(725f, uIHandleRect.sizeDelta.y);
+                uIHandleRect.sizeDelta = new Vector2(695f, uIHandleRect.sizeDelta.y);
                 break;
 
             case "List":
                 GridToggleBtnImage.sprite = gridListSprite;
                 uIParentRect.sizeDelta = new Vector2(340f, uIParentRect.sizeDelta.y);
-                uIHandleRect.sizeDelta = new Vector2(265f, uIHandleRect.sizeDelta.y);
+                uIHandleRect.sizeDelta = new Vector2(235f, uIHandleRect.sizeDelta.y);
                 break;
         }
 
@@ -333,6 +347,65 @@ public class ChangeCharManager : MonoBehaviour
 
         // 뷰 모드가 전환(혹은 초기화)될 때마다, 현재 화면에 보여질 슬롯들의 UI 상태를 최신화
         RefreshAllSlotsFavoriteUI();
+    }
+
+    public void ApplyFilter(CharacterFilterType filterType)
+    {
+        currentFilter = filterType;
+        UpdateSlotsVisibility();
+    }
+
+    // 버튼 등에 단일 이벤트로 연결할 수 있는 토글 함수 (임시 Fast)
+    public void ToggleFavoriteFilter()
+    {
+        if (currentFilter == CharacterFilterType.Favorite)
+        {
+            ApplyFilter(CharacterFilterType.All);
+        }
+        else
+        {
+            ApplyFilter(CharacterFilterType.Favorite);
+        }
+    }
+
+    // 조건에 따라 활성화/비활성화 갱신
+    private void UpdateSlotsVisibility()
+    {
+        // 리스트 뷰 처리
+        foreach (ChangeCharListSlotController slot in listContentParent.GetComponentsInChildren<ChangeCharListSlotController>(true))
+        {
+            bool isVisible = CheckFilterCondition(slot.CharData);
+            if (slot.gameObject.activeSelf != isVisible)
+            {
+                slot.gameObject.SetActive(isVisible);
+            }
+        }
+
+        // 그리드 뷰 처리
+        foreach (ChangeCharCardController slot in gridContentParent.GetComponentsInChildren<ChangeCharCardController>(true))
+        {
+            bool isVisible = CheckFilterCondition(slot.CharData);
+            if (slot.gameObject.activeSelf != isVisible)
+            {
+                slot.gameObject.SetActive(isVisible);
+            }
+        }
+    }
+
+    // 현재 필터 상태와 캐릭터 데이터를 비교
+    private bool CheckFilterCondition(ChangeCharInfo charInfo)
+    {
+        if (charInfo == null) return false;
+
+        switch (currentFilter)
+        {
+            case CharacterFilterType.Favorite:
+                return charInfo.isFavorite;
+
+            case CharacterFilterType.All:
+            default:
+                return true;
+        }
     }
 
     // JSON에서 캐릭터 데이터베이스를 로드합니다.
