@@ -5,6 +5,22 @@ public static class ModelDataLocal
     // 모델 이름과 고유 ID (표시용 텍스트, 내부값)
     public static readonly List<ModelOption> ModelOptions = new List<ModelOption>
     {     
+        new ModelOption("qwen3.5-9b", "Qwen3.5(9B)", new List<ModelFileInfo> {
+            new ModelFileInfo("Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf", "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf?download=true", "5.68GB", 9348464640L),
+            new ModelFileInfo("mmproj-Qwen3.5-BF16.gguf", "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/mmproj-BF16.gguf?download=true", "922MB", 788529152L)
+        }, "9.46GB"),
+        new ModelOption("qwen3.5-9b-UC", "Qwen3.5(9B-UC)", new List<ModelFileInfo> {
+            new ModelFileInfo("Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf", "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/Qwen3VL-8B-Instruct-Q4_K_M.gguf?download=true", "8.71GB", 9348464640L),
+            new ModelFileInfo("mmproj-Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-BF16.gguf", "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf?download=true", "752MB", 788529152L)
+        }, "9.46GB"),
+        new ModelOption("Gemma4-26b", "Gemma4(26B)", new List<ModelFileInfo> {
+            new ModelFileInfo("gemma-4-26B-A4B-it-UD-Q4_K_M.gguf", "https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-UD-Q4_K_M.gguf?download=true", "5.68GB", 9348464640L),
+            new ModelFileInfo("mmproj-BF16.gguf", "https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/mmproj-BF16.gguf?download=true", "922MB", 788529152L)
+        }, "9.46GB"),
+        new ModelOption("Gemma4-26b-UC", "Gemma4(26B-UC)", new List<ModelFileInfo> {
+            new ModelFileInfo("supergemma4-26b-uncensored-fast-v2-Q4_K_M.gguf", "https://huggingface.co/Jiunsong/supergemma4-26b-uncensored-gguf-v2/resolve/main/supergemma4-26b-uncensored-fast-v2-Q4_K_M.gguf?download=true", "5.68GB", 9348464640L),
+            new ModelFileInfo("mmproj-BF16.gguf", "https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/mmproj-BF16.gguf?download=true", "922MB", 788529152L)
+        }, "9.46GB"),
         new ModelOption("qwen3vl-8b", "Qwen3VL(8B)", new List<ModelFileInfo> {
             new ModelFileInfo("Qwen3VL-8B-Instruct-Q4_K_M.gguf", "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/Qwen3VL-8B-Instruct-Q4_K_M.gguf?download=true", "8.71GB", 9348464640L),
             new ModelFileInfo("mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf", "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf?download=true", "752MB", 788529152L)
