@@ -33,6 +33,9 @@ public enum HotKeyActionType
     [DisplayText("Change Clothes")]
     ActionChangeClothes,
     
+    [DisplayText("Change Costume")]
+    ActionChangeCostume,
+    
     [DisplayText("Change Char")]
     ActionChangeChar,
     
@@ -160,6 +163,12 @@ public class HotKeyActionManager : MonoBehaviour
         actions["ActionChangeClothes"] = () =>
         {
             CharManager.Instance.ChangeClothes();
+        };
+
+        // 코스튬 변경 (리스트 로테이션 방식)
+        actions["ActionChangeCostume"] = () =>
+        {
+            CharManager.Instance.ChangeCostume();
         };
 
         // 캐릭터 변경 [다음캐릭터, 랜덤캐릭터로 차후 확장 가능]

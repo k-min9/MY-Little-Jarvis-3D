@@ -800,20 +800,24 @@ public class CharManager : MonoBehaviour
             }
 
             charAttributes.currentCostumeIndex = (charAttributes.currentCostumeIndex + 1) % charAttributes.costumeSets.Count;
-            
-            for (int i = 0; i < charAttributes.costumeSets.Count; i++)
+
+            // 모든 세트의 piece를 먼저 전부 비활성화
+            foreach (CharAttributes.CostumeSet set in charAttributes.costumeSets)
             {
-                CharAttributes.CostumeSet set = charAttributes.costumeSets[i];
-                if (set != null)
+                if (set == null) continue;
+                foreach (GameObject piece in set.costumePieces)
                 {
-                    bool shouldBeActive = (i == charAttributes.currentCostumeIndex);
-                    foreach (GameObject piece in set.costumePieces)
-                    {
-                        if (piece != null)
-                        {
-                            piece.SetActive(shouldBeActive);
-                        }
-                    }
+                    if (piece != null) piece.SetActive(false);
+                }
+            }
+
+            // 현재 세트의 piece 활성화
+            CharAttributes.CostumeSet activeSet = charAttributes.costumeSets[charAttributes.currentCostumeIndex];
+            if (activeSet != null)
+            {
+                foreach (GameObject piece in activeSet.costumePieces)
+                {
+                    if (piece != null) piece.SetActive(true);
                 }
             }
         }
