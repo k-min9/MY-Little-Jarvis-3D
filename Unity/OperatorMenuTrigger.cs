@@ -48,7 +48,13 @@ public class OperatorMenuTrigger : MonoBehaviour, IPointerDownHandler, IPointerU
         if (m_RadialMenuAction == null)
             m_RadialMenuAction = WidgetUtility.Find<RadialMenu>("RadialMenuAction");
         if (_charAttributes == null)
-            _charAttributes = FindObjectOfType<CharAttributes>();
+        {
+            _charAttributes = GetComponent<CharAttributes>();
+            if (_charAttributes == null)
+                _charAttributes = GetComponentInParent<CharAttributes>();
+            if (_charAttributes == null)
+                _charAttributes = FindObjectOfType<CharAttributes>();
+        }
     }
 
     private void Update()
