@@ -20,8 +20,6 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
     private GameObject emotionBalloonInstance = null;
     private GameObject emotionFxInstance = null;
     public float headPatThreshold = 18f;  // 머리쓰다듬기 반응 비율
-    public float emotionFxMultiRate = 0.0002f;  // 이펙트 비율
-
 
     private void Start()
     {
@@ -211,27 +209,20 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
         }
         emotionFxInstance = EffectManager.Instance.CreateEffectToGameObject(this.transform.parent.gameObject);
         
-        // char_size 값 명시적 활용
-        float charSize = SettingManager.Instance.settings.char_size;
-        float emotionFxBaseMultiplier = 20000.0f; // 기본적으로 곱해주는 이펙트 크기 상수
-        
-        // 현재 이펙트 기본 스케일
-        Vector3 currentScale = emotionFxInstance.transform.localScale;
-        
-        // 화면에 최종적으로 출력될 이펙트의 절대 목표 크기 결정 (상수 multiplier 적용)
-        float finalSizeRate = emotionFxMultiRate * emotionFxBaseMultiplier * (charSize / 100f);
-        Vector3 targetWorldScale = new Vector3(
-            currentScale.x * finalSizeRate,
-            currentScale.y * finalSizeRate,
-            currentScale.z * finalSizeRate
-        );
+        float emotionFxBaseMultiplier = 10f;
 
-        // 부모(캐릭터)의 현재 스케일 영향을 완벽히 상쇄하여, 목표 크기(targetWorldScale)로 일관되게 출력
-        Vector3 parentScale = this.transform.parent.localScale;
+        // charAttributes.initLocalScale: setCharSize 적용 전 원본 스케일
+        // initLocalScale로만 나눔으로써 charSize 배율이 월드 스케일에 남아
+        // → 이펙트 월드 크기 ∝ charSize (캐릭터 커지면 이펙트도 커짐)
+        float initLocalScale = (charAttributes != null && charAttributes.initLocalScale > 0f)
+            ? charAttributes.initLocalScale
+            : 1f;
+
+        Vector3 currentScale = emotionFxInstance.transform.localScale;
         emotionFxInstance.transform.localScale = new Vector3(
-            targetWorldScale.x / parentScale.x,
-            targetWorldScale.y / parentScale.y,
-            targetWorldScale.z / parentScale.z
+            currentScale.x * emotionFxBaseMultiplier / initLocalScale,
+            currentScale.y * emotionFxBaseMultiplier / initLocalScale,
+            currentScale.z * emotionFxBaseMultiplier / initLocalScale
         );
 
         // 아로나일 경우 얼굴 표정 정도 변경
