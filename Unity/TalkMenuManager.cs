@@ -6,7 +6,6 @@ using System;
 
 public class TalkMenuManager : MonoBehaviour
 {
-    [SerializeField] private Canvas _canvas; 
     [SerializeField] private GameObject talkMenu; // TalkMenu 이미지
     [SerializeField] public RectTransform characterTransform; // TalkMenu 표시될 캐릭터의 Transform
     [SerializeField] private RectTransform talkMenuTransform; // TalkMenu Transform

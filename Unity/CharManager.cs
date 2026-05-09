@@ -37,13 +37,16 @@ public class CharManager : MonoBehaviour
     private CharacterDatabaseData _characterDatabaseData;
 
     // 캐릭터가 속할 Canvas
-    public Canvas canvas; // Canvas를 에디터에서 설정하거나 Find로 찾기
+    private Canvas canvasChar; // Canvas를 에디터에서 설정하거나 Find로 찾기
 
     // 오류시 보낼 기본 값
     public Sprite sampleSprite;
 
     private async void Awake()
     {
+        // canvas 값 세팅
+        canvasChar = CanvasManager.Instance.canvasChar;
+
         // 선행작업 로딩
         SettingManager.Instance.LoadSettings();
 
@@ -146,66 +149,6 @@ public class CharManager : MonoBehaviour
         setCharSize();
     }
 
-    // 250708 기존코드
-    // 첫 번째 캐릭터를 RectTransform (0,0,-70)에 생성하는 함수
-    // private void InitCharacter()
-    // {
-    //     if (charList.Count == 0)
-    //     {
-    //         Debug.LogError("Character list is empty.");
-    //         return;
-    //     }
-
-    //     // 첫 번째 캐릭터 생성, Canvas의 자식으로 설정
-    //     StatusManager.Instance.IsDragging = false;
-    //     currentCharacter = Instantiate(charList[0], Vector3.zero, charList[0].transform.rotation, canvas.transform);
-    //     currentCharacterInitLocalScale = currentCharacter.transform.localScale.x;
-
-    //     // Handler에 값 setting
-    //     setDragHandlerVar(currentCharacter);
-    //     setClickHandlerVar(currentCharacter);
-    //     setPhysicsManagerVar(currentCharacter);
-    //     setAnswerBalloonVar(currentCharacter);
-    //     setAnswerBalloonSimpleVar(currentCharacter);
-    //     setChatBalloonVar(currentCharacter);
-    //     setAskBalloonVar(currentCharacter);
-    //     setTalkMenuVar(currentCharacter);
-    //     setStatusManagerVar(currentCharacter);
-    //     setEmotionFaceController(currentCharacter);
-
-    //     // RectTransform을 찾아서 위치를 (0, 0, -70)으로 설정
-    //     RectTransform rectTransform = currentCharacter.GetComponent<RectTransform>();
-    //     if (rectTransform != null)
-    //     {
-    //         rectTransform.anchoredPosition3D = new Vector3(0, 0, -70);
-    //     }
-
-    //     // 현재 인덱스 업데이트
-    //     charIndex = 0;
-
-    // #if UNITY_ANDROID && !UNITY_EDITOR  // 안드로이드
-    //     // 현재 Dialogue 업데이트 + 변경 음성 출력
-    //     StartCoroutine(LoadAndPlayGreeting());
-    // #else
-    //     // 현재 Dialogue 업데이트
-    //     DialogueManager.Instance.LoadDialoguesFromJSON();
-
-    //     // 변경 음성 출력
-    //     Dialogue greeting = DialogueManager.Instance.GetRandomGreeting();
-    //     VoiceManager.Instance.PlayAudioFromPath(greeting.filePath);
-    // #endif
-
-    //     // 캐릭터 닉네임 출력
-    //     string nickname = GetNickname(currentCharacter);
-    //     if (!string.IsNullOrEmpty(nickname))
-    //     {
-    //         Debug.Log("Initialized character: " + nickname);
-    //     }
-    //     else
-    //     {
-    //         Debug.Log("Initialized character has no nickname.");
-    //     }
-    // }
 
     private void InitCharacter()
     {
@@ -262,7 +205,7 @@ public class CharManager : MonoBehaviour
                     }
 
                     StatusManager.Instance.IsDragging = false;
-                    currentCharacter = Instantiate(gen2DPrefab, Vector3.zero, gen2DPrefab.transform.rotation, canvas.transform);
+                    currentCharacter = Instantiate(gen2DPrefab, Vector3.zero, gen2DPrefab.transform.rotation, canvasChar.transform);
                     currentCharacterInitLocalScale = currentCharacter.transform.localScale.x;
                     setCharSize();
 
@@ -330,7 +273,7 @@ public class CharManager : MonoBehaviour
 
         // 캐릭터 인스턴스 생성 및 초기화
         StatusManager.Instance.IsDragging = false;
-        currentCharacter = Instantiate(selectedChar, Vector3.zero, selectedChar.transform.rotation, canvas.transform);
+        currentCharacter = Instantiate(selectedChar, Vector3.zero, selectedChar.transform.rotation, canvasChar.transform);
         
         // 크기 즉시 적용 (Start() 타이밍 지연 보완)
         currentCharacterInitLocalScale = currentCharacter.transform.localScale.x;
@@ -476,7 +419,7 @@ public class CharManager : MonoBehaviour
 
         // 새로운 캐릭터 생성, Canvas의 자식으로 설정
         StatusManager.Instance.IsDragging = false;
-        currentCharacter = Instantiate(charList[index], previousPosition, previousRotation, canvas.transform);
+        currentCharacter = Instantiate(charList[index], previousPosition, previousRotation, canvasChar.transform);
 
         // 시각적 튐 방지: 크기 및 위치 즉시 동기화
         currentCharacterInitLocalScale = currentCharacter.transform.localScale.x;
@@ -531,7 +474,7 @@ public class CharManager : MonoBehaviour
 #endif
 
         // 이펙트(FX, SFX) 효과
-        fx_change.transform.position = canvas.transform.TransformPoint(previousPosition);
+        fx_change.transform.position = canvasChar.transform.TransformPoint(previousPosition);
         fx_change.Play();
 
 
@@ -890,7 +833,7 @@ public class CharManager : MonoBehaviour
         if (dragHandler != null)
         {
             // 최상위 Canvas를 _canvas에 할당
-            dragHandler._canvas = FindObjectOfType<Canvas>();
+            dragHandler.canvasChar = canvasChar;
 
             // 부모 캐릭터의 Animator를 _animator에 할당
             Animator charAnimator = charObj.GetComponent<Animator>();

@@ -70,7 +70,7 @@ public class ScreenshotOCRRectManager : MonoBehaviour
             return;
         }
 
-        _canvas = FindObjectOfType<Canvas>();
+        _canvas = CanvasManager.Instance.canvasUI;
         
         // 모든 슬롯 초기화 (비영속 - 항상 기본설정으로 시작)
         for (int i = 0; i < customRects.Length; i++)

@@ -49,7 +49,7 @@ public class UIResizeHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, I
         rootCanvas = GetComponentInParent<Canvas>();
         if (rootCanvas == null)
         {
-            rootCanvas = FindObjectOfType<Canvas>();
+            rootCanvas = CanvasManager.Instance.canvasUI;
         }
         
         isChatBalloon = CheckIfChatBalloon();

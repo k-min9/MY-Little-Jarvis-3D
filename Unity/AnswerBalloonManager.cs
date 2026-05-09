@@ -20,7 +20,6 @@ public class AnswerBalloonManager : MonoBehaviour
         }
     }
 
-    [SerializeField] private Canvas _canvas; // AnswerBalloon 이미지
     [SerializeField] private GameObject answerBalloon; // AnswerBalloon 이미지
     [SerializeField] private TextMeshProUGUI answerText; // AnswerBalloon 하위의 TMP 텍스트
     [SerializeField] public RectTransform characterTransform; // AnswerBalloon이 표시될 캐릭터의 Transform
@@ -44,8 +43,6 @@ public class AnswerBalloonManager : MonoBehaviour
 
     void Start()
     {
-        _canvas = FindObjectOfType<Canvas>();  // 최상위 Canvas
-
         // UI 최초 비활성화
         webImage.SetActive(false);
     }
@@ -257,16 +254,7 @@ public class AnswerBalloonManager : MonoBehaviour
     // AnswerBalloon의 위치를 캐릭터 바로 위로 조정하는 함수
     private void UpdateAnswerBalloonPosition()
     {
-        Vector2 charPosition = characterTransform.anchoredPosition;
-
-        // 캐릭터의 X 위치와 동일하게 설정
-        RectTransform canvasRect = _canvas.GetComponent<RectTransform>();
-        float leftBound = -canvasRect.rect.width / 2; // 캔버스 왼쪽 끝
-        float rightBound = canvasRect.rect.width / 2; // 캔버스 오른쪽 끝
-        float charPositionX = Mathf.Clamp(charPosition.x, leftBound + 250, rightBound - 250);
-
-        // answerBalloonTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 270 * SettingManager.Instance.settings.char_size / 100f); // Y축 창크기 270만큼
-        answerBalloonTransform.anchoredPosition = new Vector2(charPositionX, charPosition.y + 200 * SettingManager.Instance.settings.char_size / 100f + 100);
+        answerBalloonTransform.anchoredPosition = UIPositionManager.Instance.GetBalloonAnchoredPosition(characterTransform);
     }
 
     public void ShowWebImage()

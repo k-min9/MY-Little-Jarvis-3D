@@ -10,7 +10,7 @@ using UnityWeld.Binding;
 [Binding] 
 public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHandler 
 {
-    public Canvas _canvas;
+    public Canvas canvasChar;
     [SerializeField] public Animator _animator; 
     private CharAttributes charAttributes;
 
@@ -37,14 +37,7 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
     private void InitDragHandler()
     {
         // Canvas가 설정되지 않은 경우 찾아서 설정
-        if (_canvas == null)
-        {
-            _canvas = FindObjectOfType<Canvas>();
-            if (_canvas == null)
-            {
-                Debug.LogWarning($"DragHandler: Canvas를 찾을 수 없습니다. ({gameObject.name})");
-            }
-        }
+        canvasChar = CanvasManager.Instance.canvasChar;
         
         // Animator가 설정되지 않은 경우 부모에서 찾아서 설정
         if (_animator == null)
@@ -66,9 +59,9 @@ public class DragHandler : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndD
         mousePos.x = Mathf.Clamp(mousePos.x, 0, Screen.width);
         mousePos.y = Mathf.Clamp(mousePos.y-50, 0, Screen.height);
         
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvas.transform as RectTransform, mousePos, _canvas.worldCamera, out Vector2 pos);
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasChar.transform as RectTransform, mousePos, canvasChar.worldCamera, out Vector2 pos);
         Vector3 newPos = new Vector3(pos.x, pos.y, -70);  // z=--70
-        transform.parent.position = _canvas.transform.TransformPoint(newPos);
+        transform.parent.position = canvasChar.transform.TransformPoint(newPos);
     }
 
     public void OnBeginDrag(PointerEventData eventData)

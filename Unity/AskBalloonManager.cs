@@ -18,7 +18,6 @@ public class AskBalloonManager : MonoBehaviour
         }
     }
 
-    [SerializeField] private Canvas _canvas; // askBalloon 이미지
     [SerializeField] private GameObject askBalloon; // askBalloon 이미지
     [SerializeField] private TextMeshProUGUI askText; // askBalloon이 하위의 TMP 텍스트
     [SerializeField] public RectTransform characterTransform; // askBalloon이 표시될 캐릭터의 Transform
@@ -136,11 +135,7 @@ public class AskBalloonManager : MonoBehaviour
     // askBalloon의 위치를 캐릭터 바로 위로 조정하는 함수
     private void UpdateAskBalloonPosition()
     {
-        Vector2 charPosition = characterTransform.anchoredPosition;
-        
-        // 캐릭터의 X 위치와 동일하게 설정
-        // askBalloonTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 270 * SettingManager.Instance.settings.char_size / 100f); // Y축 창크기 270만큼
-        askBalloonTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 200 * SettingManager.Instance.settings.char_size / 100f + 100);
+        askBalloonTransform.anchoredPosition = UIPositionManager.Instance.GetBalloonAnchoredPosition(characterTransform);
     }
 
     // Yes 버튼 사용 > 과거의 서버 인스톨 후 시작 흔적

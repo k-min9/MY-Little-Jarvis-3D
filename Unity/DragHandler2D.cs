@@ -13,6 +13,11 @@ public class DragHandler2D : MonoBehaviour, IDragHandler, IBeginDragHandler, IEn
     public Canvas _canvas;
     // [SerializeField] public Animator _animator; 
 
+    private void Awake()
+    {
+        _canvas = CanvasManager.Instance.canvasUI;
+    }
+
     public void OnDrag(PointerEventData eventData)
     {
         var mousePos = Input.mousePosition;

@@ -123,7 +123,6 @@ public class ChangeCharManager : MonoBehaviour
     [Header("Filter Setting")]
     public CharacterFilterType currentFilter = CharacterFilterType.All;
 
-    private Canvas _canvas;
     private string favoritesFilePath;
     private string databaseFilePath;
 
@@ -249,8 +248,6 @@ public class ChangeCharManager : MonoBehaviour
 
     void Start()
     {
-        _canvas = FindObjectOfType<Canvas>();  // 최상위 Canvas
-
         // 데이터베이스 기반 슬롯 생성
         GenerateCharacterSlots();
 

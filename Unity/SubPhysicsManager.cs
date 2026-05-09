@@ -12,7 +12,7 @@ public class SubPhysicsManager : MonoBehaviour
     public float walkProbability = 30f;
     public RectTransform rectTransform;
     public CharAttributes charAttributes;
-    public Canvas canvas; 
+    [SerializeField] private Canvas canvasChar; 
     private float initialRotationY;
 
     private float controlTimer = 3f;  // 타이머 초기값
@@ -23,7 +23,7 @@ public class SubPhysicsManager : MonoBehaviour
 
     private void Start()
     {
-        canvas = FindObjectOfType<Canvas>();
+        canvasChar = CanvasManager.Instance.canvasChar;
         subStatusManager = this.gameObject.GetComponent<SubStatusManager>();
         walkProbability = 100f - idleProbability;
         initialRotationY = rectTransform.localEulerAngles.y;
@@ -159,7 +159,7 @@ public class SubPhysicsManager : MonoBehaviour
             Vector2 newPosition = rectTransform.anchoredPosition + new Vector2(-moveSpeed * Time.deltaTime * SettingManager.Instance.settings.char_speed / 100f, 0);
 
             // Canvas의 크기 제한 가져오기
-            RectTransform canvasRect = canvas.GetComponent<RectTransform>();
+            RectTransform canvasRect = canvasChar.GetComponent<RectTransform>();
             float leftBound = -canvasRect.rect.width/2; // 캔버스 왼쪽 끝
             float rightBound = canvasRect.rect.width/2; // 캔버스 오른쪽 끝
 
@@ -184,7 +184,7 @@ public class SubPhysicsManager : MonoBehaviour
             Vector2 newPosition = rectTransform.anchoredPosition + new Vector2(moveSpeed * Time.deltaTime * SettingManager.Instance.settings.char_speed / 100f, 0);
 
             // Canvas의 크기 제한 가져오기
-            RectTransform canvasRect = canvas.GetComponent<RectTransform>();
+            RectTransform canvasRect = canvasChar.GetComponent<RectTransform>();
             float leftBound = -canvasRect.rect.width/2; // 캔버스 왼쪽 끝
             float rightBound = canvasRect.rect.width/2; // 캔버스 오른쪽 끝
 

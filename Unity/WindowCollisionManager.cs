@@ -77,7 +77,7 @@ public class WindowCollisionManager : MonoBehaviour
     {
 
         // Canvas 찾기
-        canvas = FindObjectOfType<Canvas>();
+        canvas = CanvasManager.Instance.canvasUI;
 
         // 싱글톤
         if (Instance == null)

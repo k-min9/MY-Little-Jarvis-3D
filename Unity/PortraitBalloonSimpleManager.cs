@@ -4,7 +4,6 @@ using TMPro;
 
 public class PortraitBalloonSimpleManager : MonoBehaviour
 {
-    [SerializeField] private Canvas _canvas; // Portrait용 말풍선이 있는 Canvas
     [SerializeField] private GameObject portraitBalloonSimple; // 말풍선 오브젝트
     [SerializeField] private TextMeshProUGUI portraitText; // 텍스트 필드
     [SerializeField] public RectTransform targetPortraitTransform; // 말풍선 붙일 대상 (예: Portrait 기준)

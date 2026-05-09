@@ -6,7 +6,6 @@ using System;
 
 public class DebugMenuManager : MonoBehaviour
 {
-    [SerializeField] private Canvas _canvas; 
     [SerializeField] private GameObject debugMenu; // debugMenu 이미지
 
     public bool isShowing = false;  // EDITOR일때 활성화하는 식으로

@@ -237,7 +237,7 @@ public class ScreenshotManager : MonoBehaviour
     {
         backgroundOverlayPanel.SetActive(false); // Initially, background is disabled
         screenshotArea.SetActive(false); // Initially, screenshot area is hidden
-        _canvas = FindObjectOfType<Canvas>();  // 최상위 Canvas
+        _canvas = CanvasManager.Instance.canvasUI;
         
         // Unity 창 핸들 획득
         _unityWindowHandle = GetActiveWindow();

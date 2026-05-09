@@ -12,13 +12,8 @@ public class WindowCollisionUI : MonoBehaviour
     // UI 보여주고 싶을 경우 활성화
     private void Start()
     {
-        // Canvas 찾기
-        canvas = FindObjectOfType<Canvas>();
-        if (canvas == null)
-        {
-            Debug.LogError("Canvas를 찾을 수 없습니다! 씬에 Canvas가 있어야 합니다.");
-            return;
-        }
+        // Canvas 세팅
+        canvas = CanvasManager.Instance.canvasUI;
 
         if (isWindowsRectShowing) 
         {

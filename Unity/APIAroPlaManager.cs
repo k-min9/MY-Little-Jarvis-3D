@@ -59,7 +59,7 @@ public class APIAroPlaManager : MonoBehaviour
     [Header("Aropla Channel Settings")]
     public GameObject planaPrefab;   // 인스펙터에서 설정할 프라나 프리팹
     private GameObject planaInstance;  // 생성된 프라나 인스턴스
-    private Canvas canvas;
+    public Canvas canvasChar;
 
     // 서브 캐릭터(프라나) 배치 상수
     private const float PLANA_OFFSET_X = 300f;   // 프라나는 오른쪽으로  
@@ -80,12 +80,8 @@ public class APIAroPlaManager : MonoBehaviour
 
     private void InitializeAroplaChannel()
     {
-        // Canvas 초기화 (CharManager 방식 참고)
-        canvas = FindObjectOfType<Canvas>();
-        if (canvas == null)
-        {
-            AroplaLogError("Canvas를 찾을 수 없습니다. 아로프라 채널이 제대로 작동하지 않을 수 있습니다.");
-        }
+        // Canvas
+        canvasChar = CanvasManager.Instance.canvasChar;
         
         // 로그 파일 경로 생성
         string dateTime = DateTime.Now.ToString("yyyyMMdd_HHmmss");
@@ -1205,14 +1201,9 @@ public class APIAroPlaManager : MonoBehaviour
         }
 
         // Canvas가 없는 경우 다시 찾기
-        if (canvas == null)
+        if (canvasChar == null)
         {
-            canvas = FindObjectOfType<Canvas>();
-            if (canvas == null)
-            {
-                AroplaLogError("Canvas를 찾을 수 없어 프라나를 생성할 수 없습니다.");
-                return;
-            }
+            canvasChar = CanvasManager.Instance.canvasChar;
         }
 
         // 프라나 생성 (서브 캐릭터)
@@ -1235,7 +1226,7 @@ public class APIAroPlaManager : MonoBehaviour
         Vector3 planaPosition = CalculateSubCharacterPosition(PLANA_OFFSET_X, PLANA_OFFSET_Y);
 
         // 프라나 인스턴스 생성
-        planaInstance = Instantiate(planaPrefab, planaPosition, planaPrefab.transform.rotation, canvas.transform);
+        planaInstance = Instantiate(planaPrefab, planaPosition, planaPrefab.transform.rotation, canvasChar.transform);
 
         // RectTransform 위치 설정
         RectTransform planaRect = planaInstance.GetComponent<RectTransform>();
@@ -1319,7 +1310,7 @@ public class APIAroPlaManager : MonoBehaviour
         if (dragHandler != null)
         {
             // Canvas 할당
-            dragHandler._canvas = canvas ?? FindObjectOfType<Canvas>();
+            dragHandler.canvasChar = canvasChar;
 
             // 부모(프라나) 캐릭터의 Animator 할당
             Animator planaAnimator = planaInstance.GetComponent<Animator>();

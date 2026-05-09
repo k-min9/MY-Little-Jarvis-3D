@@ -37,7 +37,7 @@ public class SubCharManager : MonoBehaviour
     void Awake()
     {
         // 초기화
-        canvas = FindObjectOfType<Canvas>();
+        canvas = CanvasManager.Instance.canvasChar;
 
         
         // 빈 GameObject 생성 (사각형들을 정리하기 위함)
@@ -476,8 +476,8 @@ public class SubCharManager : MonoBehaviour
 
         if (dragHandler != null)
         {
-            // 최상위 Canvas를 _canvas에 할당
-            dragHandler._canvas = FindObjectOfType<Canvas>();
+            // 최상위 Canvas를 canvasChar에 할당
+            dragHandler.canvasChar = CanvasManager.Instance.canvasChar;
 
             // 부모 캐릭터의 Animator를 _animator에 할당
             Animator charAnimator = charObj.GetComponent<Animator>();

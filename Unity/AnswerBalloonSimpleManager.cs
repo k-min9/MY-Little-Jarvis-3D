@@ -19,7 +19,6 @@ public class AnswerBalloonSimpleManager : MonoBehaviour
         }
     }
 
-    [SerializeField] private Canvas _canvas; // AnswerBalloonSimple 이미지
     [SerializeField] private GameObject answerBalloonSimple; // AnswerBalloonSimple 이미지
     [SerializeField] private TextMeshProUGUI answerText; // AnswerBalloonSimple 하위의 TMP 텍스트
     [SerializeField] public RectTransform characterTransform; // AnswerBalloonSimple이 표시될 캐릭터의 Transform
@@ -181,9 +180,6 @@ public class AnswerBalloonSimpleManager : MonoBehaviour
     // AnswerBalloonSimple의 위치를 캐릭터 바로 위로 조정하는 함수
     private void UpdateAnswerBalloonSimplePosition()
     {
-        Vector2 charPosition = characterTransform.anchoredPosition;
-        
-        // 캐릭터의 X 위치와 동일하게 설정
-        answerBalloonSimpleTransform.anchoredPosition = new Vector2(charPosition.x, charPosition.y + 200 * SettingManager.Instance.settings.char_size / 100f + 100);
+        answerBalloonSimpleTransform.anchoredPosition = UIPositionManager.Instance.GetBalloonAnchoredPosition(characterTransform);
     }
 }

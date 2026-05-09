@@ -24,7 +24,7 @@ public class UIPositionManager : MonoBehaviour
         if (instance == null)
         {
             instance = this;
-            canvas = FindObjectOfType<Canvas>();
+            canvas = CanvasManager.Instance.canvasUI;
             canvasRect = canvas.GetComponent<RectTransform>();
         }
     }
@@ -81,6 +81,34 @@ public class UIPositionManager : MonoBehaviour
     public Vector3 GetCanvasPositionBottomRight()
     {
         return canvas.transform.TransformPoint(new Vector3(canvasRect.rect.width / 2 - 100f, -canvasRect.rect.height / 2 + 100f, 0f));
+    }
+
+    // 캐릭터의 Transform을 기반으로 말풍선의 AnchoredPosition 계산
+    public Vector2 GetBalloonAnchoredPosition(RectTransform charTransform)
+    {
+        Vector2 charPosition = charTransform.anchoredPosition;
+
+        // 캔버스 범위를 벗어나지 않도록 X 좌표 제한
+        float leftBound = -canvasRect.rect.width / 2;
+        float rightBound = canvasRect.rect.width / 2;
+        float charPositionX = Mathf.Clamp(charPosition.x, leftBound + 250, rightBound - 250);
+
+        // Y 좌표는 캐릭터 위치에 비례하여 위로 띄움
+        float charSizeScale = SettingManager.Instance.settings.char_size / 100f;
+        return new Vector2(charPositionX, charPosition.y + 200 * charSizeScale + 100);
+    }
+
+    // 특정 좌표를 기반으로 말풍선의 AnchoredPosition 계산
+    public Vector2 GetBalloonAnchoredPositionByPosition(Vector2 targetPosition)
+    {
+        // 캔버스 범위를 벗어나지 않도록 X 좌표 제한
+        float leftBound = -canvasRect.rect.width / 2;
+        float rightBound = canvasRect.rect.width / 2;
+        float positionX = Mathf.Clamp(targetPosition.x, leftBound + 250, rightBound - 250);
+
+        // Y 좌표는 캐릭터 위치에 비례하여 위로 띄움
+        float charSizeScale = SettingManager.Instance.settings.char_size / 100f;
+        return new Vector2(positionX, targetPosition.y + 200 * charSizeScale + 100);
     }
 
     // 특정 메뉴 이름에 따라 하드코딩된 위치 반환 (예시만)
