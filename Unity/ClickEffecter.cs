@@ -55,7 +55,7 @@ public class ClickEffecter : MonoBehaviour
         // Canvas 미할당이면 최상위 canvas 사용
         if (targetCanvas == null)
         {
-            targetCanvas = FindObjectOfType<Canvas>();  // 최상위 Canvas
+            targetCanvas = CanvasManager.Instance.canvasUI;
         }
 
         // 클릭이 없는 프레임은 조기 리턴

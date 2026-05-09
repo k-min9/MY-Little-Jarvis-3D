@@ -57,7 +57,7 @@ public class EmotionBalloonManager : MonoBehaviour
 
     public void Start()
     {
-        _canvas = FindObjectOfType<Canvas>();
+        _canvas = CanvasManager.Instance.canvasUI;
     }
 
     public GameObject ShowEmotionBalloon(GameObject target, string spriteName = "Love", float duration = 60f)

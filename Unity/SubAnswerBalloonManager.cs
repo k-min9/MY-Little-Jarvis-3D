@@ -232,8 +232,6 @@ public class SubAnswerBalloonManager : MonoBehaviour
     // AnswerBalloon의 위치를 업데이트하는 함수 (유연한 위치 설정)
     private void UpdateAnswerBalloonPosition()
     {
-        if (answerBalloonTransform == null || _canvas == null) return;
-
         Vector2 finalPosition;
 
         if (useCustomPosition)
@@ -247,22 +245,7 @@ public class SubAnswerBalloonManager : MonoBehaviour
             finalPosition = Vector2.zero;
         }
 
-        // 캔버스 경계 확인 및 조정
-        RectTransform canvasRect = _canvas.GetComponent<RectTransform>();
-        if (canvasRect != null)
-        {
-            float leftBound = -canvasRect.rect.width / 2; // 캔버스 왼쪽 끝
-            float rightBound = canvasRect.rect.width / 2; // 캔버스 오른쪽 끝
-            float finalX = Mathf.Clamp(finalPosition.x, leftBound + 250, rightBound - 250);
-
-            // Y 위치는 캐릭터 위에 표시 (캐릭터 크기 고려)
-            float offsetY = 200 * SettingManager.Instance.settings.char_size / 100f + 100;
-            answerBalloonTransform.anchoredPosition = new Vector2(finalX, finalPosition.y + offsetY);
-        }
-        else
-        {
-            answerBalloonTransform.anchoredPosition = new Vector2(finalPosition.x, finalPosition.y + 300);
-        }
+        answerBalloonTransform.anchoredPosition = UIPositionManager.Instance.GetBalloonAnchoredPositionByPosition(finalPosition);
     }
 
     // 위치를 직접 설정하는 메서드
