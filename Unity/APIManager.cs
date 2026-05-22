@@ -1290,11 +1290,11 @@ public class APIManager : MonoBehaviour
         string boundary = "----WebKitFormBoundary" + DateTime.Now.Ticks.ToString("x");
         string contentType = "multipart/form-data; boundary=" + boundary;
 
+        // 세션 객체 생성
+        AIChatSession session = new AIChatSession(targetCharacter, curChatIdxNum);
+
         try
         {
-            // 세션 객체 생성
-            AIChatSession session = new AIChatSession(targetCharacter, curChatIdxNum);
-
             // HttpWebRequest 객체를 사용하여 요청 생성
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
             request.Method = "POST";
@@ -1575,6 +1575,42 @@ public class APIManager : MonoBehaviour
                 {
                     string errorResponse = await errorReader.ReadToEndAsync();
                     Debug.LogError($"Error Response: {errorResponse}");
+
+                    try
+                    {
+                        var jsonObject = JObject.Parse(errorResponse);
+                        string replyType = jsonObject["type"]?.ToString() ?? "";
+                        if (replyType == "reply" && jsonObject["reply_list"] != null)
+                        {
+                            if (!session.isResponsedStarted)
+                            {
+                                AnswerBalloonSimpleManager.Instance.HideAnswerBalloonSimple();
+                                NoticeManager.Instance.DeleteNoticeBalloonInstance();
+
+                                if (session.targetCharacter == null || session.targetCharacter == CharManager.Instance.GetCurrentCharacter())
+                                {
+                                    AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
+                                    AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();
+                                }
+                                session.isResponsedStarted = true;
+
+                                if (jsonObject["query"] != null)
+                                {
+                                    session.query_origin = jsonObject["query"]["origin"]?.ToString() ?? "";
+                                    session.query_trans = jsonObject["query"]["text"]?.ToString() ?? "";
+                                    AddQueryOrigin(session.chatIdxNum, session.query_origin);
+                                }
+                            }
+                            
+                            ProcessReply(jsonObject, session);
+                            OnFinalResponseReceived(session);
+                            return;
+                        }
+                    }
+                    catch (Exception jsonEx)
+                    {
+                        Debug.Log($"Failed to parse error response as JSON: {jsonEx.Message}");
+                    }
                 }
             }
 
@@ -1982,6 +2018,16 @@ public class APIManager : MonoBehaviour
             { "intent_smalltalk_answer", intent_smalltalk_answer},  // SmallTalk 연관성 플래그
             { "query_smalltalk", query_smalltalk}
         };
+        
+        // 로그용: memory만 마지막 2개로 잘라서 출력 (실제 요청 데이터는 변경 없음)
+        var logData = new Dictionary<string, string>(requestData);
+        if (memory != null && memory.Count > 0)
+        {
+            int startIdx = Math.Max(0, memory.Count - 2);
+            var memoryLast2 = memory.GetRange(startIdx, memory.Count - startIdx);
+            logData["memory"] = JsonConvert.SerializeObject(memoryLast2);
+        }
+        Debug.Log($"### [Request param] {JsonConvert.SerializeObject(logData)}");
 
         await FetchStreamingData(streamUrl, requestData, screenshotBytes, targetCharacter);
     }
