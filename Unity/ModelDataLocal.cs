@@ -6,12 +6,16 @@ public static class ModelDataLocal
     public static readonly List<ModelOption> ModelOptions = new List<ModelOption>
     {     
         new ModelOption("qwen3.5-9b", "Qwen3.5(9B)", new List<ModelFileInfo> {
-            new ModelFileInfo("Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf", "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf?download=true", "5.68GB", 9348464640L),
+            new ModelFileInfo("Qwen3.5-9B-Q4_K_M.gguf", "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf?download=true", "5.68GB", 9348464640L),
             new ModelFileInfo("mmproj-Qwen3.5-BF16.gguf", "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/mmproj-BF16.gguf?download=true", "922MB", 788529152L)
         }, "9.46GB"),
         new ModelOption("qwen3.5-9b-UC", "Qwen3.5(9B-UC)", new List<ModelFileInfo> {
             new ModelFileInfo("Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf", "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/Qwen3VL-8B-Instruct-Q4_K_M.gguf?download=true", "8.71GB", 9348464640L),
             new ModelFileInfo("mmproj-Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-BF16.gguf", "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf?download=true", "752MB", 788529152L)
+        }, "9.46GB"),
+        new ModelOption("qwen3.6-27b", "Qwen3.6(27B)", new List<ModelFileInfo> {
+            new ModelFileInfo("Qwen3.6-27B-UD-IQ3_XXS.gguf", "https://huggingface.co/unsloth/Qwen3.6-27B-GGUF/blob/main/Qwen3.6-27B-Q3_K_S.gguf?download=true", "12.4GB", 9348464640L),
+            new ModelFileInfo("mmproj-Qwen3.6-BF16.gguf", "https://huggingface.co/unsloth/Qwen3.6-27B-GGUF/resolve/main/mmproj-BF16.gguf?download=true", "922MB", 788529152L)
         }, "9.46GB"),
         new ModelOption("Gemma4-26b", "Gemma4(26B)", new List<ModelFileInfo> {
             new ModelFileInfo("gemma-4-26B-A4B-it-UD-Q4_K_M.gguf", "https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-UD-Q4_K_M.gguf?download=true", "5.68GB", 9348464640L),
@@ -70,7 +74,7 @@ public static class ModelDataLocal
     // 개별 파일 정보
     public class ModelFileInfo
     {
-        public string FileName;
+        public string FileName;  // 서버쪽에서 인식할 이름 : 
         public string DownloadUrl;
         public string FileSizeText;  // "8.71GB" 같은 표시용 텍스트
         public long FileSizeBytes;    // 바이트 단위 크기 (0이면 HEAD 요청으로 확인)
