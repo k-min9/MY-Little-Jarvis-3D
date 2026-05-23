@@ -5,7 +5,7 @@ public static class ModelDataGemini
     // Gemini 모델 옵션 (ID, 표시명, Free/Paid 구분)
     public static readonly List<ModelOption> ModelOptions = new List<ModelOption>
     {
-        new ModelOption("gemma-3-27b-it", "Gemma3 27B", "Free"),
+        new ModelOption("gemma-4-31b-it", "Gemma4 31B", "Free"),
         // new ModelOption("gemini-1.5-pro", "Gemini 1.5 Pro", "Paid"),
         // new ModelOption("gemini-2.0-flash-exp", "Gemini 2.0 Flash (Experimental)", "Free"),
         // new ModelOption("gemini-exp-1206", "Gemini Exp 1206", "Free"),

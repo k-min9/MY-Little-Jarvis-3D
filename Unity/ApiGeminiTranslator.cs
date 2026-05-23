@@ -13,7 +13,7 @@ public class ApiGeminiTranslator : MonoBehaviour
     public static ApiGeminiTranslator Instance { get; private set; }
     
     private string apiKey;
-    private string modelName = "gemma-3-27b-it";
+    private string modelName = "gemma-4-31b-it";
     
     void Awake()
     {

@@ -32,7 +32,7 @@ public class ApiGeminiMultiClient : MonoBehaviour
         }
     }
 
-    [SerializeField] private string modelName = "gemma-3-27b-it";
+    [SerializeField] private string modelName = "gemma-4-31b-it";
     private string apiKey;
     private static readonly System.Net.Http.HttpClient httpClient = new System.Net.Http.HttpClient();  // HttpWebRequest보다 현대적이라는데 음...
 

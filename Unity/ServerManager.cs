@@ -475,7 +475,7 @@ public class ServerManager : MonoBehaviour
     //         string result = null;
     //         yield return GetLatestFreeOpenRouterModel((fetchedModel) =>
     //         {
-    //             result = string.IsNullOrEmpty(fetchedModel) ? "google/gemma-3-27b-it:free" : fetchedModel;
+    //             result = string.IsNullOrEmpty(fetchedModel) ? "google/gemma-4-31b-it:free" : fetchedModel;
     //             done = true;
     //         });
     //         while (!done) yield return null;
@@ -559,7 +559,7 @@ public class ServerManager : MonoBehaviour
 
             yield return GetLatestFreeOpenRouterModel((fetchedModel) =>
             {
-                result = string.IsNullOrEmpty(fetchedModel) ? "google/gemma-3-27b-it:free" : fetchedModel;
+                result = string.IsNullOrEmpty(fetchedModel) ? "google/gemma-4-31b-it:free" : fetchedModel;
                 done = true;
             });
 

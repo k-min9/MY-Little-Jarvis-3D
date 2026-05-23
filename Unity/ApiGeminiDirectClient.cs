@@ -26,7 +26,7 @@ public class ApiGeminiDirectClient : MonoBehaviour
         }
     }
 
-    [SerializeField] private string modelName = "gemma-3-27b-it";
+    [SerializeField] private string modelName = "gemma-4-31b-it";  // gemma-4-26b-a4b-it
     private string apiKey;
 
     // Stop strings (Python util_gemini.py + util_string 기본값 포함)
@@ -60,6 +60,8 @@ public class ApiGeminiDirectClient : MonoBehaviour
 
     void Awake()
     {
+        modelName = "gemma-4-31b-it";
+
         // 씬에 여러 개가 생겼을 때는 먼저 생성된 것을 사용합니다.
         if (instance == null)
         {
@@ -246,8 +248,8 @@ public class ApiGeminiDirectClient : MonoBehaviour
                         string payload = eventData.ToString();
                         eventData.Clear();
 
-                        // JSON에서 텍스트 추출
-                        if (TryExtractChunkTextFromJson(payload, out string chunkText))
+                        // JSON에서 텍스트 추출 : 기존버전 -> Gemma4 변경으로 특화
+                        if (TryExtractChunkTextFromJsonForGemma4(payload, out string chunkText))
                         {
                             accumulatedText += chunkText;
                             debugLog.AppendLine($"[Chunk Received] '{chunkText}'");
@@ -440,10 +442,64 @@ public class ApiGeminiDirectClient : MonoBehaviour
             StringBuilder sb = new StringBuilder();
             foreach (var p in parts)
             {
+                // thought: true 일 경우 무시 (새로운 API 응답 구조 대응)
+                var thoughtToken = p?["thought"];
+                if (thoughtToken != null && thoughtToken.Type == JTokenType.Boolean && thoughtToken.Value<bool>())
+                {
+                    continue;
+                }
+
                 string t = p?["text"]?.ToString();
                 if (!string.IsNullOrEmpty(t))
                 {
                     sb.Append(t);
+                }
+            }
+
+            text = sb.ToString();
+            return text.Length > 0;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[GeminiDirect] JSON parse error: {ex.Message}");
+            return false;
+        }
+    }
+
+    // SSE JSON에서 텍스트 추출 (Gemma 4 Thought 구조 대응)
+    private bool TryExtractChunkTextFromJsonForGemma4(string json, out string text)
+    {
+        text = "";
+        try
+        {
+            JObject obj = JObject.Parse(json);
+
+            var cand = obj["candidates"]?[0];
+            if (cand == null)
+            {
+                return false;
+            }
+
+            var parts = cand["content"]?["parts"] as JArray;
+            if (parts == null || parts.Count == 0)
+            {
+                return false;
+            }
+
+            StringBuilder sb = new StringBuilder();
+            foreach (var p in parts)
+            {
+                // 🔥 핵심 수정: thought 속성이 true인지 확인
+                bool isThought = p["thought"] != null && (bool)p["thought"] == true;
+
+                // 생각이 아닌 실제 출력 텍스트만 추출
+                if (!isThought)
+                {
+                    string t = p["text"]?.ToString();
+                    if (!string.IsNullOrEmpty(t))
+                    {
+                        sb.Append(t);
+                    }
                 }
             }
 

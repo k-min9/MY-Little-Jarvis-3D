@@ -1009,7 +1009,7 @@ public class APIManager : MonoBehaviour
             try
             {
                 string ai_info_server_type = jsonObject["ai_info"]["server_type"]?.ToString() ?? "Google-Direct";
-                string ai_info_model = jsonObject["ai_info"]["model"]?.ToString() ?? "gemma-3-27b-it";
+                string ai_info_model = jsonObject["ai_info"]["model"]?.ToString() ?? "gemma-4-31b-it";
                 string ai_info_prompt = "gemma";
                 string ai_info_lang_used = jsonObject["ai_info"]["lang_used"]?.ToString() ?? "";
                 string ai_info_translator = "N/A";

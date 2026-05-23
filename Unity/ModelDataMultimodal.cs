@@ -11,7 +11,7 @@ public static class ModelDataMultimodal
         new MultimodalOption("Qwen3VL-30B-A3B-Instruct-Q4_K_M.gguf", "Qwen3 VL 30B-A3B", "Custom", new string[] { "image", "voice", "sound", "movie" }),
         
         // Gemini 모델
-        new MultimodalOption("gemma-3-27b-it", "Gemma3 27B", "Gemini", new string[] { "image", "voice", "sound", "movie" }),
+        new MultimodalOption("gemma-4-31b-it", "Gemma4 31B", "Gemini", new string[] { "image", "voice", "sound", "movie" }),
     };
 
     // 특정 모델 ID가 이미지 인식 가능한지 확인
@@ -58,7 +58,7 @@ public static class ModelDataMultimodal
 
     public class MultimodalOption
     {
-        public string ModelId;          // 모델 ID (예: "Qwen3VL-8B-Instruct-Q4_K_M.gguf", "gemma-3-27b-it")
+        public string ModelId;          // 모델 ID (예: "Qwen3VL-8B-Instruct-Q4_K_M.gguf", "gemma-4-31b-it")
         public string DisplayName;      // UI에 표시될 이름
         public string Provider;         // Provider (예: "Custom", "Gemini", "OpenRouter")
         public string[] SupportedTypes; // 지원 타입 배열 (예: "image", "voice", "sound", "movie")
