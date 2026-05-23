@@ -378,19 +378,29 @@ public class SettingManager : MonoBehaviour
     // 버튼용 래핑 함수 (5초간 버튼 비활성화)
     public void CallReleaseLocalModel() 
     { 
-        if (serverLocalReleaseButton != null)
-        {
-            APIManager.Instance.CallReleaseModel();
-            StartCoroutine(DisableButtonTemporarily(serverLocalReleaseButton, 5f));
-        }
+        APIManager.Instance.CallReleaseModel();
+        StartCoroutine(DisableButtonTemporarily(serverLocalReleaseButton, 5f));
     }
     
     public void CallLoadLocalModel() 
     { 
-        if (serverLocalLoadButton != null)
+        // 현재 선택된 로컬 모델 파일 보유 여부 확인
+        string exeDirectory = Path.GetDirectoryName(Application.dataPath);
+        var model = ModelDataLocal.ModelOptions.Find(m => m.Id == settings.model_name_Local);
+        bool modelExists = model != null && model.FileInfos.Count > 0 &&
+                           File.Exists(Path.Combine(exeDirectory, "model", model.FileInfos[0].FileName));
+
+        if (DevManager.Instance.IsDevModeEnabled() || modelExists)
         {
+            // 보유 중이거나 devmode → 바로 로드
             APIManager.Instance.CallLoadModel();
-            StartCoroutine(DisableButtonTemporarily(serverLocalLoadButton, 5f));
+            if (serverLocalLoadButton != null)
+                StartCoroutine(DisableButtonTemporarily(serverLocalLoadButton, 5f));
+        }
+        else
+        {
+            // 미보유 + 일반모드 → 다운로드 요청
+            DownloadManager.Instance.RequestDownload();
         }
     }
 
@@ -1463,19 +1473,20 @@ public class SettingManager : MonoBehaviour
             LanguageManager.Instance.SetServerModelTypeDownloadTooltip(0);  // 0: Download 1: Owned
         }
 
-        // 모델이 있을 때만 Release/Load 버튼 활성화
-        if (serverLocalReleaseButton != null)
-            serverLocalReleaseButton.interactable = modelExists;
-        
-        if (serverLocalLoadButton != null)
-            serverLocalLoadButton.interactable = modelExists;
+        // 과거 : 모델 보유 여부에 따라 변경되었음.
+        // // 모델이 있을 때만 Release/Load 버튼 활성화
+        // if (serverLocalReleaseButton != null)
+        //     serverLocalReleaseButton.interactable = modelExists;
+        // 
+        // if (serverLocalLoadButton != null)
+        //     serverLocalLoadButton.interactable = modelExists;
 
-        // Devmode면 상관없이 True
-        if (DevManager.Instance.IsDevModeEnabled())
-        {
-            serverLocalReleaseButton.interactable = true;
-            serverLocalLoadButton.interactable = true;
-        }
+        // // Devmode면 상관없이 True
+        // if (DevManager.Instance.IsDevModeEnabled())
+        // {
+        //     serverLocalReleaseButton.interactable = true;
+        //     serverLocalLoadButton.interactable = true;
+        // }
 
     }
 
