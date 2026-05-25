@@ -122,20 +122,24 @@ public class ClickEffecter : MonoBehaviour
 
         // Canvas 하위에 FX 생성 (RectTransform 로컬 좌표로 배치)
         GameObject fxInstance = Instantiate(prefab, canvasRect);
-        RectTransform fxRect = fxInstance.GetComponent<RectTransform>();
         
-        // 이펙트가 묻히는걸 방지하기 위해 z축 조정 : -200 정도면 보이기는 함
+        // 하이어라키 맨 아래로 보내어 UI 요소들 중 가장 마지막에 렌더링 : 이펙트간 순서를 위해 남겨두기
+        fxInstance.transform.SetAsLastSibling();
+
+        // 위치 조정 : Z축을 억지로 당길 필요 없이 0으로 설정
+        RectTransform fxRect = fxInstance.GetComponent<RectTransform>();
         if (fxRect != null)
         {
             // RectTransform이 있는 프리팹이면 로컬 위치로 배치
-            fxRect.localPosition = new Vector3(localPoint.x, localPoint.y, -150f);
+            fxRect.localPosition = new Vector3(localPoint.x, localPoint.y, 0f);
         }
         else
         {
             // RectTransform이 없는 프리팹이면 월드 좌표로 배치
-            fxInstance.transform.position = canvasRect.TransformPoint(new Vector3(localPoint.x, localPoint.y, -150f));
+            fxInstance.transform.position = canvasRect.TransformPoint(new Vector3(localPoint.x, localPoint.y, 0f));
         }
 
+        // 데이터 추가
         _activeFxQueue.Enqueue(fxInstance);
 
         // 파티클 재생 완료 후 자동 Destroy
