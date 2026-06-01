@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: afa1861f1ee4def42a84c93f1f02d233
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 55542
+  packageName: UI Widgets
+  packageVersion: 1.1.1
+  assetPath: Assets/Devion Games/UI Widgets/Scripts/Runtime/Settings/QualityLevel.cs
+  uploadId: 420872

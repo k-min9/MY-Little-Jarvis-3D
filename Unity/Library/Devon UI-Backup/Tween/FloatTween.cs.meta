@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 30a9f98525192134e97f94e5e68b59c7
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 55542
+  packageName: UI Widgets
+  packageVersion: 1.1.1
+  assetPath: Assets/Devion Games/UI Widgets/Scripts/Runtime/Tween/FloatTween.cs
+  uploadId: 420872

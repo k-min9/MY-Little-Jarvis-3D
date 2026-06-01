@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: ef38f6e1a427f4846975cf6009a8141f
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 55542
+  packageName: UI Widgets
+  packageVersion: 1.1.1
+  assetPath: Assets/Devion Games/UI Widgets/Scripts/Runtime/StringPairSlot.cs
+  uploadId: 420872

@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 6fca821a79b1b8e4b86f38fe002d7e3b
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 55542
+  packageName: UI Widgets
+  packageVersion: 1.1.1
+  assetPath: Assets/Devion Games/UI Widgets/Scripts/Runtime/UISlot.cs
+  uploadId: 420872

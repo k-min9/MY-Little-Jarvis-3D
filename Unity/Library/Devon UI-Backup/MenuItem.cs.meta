@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: c2b07d55f135ac04bbe9c99ce80d32ef
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 55542
+  packageName: UI Widgets
+  packageVersion: 1.1.1
+  assetPath: Assets/Devion Games/UI Widgets/Scripts/Runtime/MenuItem.cs
+  uploadId: 420872

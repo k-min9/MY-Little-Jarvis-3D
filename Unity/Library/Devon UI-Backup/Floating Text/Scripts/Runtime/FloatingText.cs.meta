@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: e230ed2eec077174aafa03ae847f9554
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 55542
+  packageName: UI Widgets
+  packageVersion: 1.1.1
+  assetPath: Assets/Devion Games/UI Widgets/Scripts/Runtime/Floating Text/Scripts/Runtime/FloatingText.cs
+  uploadId: 420872

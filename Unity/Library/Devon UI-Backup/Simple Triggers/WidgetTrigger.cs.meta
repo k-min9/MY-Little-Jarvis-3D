@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: cfd56ac4ec1b95e478be442fe8a323c4
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 55542
+  packageName: UI Widgets
+  packageVersion: 1.1.1
+  assetPath: Assets/Devion Games/UI Widgets/Scripts/Runtime/Simple Triggers/WidgetTrigger.cs
+  uploadId: 420872
