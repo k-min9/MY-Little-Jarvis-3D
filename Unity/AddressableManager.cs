@@ -104,38 +104,6 @@ public class AddressableManager : MonoBehaviour
         }
     }
 
-    // Local default Group 전용 직접 로드
-    // GetDownloadSizeAsync 체크 없이 LoadAssetAsync를 바로 시도합니다.
-    // Remote 의존성 체인에 엮이지 않으므로 Remote 카탈로그 실패와 무관하게 동작합니다.
-    public async Task<T> LoadLocal<T>(string address) where T : UnityEngine.Object
-    {
-        if (string.IsNullOrEmpty(address)) return null;
-
-        try
-        {
-            var handle = Addressables.LoadAssetAsync<T>(address);
-            await handle.Task;
-
-            if (handle.Status == AsyncOperationStatus.Succeeded)
-            {
-                Debug.Log($"[AddressableManager] LoadLocal: 로드 성공 ({address})");
-                downloadedCache[address] = true;
-                return handle.Result;
-            }
-            else
-            {
-                Debug.LogWarning($"[AddressableManager] LoadLocal: 로드 실패 ({address})");
-                Addressables.Release(handle);
-                return null;
-            }
-        }
-        catch (Exception e)
-        {
-            Debug.LogWarning($"[AddressableManager] LoadLocal: 예외 발생 ({address}): {e.Message}");
-            return null;
-        }
-    }
-
     // 없으면 다운로드, 있으면 로드
     public async void LoadWithDownloadable<T>(string address, Action<bool, T> onComplete) where T : UnityEngine.Object
     {

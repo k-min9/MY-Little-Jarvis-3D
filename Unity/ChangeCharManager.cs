@@ -25,10 +25,10 @@ public class ChangeCharClothesInfo
 {
     public string name;           // 내부 관리용 의상 이름
     public string text;           // UI에 표시될 의상 텍스트 (예: "< 교복 >")
-    public string spriteAddress;  // 해당 의상을 입었을 때의 캐릭터 아이콘의 Address
-    public string prefabAddress;  // 인게임에서 교체될 실제 3D 모델(프리팹)의 Address
+    public string spriteAddress;  // isLocal=true: PrefabDataLocal icon key, false: Addressables sprite address
+    public string prefabAddress;  // isLocal=true: PrefabDataLocal prefab key, false: Addressables prefab address
                                   // "2d_general" 이면 공용 2D 프리팹 특수 로직 사용
-    public bool   isLocal = false; // true = Local default Group (직접 로드), false = Remote DLC (size 체크 후 로드)
+    public bool   isLocal = false; // true = PrefabDataLocal key 참조, false = Remote DLC Addressables
 
     // 2d_general 전용 - Addressable AnimatorController 주소
     public string animatorControllerAddress;
@@ -149,9 +149,40 @@ public class ChangeCharManager : MonoBehaviour
         // Remote 카탈로그 업데이트 체크 (백그라운드)
         StartCoroutine(CheckCatalogUpdates());
         
-        // 원격 카탈로그 초기화 후 DLC 로딩 진단 정보 출력 (개발/테스트용)
-        TestDLC();
+        // DLC 로딩 진단은 필요할 때만 수동으로 호출합니다.
+        // TestDLC();
     }
+
+    public Sprite GetLocalSprite(string key)
+    {
+        return PrefabDataLocal.Instance.GetSprite(key);
+    }
+
+    public GameObject GetLocalPrefab(string key)
+    {
+        return PrefabDataLocal.Instance.GetPrefab(key);
+    }
+
+    public RuntimeAnimatorController GetLocalAnimatorController(string key)
+    {
+        return PrefabDataLocal.Instance.GetAnimatorController(key);
+    }
+
+    public bool HasLocalSprite(string key)
+    {
+        return PrefabDataLocal.Instance.ContainsSprite(key);
+    }
+
+    public bool HasLocalPrefab(string key)
+    {
+        return PrefabDataLocal.Instance.ContainsPrefab(key);
+    }
+
+    public bool HasLocalAnimatorController(string key)
+    {
+        return PrefabDataLocal.Instance.ContainsAnimatorController(key);
+    }
+
 
     // private void LoadFallbackSprite()
     // {

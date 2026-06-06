@@ -28,22 +28,42 @@ public class ChangeCharListSlotController : MonoBehaviour
         // 리스트에서는 의상을 안 바꾸므로 첫 번째 기본 의상을 보여준다고 가정
         if (charData.clothesList.Count > 0)
         {
-            LoadSpriteFromAddressable(charData.clothesList[0].spriteAddress);
+            LoadSpriteForClothes(charData.clothesList[0]);
         }
 
         UpdateFavoriteUI();
     }
 
-    private async void LoadSpriteFromAddressable(string address)
+    private async void LoadSpriteForClothes(ChangeCharClothesInfo clothes)
     {
-        if (string.IsNullOrEmpty(address))
+        if (clothes == null)
+        {
+            ApplyFallbackSprite();
+            return;
+        }
+
+        if (clothes.isLocal)
+        {
+            Sprite localSprite = ChangeCharManager.Instance.GetLocalSprite(clothes.spriteAddress);
+            if (localSprite != null)
+            {
+                characterIcon.sprite = localSprite;
+            }
+            else
+            {
+                ApplyFallbackSprite();
+            }
+            return;
+        }
+
+        if (string.IsNullOrEmpty(clothes.spriteAddress))
         {
             ApplyFallbackSprite();
             return;
         }
 
         // 다운로드된 경우만 로드, 미다운로드면 null → fallback
-        Sprite sprite = await AddressableManager.Instance.LoadIfExist<Sprite>(address);
+        Sprite sprite = await AddressableManager.Instance.LoadIfExist<Sprite>(clothes.spriteAddress);
         if (sprite != null)
         {
             characterIcon.sprite = sprite;
@@ -117,7 +137,7 @@ public class ChangeCharListSlotController : MonoBehaviour
         if (clothes.prefabAddress == "2d_general")
         {
             // 2d_general DLC 에셋(애니메이터)이 미다운로드 상태면 먼저 다운로드
-            if (!string.IsNullOrEmpty(clothes.animatorControllerAddress))
+            if (!clothes.isLocal && !string.IsNullOrEmpty(clothes.animatorControllerAddress))
             {
                 var ac = await AddressableManager.Instance.LoadWithDownloadableAsync<RuntimeAnimatorController>(clothes.animatorControllerAddress);
                 if (ac == null)
@@ -128,7 +148,21 @@ public class ChangeCharListSlotController : MonoBehaviour
             }
 
             await CharManager.Instance.ChangeCharacter2DGeneral(clothes);
-            LoadSpriteFromAddressable(clothes.spriteAddress);
+            LoadSpriteForClothes(clothes);
+            return;
+        }
+
+        if (clothes.isLocal)
+        {
+            GameObject localPrefab = ChangeCharManager.Instance.GetLocalPrefab(clothes.prefabAddress);
+            if (localPrefab == null)
+            {
+                Debug.LogWarning($"[LocalChar] 변경 실패: {clothes.prefabAddress}");
+                return;
+            }
+
+            CharManager.Instance.ChangeCharacterFromGameObject(localPrefab);
+            LoadSpriteForClothes(clothes);
             return;
         }
 
@@ -138,7 +172,7 @@ public class ChangeCharListSlotController : MonoBehaviour
             if (success)
             {
                 CharManager.Instance.ChangeCharacterFromDLC(prefab);
-                LoadSpriteFromAddressable(clothes.spriteAddress); // 다운로드 완료 후 스프라이트 갱신
+                LoadSpriteForClothes(clothes); // 다운로드 완료 후 스프라이트 갱신
             }
             else
             {
