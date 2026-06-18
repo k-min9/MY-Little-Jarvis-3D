@@ -843,6 +843,25 @@ public class APIManager : MonoBehaviour
         string chatIdx = jsonObject["chat_idx"]?.ToString() ?? "-1";
         session.ai_language_out = jsonObject["ai_language_out"]?.ToString() ?? "";
 
+        // 추천 선택지 파싱
+        JToken recommendedChoicesToken = jsonObject["recommended_choices"];
+        if (recommendedChoicesToken != null)
+        {
+            if (recommendedChoicesToken.Type == JTokenType.Array)
+            {
+                session.recommendedChoices.Clear();
+                foreach (var choice in recommendedChoicesToken)
+                {
+                    session.recommendedChoices.Add(choice.ToString());
+                }
+                Debug.Log($"[APIManager] 추천 선택지 파싱 성공: 총 {session.recommendedChoices.Count}개");
+            }
+            else if (recommendedChoicesToken.Type == JTokenType.String)
+            {
+                Debug.LogWarning($"[APIManager] 추천 답변 생성 실패 알림 수신: {recommendedChoicesToken.ToString()}");
+            }
+        }
+
         // 이중 체크 - 현재 대화가 아님
         if (chatIdx != GameManager.Instance.chatIdxSuccess.ToString())
         {
@@ -927,6 +946,283 @@ public class APIManager : MonoBehaviour
                 string nickname = session.targetCharacter != null ? CharManager.Instance.GetNickname(session.targetCharacter) : null;
                 TTSManager.Instance.RequestTTS(answerVoice, chatIdx, soundLang, nickname);
             }
+        }
+    }
+
+    // Router conversation 세션 시작
+    public AIChatSession BeginConversationStreamFromRouter(string query, string chatIdx, GameObject targetCharacter = null)
+    {
+        if (chatIdx != "-1")
+        {
+            GameManager.Instance.chatIdxSuccess = chatIdx;
+        }
+
+        // 애니메이션 재생 초기화
+        AnimationManager.Instance.Idle();
+
+        int chatIdxNum = 0;
+        if (!int.TryParse(chatIdx, out chatIdxNum))
+        {
+            chatIdxNum = 0;
+        }
+
+        // 타겟 캐릭터 보완
+        GameObject resolvedTargetCharacter = targetCharacter;
+        if (resolvedTargetCharacter == null)
+        {
+            resolvedTargetCharacter = CharManager.Instance.GetActiveCharacter();
+        }
+
+        // 세션 생성
+        AIChatSession session = new AIChatSession(resolvedTargetCharacter, chatIdxNum);
+        session.query_origin = query;
+        session.query_trans = "";
+        session.currentMemoryType = "conversation";
+        session.latestIntentSmallTalkAnswer = "off";
+        session.latestSmallTalkQuery = "";
+
+        // 원문 기록 및 TTS 세션 시작
+        AddQueryOrigin(session.chatIdxNum, session.query_origin);
+        TTSManager.Instance.BeginTtsSession(chatIdxNum);
+
+        // 전송시작 말풍선
+        NoticeManager.Instance.ShowNoticeEmotionBalloon("Time");
+
+        Debug.Log($"[RouterConversation] Begin chatIdx={chatIdx}, query={query}");
+        return session;
+    }
+
+    // Router conversation 이벤트 처리
+    public void ProcessConversationStreamEventFromRouter(JObject jsonObject, AIChatSession session)
+    {
+        if (session == null)
+        {
+            Debug.LogWarning("[RouterConversation] session이 null입니다.");
+            return;
+        }
+
+        Debug.Log("[RouterConversation] jsonObject Start");
+        Debug.Log(jsonObject.ToString());
+        Debug.Log("[RouterConversation] jsonObject End");
+
+        // 풍선기준 최신대화여야 함
+        if (session.chatIdxNum < GameManager.Instance.chatIdxBalloon)
+        {
+            Debug.Log("과거대화 : " + session.chatIdxNum.ToString() + "/" + GameManager.Instance.chatIdxBalloon.ToString());
+            return;
+        }
+
+        // 최신화
+        if (GameManager.Instance.chatIdxBalloon != session.chatIdxNum)
+        {
+            GameManager.Instance.chatIdxBalloon = session.chatIdxNum;
+        }
+
+        // intent_info에서 SmallTalk 연관성 저장
+        try
+        {
+            if (jsonObject["intent_info"] != null)
+            {
+                session.latestIntentSmallTalkAnswer = jsonObject["intent_info"]["is_intent_smalltalk_answer"]?.ToString() ?? "off";
+                session.latestSmallTalkQuery = jsonObject["intent_info"]["smalltalk_query"]?.ToString() ?? "";
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.Log($"[SmallTalk] Failed to parse intent_info: {ex.Message}");
+        }
+
+        // 응답 타입 처리
+        string replyType = jsonObject["type"]?.ToString() ?? "reply";
+        if (replyType == "thinking")
+        {
+            NoticeManager.Instance.Notice("thinking");
+        }
+        else if (replyType == "webSearch")
+        {
+            NoticeManager.Instance.Notice("webSearch");
+        }
+        else if (replyType == "asking_intent")
+        {
+            // 시스템 메시지로 저장
+            session.currentMemoryType = "system";
+
+            // intent_info 확인
+            string intentInfo = jsonObject["intent_info"]?.ToString() ?? "";
+            if (intentInfo == "change_model")
+            {
+                // 멀티모달 모델 변경 시나리오 시작
+                StartCoroutine(ScenarioAskManager.Instance.Scenario_S00_AskChangeModel());
+            }
+            else if (intentInfo == "no_image")
+            {
+                // 이미지 필요 시나리오 시작
+                StartCoroutine(ScenarioAskManager.Instance.Scenario_S01_AskNeedImage());
+            }
+        }
+        else if (replyType == "trigger")
+        {
+            // 시스템 메시지로 저장
+            session.currentMemoryType = "system";
+        }
+        else if (replyType == "final")
+        {
+            // final 응답 : Trigger 기동을 위해 ProcessReply 호출하지 않고 다음 응답으로
+            GlobalTimeVariableManager.Instance.smallTalkTimer = 0f;
+        }
+        else
+        {
+            // 일반 reply 처리
+            PrepareConversationReplyUiFromRouter(jsonObject, session);
+            ProcessReply(jsonObject, session);
+        }
+    }
+
+    // Router conversation 완료 처리
+    public void CompleteConversationStreamFromRouter(AIChatSession session)
+    {
+        if (session == null)
+        {
+            Debug.LogWarning("[RouterConversation] 완료 처리 session이 null입니다.");
+            return;
+        }
+
+        string chatIdx = session.chatIdxNum.ToString();
+        if (chatIdx == GameManager.Instance.chatIdxSuccess)
+        {
+            if (session.currentMemoryType != "system")
+            {
+                // SmallTalk 연관성이 있으면 잡담을 먼저 메모리에 저장
+                if (session.latestIntentSmallTalkAnswer == "on" && !string.IsNullOrEmpty(session.latestSmallTalkQuery))
+                {
+                    Debug.Log("[SmallTalk] Related conversation detected. Saving smalltalk first.");
+                    string memoryFilename = null;
+                    if (session.targetCharacter != null && session.targetCharacter != CharManager.Instance.GetCurrentCharacter())
+                    {
+                        memoryFilename = CharManager.Instance.GetNickname(session.targetCharacter);
+                    }
+
+                    MemoryManager.Instance.SaveConversationMemory(
+                        "character",
+                        "assistant",
+                        session.latestSmallTalkQuery,
+                        session.latestSmallTalkQuery,
+                        session.latestSmallTalkQuery,
+                        session.latestSmallTalkQuery,
+                        memoryFilename
+                    );
+                }
+
+                OnFinalResponseReceived(session);
+            }
+            else
+            {
+                Debug.Log("Skipping OnFinalResponseReceived for system type (asking_intent/trigger)");
+            }
+        }
+    }
+
+    // Router conversation 첫 reply UI 준비
+    private void PrepareConversationReplyUiFromRouter(JObject jsonObject, AIChatSession session)
+    {
+        if (session.isResponsedStarted)
+        {
+            return;
+        }
+
+        // 생각 중 말풍선 숨기기
+        AnswerBalloonSimpleManager.Instance.HideAnswerBalloonSimple();
+
+        // 안내 말풍선 숨기기
+        NoticeManager.Instance.DeleteNoticeBalloonInstance();
+
+        if (session.targetCharacter == null || session.targetCharacter == CharManager.Instance.GetCurrentCharacter())
+        {
+            AnswerBalloonManager.Instance.ShowAnswerBalloonInf();
+            AnswerBalloonManager.Instance.ChangeAnswerBalloonSpriteLight();
+        }
+
+        // 서브 캐릭터의 말풍선 표출은 ProcessReply 내부에서 텍스트가 들어올 때까지 지연
+        session.isResponsedStarted = true;
+
+        // query 정보 추출
+        try
+        {
+            if (jsonObject["query"] != null)
+            {
+                session.query_origin = jsonObject["query"]["origin"]?.ToString() ?? session.query_origin;
+                session.query_trans = jsonObject["query"]["text"]?.ToString() ?? session.query_trans;
+                AddQueryOrigin(session.chatIdxNum, session.query_origin);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.Log($"[RouterConversation] query 파싱 실패: {ex.Message}");
+        }
+
+        // AI Info 내용 갱신
+        try
+        {
+            string ai_info_server_type = jsonObject["ai_info"]["server_type"].ToString();
+            string ai_info_model = jsonObject["ai_info"]["model"].ToString();
+            string ai_info_prompt = jsonObject["ai_info"]["prompt"].ToString();
+            string ai_info_lang_used = jsonObject["ai_info"]["lang_used"].ToString();
+            string ai_info_translator = jsonObject["ai_info"]["translator"].ToString();
+            string ai_info_time = jsonObject["ai_info"]["time"].ToString();
+            string ai_info_intent = jsonObject["ai_info"]["time"].ToString();
+            SettingManager.Instance.RefreshAIInfoText(ai_info_server_type, ai_info_model, ai_info_prompt, ai_info_lang_used, ai_info_translator, ai_info_time, ai_info_intent);
+        }
+        catch (Exception ex)
+        {
+            Debug.Log(ex);
+        }
+
+        // AI Info 표정 갱신
+        try
+        {
+            string ai_info_emotion = jsonObject["ai_info"]["emotion"].ToString();
+            Debug.Log("### emotion : " + ai_info_emotion);
+            EmotionManager.Instance.ShowEmotionFromEmotion(ai_info_emotion);
+        }
+        catch (Exception ex)
+        {
+            Debug.Log(ex);
+        }
+
+        // 의도(Intent) 관련 정보 갱신
+        AnswerBalloonManager.Instance.HideWebImage();
+        try
+        {
+            string intent_info_is_intent_web = jsonObject["intent_info"]["is_intent_web"].ToString();
+            if (intent_info_is_intent_web == "on")
+            {
+                AnswerBalloonManager.Instance.ShowWebImage();
+
+                // 웹 검색 메타데이터 파싱 및 로깅
+                try
+                {
+                    string webKeyword = jsonObject["intent_info"]["web_search_keyword"]?.ToString() ?? "";
+                    string webMethod = jsonObject["intent_info"]["web_search_method"]?.ToString() ?? "";
+                    string webContent = jsonObject["intent_info"]["web_search_content"]?.ToString() ?? "";
+
+                    Debug.Log($"[Web Search] Keyword: {webKeyword}");
+                    Debug.Log($"[Web Search] Method: {webMethod}");
+                    Debug.Log($"[Web Search] Content Length: {webContent.Length}");
+
+                    if (!string.IsNullOrEmpty(webKeyword) || !string.IsNullOrEmpty(webMethod))
+                    {
+                        DebugBalloonManager2.Instance.AddWebLog(webKeyword, webMethod, webContent);
+                    }
+                }
+                catch (Exception webEx)
+                {
+                    Debug.Log($"Web metadata parsing error: {webEx.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.Log(ex);
         }
     }
 
@@ -1275,6 +1571,22 @@ public class APIManager : MonoBehaviour
         {
             MemoryManager.Instance.SaveConversationMemory("player", "user", session.query_origin, session.query_origin, session.query_origin, session.query_origin, nickname);
             MemoryManager.Instance.SaveConversationMemory("character", "assistant", reply, replyKo, replyJp, replyEn, nickname);
+        }
+
+        // 최종 응답 후 추천 선택지 띄우기
+        if (session.recommendedChoices.Count > 0)
+        {
+            Debug.Log($"[APIManager] 추천 선택지 표출 시도: {session.recommendedChoices.Count}개");
+            // 나중에 다시 띄울 수 있도록 백업
+            ChoiceManager.Instance.lastRecommendedChoices = new List<string>(session.recommendedChoices);
+
+            List<Dictionary<string, string>> choicesData = new List<Dictionary<string, string>>();
+            foreach (string choiceStr in session.recommendedChoices)
+            {
+                choicesData.Add(new Dictionary<string, string> { { "ko", choiceStr }, { "jp", choiceStr }, { "en", choiceStr } });
+            }
+            ChoiceData.Choices["AI_CHOICE"] = choicesData;
+            ChoiceManager.Instance.ShowChoice(choicesData.Count, "AI_CHOICE");
         }
     }
 
@@ -2016,7 +2328,8 @@ public class APIManager : MonoBehaviour
             { "model_name_Custom", model_name_Custom},
             { "server_local_mode", server_local_mode},
             { "intent_smalltalk_answer", intent_smalltalk_answer},  // SmallTalk 연관성 플래그
-            { "query_smalltalk", query_smalltalk}
+            { "query_smalltalk", query_smalltalk},
+            { "recommend_choice", SettingManager.Instance.settings.recommend_choice ? "3" : "0"}
         };
         
         // 로그용: memory만 마지막 2개로 잘라서 출력 (실제 요청 데이터는 변경 없음)
@@ -2118,7 +2431,8 @@ public class APIManager : MonoBehaviour
             { "guideline_list", guidelineJson },
             { "situation", situationJson },
             { "chatIdx", chatIdx },
-            { "regenerate_count", GameManager.Instance.chatIdxRegenerateCount.ToString() }
+            { "regenerate_count", GameManager.Instance.chatIdxRegenerateCount.ToString() },
+            { "recommend_choice", SettingManager.Instance.settings.recommend_choice ? "3" : "0"}
         };
 
         await FetchStreamingData(streamUrl, requestData, screenshotBytes);
