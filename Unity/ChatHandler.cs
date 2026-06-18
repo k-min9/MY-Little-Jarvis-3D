@@ -19,6 +19,7 @@ public class ChatHandler : MonoBehaviour
             BindButton("SendBtn", HandleInputSubmitButton);
             BindButton("WebSearchBtn", HandleInputWebSubmitButton);
             BindButton("JobBtn", HandleVlPlannerRunButton);
+            BindButton("RouterBtn", HandleVlRouterRunButton);
             
             BindButton("Button_Close", () => {
                 subController.HideChatBalloon();
@@ -187,6 +188,61 @@ public class ChatHandler : MonoBehaviour
         // 말풍선 없애기
         if (subController != null) subController.HideChatBalloon();
         else ChatBalloonManager.Instance.HideChatBalloon();
+    }
+
+    // 버튼용 VL Router Run 실행
+    public void HandleVlRouterRunButton()
+    {
+        // 입력 텍스트 확인
+        string input = inputField.text;
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            Debug.LogWarning("[VlRouterRun] 입력 텍스트가 비어있습니다.");
+            return;
+        }
+
+        GameManager.Instance.chatIdx += 1;
+        GameManager.Instance.chatIdxRegenerateCount = 0;
+        Debug.Log($"[VlRouterRun] 버튼 실행 - query: {input}, chatIdx={GameManager.Instance.chatIdx}");
+
+        // VL Router 실행
+        ApiVlRouterManager.Instance.ExecuteVlRouterRun(
+            query: input,
+            onEvent: (eventData) =>
+            {
+                string kind = (string)eventData["kind"] ?? "unknown";  // 이벤트 종류
+                string type = (string)eventData["type"] ?? "";  // 대화 응답 타입
+                string message = (string)eventData["message"] ?? "";  // 이벤트 메시지
+                Debug.Log($"[ChatHandler] Router Event: kind={kind}, type={type}, message={message}");
+
+                var data = eventData["data"];
+                if (data != null)
+                {
+                    Debug.Log($"[ChatHandler] Router Event data: {data.ToString()}");
+                }
+            },
+            onComplete: (success, errorMsg) =>
+            {
+                if (success)
+                {
+                    Debug.Log("[ChatHandler] VL Router 실행 완료");
+                }
+                else
+                {
+                    Debug.LogWarning($"[ChatHandler] VL Router 실패: {errorMsg}");
+                }
+            }
+        );
+
+        // 말풍선 없애기
+        if (subController != null)
+        {
+            subController.HideChatBalloon();
+        }
+        else
+        {
+            ChatBalloonManager.Instance.HideChatBalloon();
+        }
     }
 
     // 입력에 따라 수행할 작업을 정의하는 함수
