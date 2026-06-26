@@ -11,6 +11,11 @@ public class AIChatSession
     public string query_origin = "";         // 사용자 원문 발화
     public string query_trans = "";          // 번역된 사용자 발화
     public string ai_language_out = "en";   // 메모리에 저장할 언어
+    public string currentMemoryType = "conversation";  // 현재 응답 메모리 타입
+    public string latestIntentSmallTalkAnswer = "off";  // SmallTalk 연관 답변 여부
+    public string latestSmallTalkQuery = "";  // 저장할 SmallTalk 문장
+
+    public List<string> recommendedChoices = new List<string>(); // 추천 답변 목록
 
     public bool isResponsedStarted = false;   // 첫 응답 청크 수신 여부
     public bool isFirstBalloonShown = false;  // 첫 문장 말풍선 표시 여부 (GeminiDirect용)

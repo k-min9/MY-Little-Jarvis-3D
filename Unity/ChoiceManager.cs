@@ -139,7 +139,7 @@ public class ChoiceManager : MonoBehaviour
                     btnText.enableAutoSizing = true;
                     btnText.fontSizeMin = 20f;
                     btnText.fontSizeMax = 36f;
-                    btnText.alignment = TextAlignmentOptions.CenterGeoAligned; // 중앙 정렬 확실하게
+                    btnText.alignment = TextAlignmentOptions.Center;
                 }
                 else
                 {
@@ -150,7 +150,7 @@ public class ChoiceManager : MonoBehaviour
                     btnText.enableWordWrapping = false;
                     btnText.enableAutoSizing = false;
                     btnText.fontSize = 36f;
-                    btnText.alignment = TextAlignmentOptions.CenterGeoAligned;
+                    btnText.alignment = TextAlignmentOptions.Center;
                 }
             }
             else
@@ -185,6 +185,33 @@ public class ChoiceManager : MonoBehaviour
         // 시나리오 ID 기반으로 분기
         switch (curChoiceScenario)
         {
+            case "AI_CHOICE":
+                if (index < ChoiceData.Choices["AI_CHOICE"].Count)
+                {
+                    string text = ChoiceData.Choices["AI_CHOICE"][index]["ko"];
+                    // 선택 시 채팅 인덱스 증가 및 초기화
+                    GameManager.Instance.chatIdx++;
+                    GameManager.Instance.chatIdxRegenerateCount = 0;
+                    Debug.Log("추천 답변 선택 (" + GameManager.Instance.chatIdx.ToString() + ") : " + text);
+
+                    // 게임 모드 체크하여 적절한 API 호출
+                    if (MiniGame20QManager.Instance != null && MiniGame20QManager.Instance.Is20QMode())
+                    {
+                        // 스무고개 게임 모드
+                        MiniGame20QManager.Instance.SendQuestion(text);
+                    }
+                    else if (APIAroPlaManager.ShouldUseAroplaManager())
+                    {
+                        // 다중 캐릭터 대화 모드 (아로프라 채널 등)
+                        APIAroPlaManager.Instance.SendUserMessage(text);
+                    }
+                    else
+                    {
+                        // 기존 1:1 대화 모드
+                        APIManager.Instance.CallConversationStream(text, GameManager.Instance.chatIdx.ToString());
+                    }
+                }
+                break;
             case string s when s.StartsWith("A"): // Tutorial 시나리오
                 ScenarioTutorialManager.Instance.OnChoiceSelected(curChoiceScenario, index);
                 break;
@@ -196,15 +223,6 @@ public class ChoiceManager : MonoBehaviour
                 break;
             case string s when s.StartsWith("S"): // Ask Manager 시나리오
                 ScenarioAskManager.Instance.OnChoiceSelected(curChoiceScenario, index);
-                break;
-            case "AI_CHOICE":
-                if (index < ChoiceData.Choices["AI_CHOICE"].Count)
-                {
-                    string text = ChoiceData.Choices["AI_CHOICE"][index]["ko"];
-                    // 선택 시 채팅 인덱스 증가 및 서버 전송
-                    GameManager.Instance.chatIdx++;
-                    APIManager.Instance.CallConversationStream(text, GameManager.Instance.chatIdx.ToString());
-                }
                 break;
             default:
                 Debug.LogWarning($"Unknown scenario type: {curChoiceScenario}");
