@@ -108,6 +108,8 @@ public class SettingManager : MonoBehaviour
     [SerializeField] private Toggle includeCharInScreenshotToggle;
     [SerializeField] private Toggle includeUIInScreenshotToggle;
     [SerializeField] private Toggle isAskChangeToMultimodalToggle; // 이미지 첨부설정일 경우, 멀티모달 모델로 변경할지 질문
+    [SerializeField] private Toggle recommendChoiceToggle; // AI 추천 답변 기능
+    [SerializeField] private Toggle minimizeChoiceToggle; // AI 추천 답변 최소화 기능
 
     [Header("Dialogue Info")]
     [SerializeField] private Text aiInfoServerType;
@@ -217,7 +219,9 @@ public class SettingManager : MonoBehaviour
         public bool confirmUserIntent;
         public bool includeCharInScreenshot;
         public bool includeUIInScreenshot;
-        public bool isAskChangeToMultimodal;  // 멀티모달 지원하지 않는 모델일 때 변경 여부 물어보기
+        public bool isAskChangeToMultimodal = true;  // 멀티모달 지원하지 않는 모델일 때 변경 여부 물어보기
+        public bool recommend_choice = false;
+        public bool minimize_choice = true;
 
         // Dev용 데이터
         public bool isDevMode;
@@ -422,6 +426,8 @@ public class SettingManager : MonoBehaviour
     public void SetIncludeCharInScreenshot(bool value) { settings.includeCharInScreenshot = value; SaveSettings(); }
     public void SetIncludeUIInScreenshot(bool value) { settings.includeUIInScreenshot = value; SaveSettings(); }
     public void SetIsAskChangeToMultimodalToggle(bool value) { settings.isAskChangeToMultimodal = value; SaveSettings(); }
+    public void SetRecommendChoice(bool isOn) {settings.recommend_choice = isOn; SaveSettings(); }
+    public void SetMinimizeChoice(bool isOn) {settings.minimize_choice = isOn; SaveSettings();}
     public void SetAiLanguage() { int value=aiLangDropdown.value; settings.ai_language_idx = value; settings.ai_language=getAiLangFromIdx(value); SaveSettings(); }
     public async void SetAIEmotion() { int value=aiEmotionDropdown.value; value = await getAiEmotionFilterScenarioAsync(value); aiEmotionDropdown.value = value; settings.ai_emotion_idx = value; settings.ai_emotion = getONOFFTypeFromIdx(value); SaveSettings(); }
     public void SetAIThinkMode() { if (aiThinkModeDropdown != null) { int value=aiThinkModeDropdown.value; settings.ai_think_mode_idx = value; settings.ai_think_mode = getONOFFTypeFromIdx(value); SaveSettings(); } }
@@ -979,6 +985,7 @@ public class SettingManager : MonoBehaviour
             if (!chk) 
             {
                 // 안내했을 경우, 0(Auto)로 반환
+                Debug.Log($"[SettingManager] getServerTypeFilterScenarioAsync - Auto 강제 전환");
                 return 0;
             }
         }
@@ -1350,6 +1357,8 @@ public class SettingManager : MonoBehaviour
         includeCharInScreenshotToggle.SetIsOnWithoutNotify(settings.includeCharInScreenshot);
         includeUIInScreenshotToggle.SetIsOnWithoutNotify(settings.includeUIInScreenshot);
         isAskChangeToMultimodalToggle.SetIsOnWithoutNotify(settings.isAskChangeToMultimodal);
+        recommendChoiceToggle.SetIsOnWithoutNotify(settings.recommend_choice);
+        minimizeChoiceToggle.SetIsOnWithoutNotify(settings.minimize_choice);
         aiLangDropdown.value = settings.ai_language_idx;
         aiEmotionDropdown.value = settings.ai_emotion_idx;
         if (aiThinkModeDropdown != null) { aiThinkModeDropdown.value = settings.ai_think_mode_idx; }
@@ -1581,6 +1590,8 @@ public class SettingManager : MonoBehaviour
         settings.includeCharInScreenshot = false;
         settings.includeUIInScreenshot = false;
         settings.isAskChangeToMultimodal = true;
+        settings.recommend_choice = false;
+        settings.minimize_choice = true;
 
         settings.isDevHowling = false;
 
