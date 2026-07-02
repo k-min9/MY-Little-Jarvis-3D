@@ -54,6 +54,7 @@ public class OperatorManager : MonoBehaviour
         // 위치와 스케일 초기화
         portraitTransform.anchoredPosition = new Vector2(finalPos.x - width * 0.5f, finalPos.y);
         portraitTransform.localScale = new Vector3(0f, 1f, 1f);
+        portraitTransform.gameObject.SetActive(true);
 
         // 위치와 스케일 동시에 Tween
         Sequence seq = DOTween.Sequence();
@@ -83,6 +84,7 @@ public class OperatorManager : MonoBehaviour
         Sequence seq = DOTween.Sequence();
         seq.Append(portraitTransform.DOScaleX(0f, 0.4f).SetEase(Ease.InCubic));
         seq.Join(portraitTransform.DOAnchorPos(targetPos, 0.4f).SetEase(Ease.InCubic));
+        seq.OnComplete(() => portraitTransform.gameObject.SetActive(false));
     }
 
     // 현재 캐릭터의 public Getter 추가
