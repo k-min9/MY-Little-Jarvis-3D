@@ -120,6 +120,8 @@ public class UIPositionManager : MonoBehaviour
                 return canvas.transform.TransformPoint(new Vector3(0f, 100f, 0f)); // 중앙보다 위
             case "charChange":
                 return canvas.transform.TransformPoint(new Vector3(700f, 150f, 0f));
+            case "characterDetail":
+                return canvas.transform.TransformPoint(new Vector3(150f, 40f, 0f));
             case "charSummon":
                 return canvas.transform.TransformPoint(new Vector3(400f, -100f, 0f));
             case "chatHistory":
@@ -134,6 +136,18 @@ public class UIPositionManager : MonoBehaviour
                 return canvas.transform.TransformPoint(new Vector3(canvasRect.rect.width / 2 - 250f, canvasRect.rect.height / 2 - 200f, 0f));
             case "ocrAutoMapper":
                 return canvas.transform.TransformPoint(new Vector3(-300f, 0f, 0f));
+            case "pomodoro":
+                return canvas.transform.TransformPoint(new Vector3(250f, 50f, 0f));
+            case "alarm":
+                return canvas.transform.TransformPoint(new Vector3(300f, 0f, 0f));
+            case "skill":
+                return canvas.transform.TransformPoint(new Vector3(300f, 0f, 0f));
+            case "calendar":
+                return canvas.transform.TransformPoint(new Vector3(40f, 0f, 0f));
+            case "todolist":
+                return canvas.transform.TransformPoint(new Vector3(300f, 0f, 0f));
+            case "alarmmini":
+                return canvas.transform.TransformPoint(new Vector3(520f, 180f, 0f));
             case "choiceInput":
                 return GetCanvasPositionCenter(); // 중앙 배치
             default:
