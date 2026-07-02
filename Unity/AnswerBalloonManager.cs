@@ -266,4 +266,10 @@ public class AnswerBalloonManager : MonoBehaviour
     {
         webImage.SetActive(false);
     }
+
+    // AI Choice 닫힌 후 다시 열기 위한 함수
+    public void ShowAIChoicesAgain()
+    {
+        ChoiceManager.Instance.ShowLastAIChoices();
+    }
 }
